@@ -10,8 +10,9 @@ Encoding: UTF-8
 LazyData: true
 LinkingTo: Rcpp
 Imports: Rcpp,
-    ggplot2
+    ggplot2,
+    tools,
+    RSQLite
 RoxygenNote: 6.0.1
 Suggests: testthat,
-    magrittr,
-    RSQLite
+    magrittr
