@@ -17,4 +17,5 @@ Imports: Rcpp,
     stats,
     utils
 RoxygenNote: 6.0.1
-Suggests: testthat
+Suggests: testthat,
+    covr
