@@ -19,7 +19,7 @@ create_agency <- function(con) {
 update_agency <- function(object, file) {
     existing <- RSQLite::dbGetQuery(object$connection,
                            "SELECT agency_id FROM agency")
-    tbl <- read.csv(file, header = TRUE)    
+    tbl <- utils::read.csv(file, header = TRUE)    
     agency <- data.frame(agency_id = as.character(tbl$agency_id),
                          agency_name = tbl$agency_name,
                          agency_url = as.character(tbl$agency_url),

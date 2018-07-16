@@ -24,7 +24,7 @@ create_stop_times <- function(con) {
 update_stop_times <- function(object, file) {
     existing <- RSQLite::dbGetQuery(object$connection,
                            "SELECT trip_id || stop_id || stop_sequence FROM stop_times")
-    tbl <- read.csv(file, header = TRUE)
+    tbl <- utils::read.csv(file, header = TRUE)
     stop_times <- data.frame(trip_id = as.character(tbl$trip_id),
                              stop_id = as.character(tbl$stop_id),
                              stop_sequence = as.integer(tbl$stop_sequence),

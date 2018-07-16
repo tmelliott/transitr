@@ -4,12 +4,16 @@
 \alias{update.trgtfs}
 \title{Update GTFS data}
 \usage{
-\method{update}{trgtfs}(object, from)
+\method{update}{trgtfs}(object, from, quiet = FALSE, ...)
 }
 \arguments{
 \item{object}{the \code{trgtfs} database object to update}
 
 \item{from}{where the new data should come from}
+
+\item{quiet}{logical, if \code{TRUE} progress output will be suppressed}
+
+\item{...}{additional arguments, ignored}
 }
 \value{
 a \code{trgtfs} object (with updated data)
@@ -20,11 +24,11 @@ Update a GTFS database object with new data.
 \details{
 The data is expected to consist of a series of GTFS text/csv files,
 and can be specified as either
-\begin{itemize}
-  \item a URL to zipped GTFS data
-  \item a path to a zipped GTFS file
-  \item a path to a GTFS directory of text files
-\end{itemize}
+\itemize{
+  \item{}{a URL to zipped GTFS data}
+  \item{}{a path to a zipped GTFS file}
+  \item{}{a path to a GTFS directory of text files}
+}
 }
 \author{
 Tom Elliott

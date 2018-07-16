@@ -12,7 +12,9 @@ LinkingTo: Rcpp
 Imports: Rcpp,
     ggplot2,
     tools,
-    RSQLite
+    RSQLite,
+    magrittr,
+    stats,
+    utils
 RoxygenNote: 6.0.1
-Suggests: testthat,
-    magrittr
+Suggests: testthat

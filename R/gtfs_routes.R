@@ -20,7 +20,7 @@ create_routes <- function(con) {
 update_routes <- function(object, file) {
     existing <- RSQLite::dbGetQuery(object$connection,
                            "SELECT route_id FROM routes")
-    tbl <- read.csv(file, header = TRUE)
+    tbl <- utils::read.csv(file, header = TRUE)
     routes <- data.frame(route_id = as.character(tbl$route_id),
                          route_short_name = as.character(tbl$route_short_name),
                          route_long_name = as.character(tbl$route_long_name),

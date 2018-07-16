@@ -25,7 +25,7 @@ create_calendar <- function(con) {
 update_calendar <- function(object, file) {
     existing <- RSQLite::dbGetQuery(object$connection,
                            "SELECT service_id FROM calendar")
-    tbl <- read.csv(file, header = TRUE)
+    tbl <- utils::read.csv(file, header = TRUE)
     calendar <- data.frame(service_id = as.character(tbl$service_id),
                            monday = as.integer(tbl$monday),
                            tuesday = as.integer(tbl$tuesday),

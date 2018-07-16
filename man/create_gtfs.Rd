@@ -4,12 +4,14 @@
 \alias{create_gtfs}
 \title{Create GTFS database}
 \usage{
-create_gtfs(from, to = tempfile())
+create_gtfs(from, to = tempfile(), quiet = FALSE)
 }
 \arguments{
 \item{from}{where the GTFS data comes from}
 
 \item{to}{where the GTFS data is going to be stored}
+
+\item{quiet}{logical, if \code{TRUE} progress output will be suppressed}
 }
 \value{
 a \code{trgtfs} object

@@ -22,7 +22,7 @@ create_trips <- function(con) {
 update_trips <- function(object, file) {
     existing <- RSQLite::dbGetQuery(object$connection,
                            "SELECT trip_id FROM trips")
-    tbl <- read.csv(file, header = TRUE)
+    tbl <- utils::read.csv(file, header = TRUE)
     trips <- data.frame(trip_id = as.character(tbl$trip_id),
                         route_id = as.character(tbl$route_id),
                         shape_id = as.character(tbl$shape_id),

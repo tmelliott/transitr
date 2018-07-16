@@ -21,7 +21,7 @@ create_shapes <- function(con) {
 update_shapes <- function(object, file) {
     existing <- RSQLite::dbGetQuery(object$connection,
                            "SELECT shape_id FROM shapes")
-    tbl <- read.csv(file, header = TRUE)
+    tbl <- utils::read.csv(file, header = TRUE)
     shapes <- data.frame(shape_id = as.character(tbl$shape_id),
                          shape_pt_lat = as.numeric(tbl$shape_pt_lat),
                          shape_pt_lon = as.numeric(tbl$shape_pt_lon),

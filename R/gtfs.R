@@ -5,10 +5,12 @@
 ##' @title Create GTFS database
 ##' @param from where the GTFS data comes from
 ##' @param to where the GTFS data is going to be stored
+##' @param quiet logical, if \code{TRUE} progress output will be suppressed
 ##' @return a \code{trgtfs} object
 ##' @author Tom Elliott
+##' @importFrom stats update
 ##' @export
-create_gtfs <- function(from, to = tempfile()) {
+create_gtfs <- function(from, to = tempfile(), quiet = FALSE) {
     if (!requireNamespace("RSQLite", quietly = TRUE)) {
         stop("Please install the `RSQLite` package first,\n",
              "  or connect to a database manually and use `load_gtfs` instead.")
@@ -17,7 +19,7 @@ create_gtfs <- function(from, to = tempfile()) {
     create_tables(con)
     nw <- load_gtfs(con)
     if (!missing(from)) {
-        update(nw, from)
+        update(nw, from, quiet = quiet)
     }
     nw
 }
@@ -54,55 +56,55 @@ load_gtfs <- function(con) {
 ##'
 ##' The data is expected to consist of a series of GTFS text/csv files,
 ##' and can be specified as either
-##' \begin{itemize}
-##'   \item a URL to zipped GTFS data
-##'   \item a path to a zipped GTFS file
-##'   \item a path to a GTFS directory of text files
-##' \end{itemize}
+##' \itemize{
+##'   \item{}{a URL to zipped GTFS data}
+##'   \item{}{a path to a zipped GTFS file}
+##'   \item{}{a path to a GTFS directory of text files}
+##' }
 ##' @title Update GTFS data
 ##' @param object the \code{trgtfs} database object to update
 ##' @param from where the new data should come from
+##' @param quiet logical, if \code{TRUE} progress output will be suppressed
+##' @param ... additional arguments, ignored
 ##' @return a \code{trgtfs} object (with updated data)
 ##' @author Tom Elliott
 ##' @export
-update.trgtfs <- function(object, from) {
+update.trgtfs <- function(object, from, quiet = FALSE, ...) {
     if (dir.exists(from)) {
-        cat("Create from directory\n")
         fn <- "dir"
     } else if (file.exists(from)) {
-        cat("Create from ZIP\n")
         fn <- "zip"
     } else {
-        cat("Create from URL\n")
         fn <- "url"
     }
 
     ## Create a function call e.g., `.update_url(object, from)`
-    eval(parse(text = sprintf(".update_%s", fn)))(object, from)
+    eval(parse(text = sprintf(".update_%s", fn)))(object, from, quiet)
 }
 
 ### Update methods for various types of data location
-.update_dir <- function(object, dir) {
+.update_dir <- function(object, dir, quiet) {
     lapply(list.files(dir, full.names = TRUE), function(file) {
         table <- get_table_name(file)
         if (check_valid_table(table)) {
+            if (!quiet) cat(" * creating", file, "\n")
             update_table(object, table, file)
         } else {
-            cat("Skipping", file, "\n")
+            if (!quiet) cat(" * skipping", file, "\n")
         }
     })
 }
 
-.update_zip <- function(object, file) {
+.update_zip <- function(object, file, quiet) {
     d <- file.path(tempdir(), "data")
-    unzip(file, exdir = d)
-    .update_dir(object, d)
+    utils::unzip(file, exdir = d)
+    .update_dir(object, d, quiet)
 }
 
-.update_url <- function(object, url) {
+.update_url <- function(object, url, quiet) {
     f <- tempfile(fileext = ".zip")
-    download.file(url, f)
-    .update_zip(object, f)
+    utils::download.file(url, f, quiet = quiet)
+    .update_zip(object, f, quiet)
 }
 
 ### Update methods for different tables
