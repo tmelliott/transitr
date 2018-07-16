@@ -1,33 +1,54 @@
-create_routes <- function(object) {
-    con <- object$connection
-    if (RSQLite::dbExistsTable(con, "routes")) {
-        stop("Routes table already exists")
+create_calendar <- function(con) {
+    if (RSQLite::dbExistsTable(con, "calendar")) {
+        stop("Calendar table already exists")
     }
 
-    res <- dbSendQuery(
+    res <- RSQLite::dbSendQuery(
         con,
         paste_nl(
-            "CREATE TABLE routes (",
-            "  route_id TEXT PRIMARY KEY,",
-            "  route_short_name TEXT,",
-            "  route_long_name TEXT,",
-            "  route_type INTEGER,",
-            "  agency_id TEXT,",
+            "CREATE TABLE calendar (",
+            "  service_id TEXT PRIMARY KEY,",
+            "  monday INTEGER,",
+            "  tuesday INTEGER,",
+            "  wednesday INTEGER,",
+            "  thursday INTEGER,",
+            "  friday INTEGER,",
+            "  saturday INTEGER,",
+            "  sunday INTEGER,",
+            "  start_date TEXT,",
+            "  end_date TEXT,",
             "  version DOUBLE",
             ")"))
-    dbClearResult(res)
+    RSQLite::dbClearResult(res)
 }
 
-update_routes <- function(object, file) {
-    existing <- dbGetQuery(object$connection,
-                           "SELECT route_id FROM routes")
+update_calendar <- function(object, file) {
+    existing <- RSQLite::dbGetQuery(object$connection,
+                           "SELECT service_id FROM calendar")
     tbl <- read.csv(file, header = TRUE)
-    routes <- data.frame(route_id = as.character(tbl$route_id),
-                         route_short_name = as.character(tbl$route_short_name),
-                         route_long_name = as.character(tbl$route_long_name),
-                         route_type = as.integer(tbl$route_type),
-                         agency_id = as.character(tbl$agency_id),
-                         version = as.numeric(gsub(".+_v", "", tbl$route_id)))
-    routes <- routes[!routes$route_id %in% existing, ]
-    dbWriteTable(object$connection, "routes", routes, append = TRUE)
+    calendar <- data.frame(service_id = as.character(tbl$service_id),
+                           monday = as.integer(tbl$monday),
+                           tuesday = as.integer(tbl$tuesday),
+                           wednesday = as.integer(tbl$wednesday),
+                           thursday = as.integer(tbl$thursday),
+                           friday = as.integer(tbl$friday),
+                           saturday = as.integer(tbl$saturday),
+                           sunday = as.integer(tbl$sunday),
+                           version = as.numeric(gsub(".+_v", "", tbl$service_id)))
+    calendar <- calendar[!calendar$service_id %in% existing, ]
+    RSQLite::dbWriteTable(object$connection, "calendar", calendar, append = TRUE)
+}
+
+check_calendar <- function(con) {
+    identical(RSQLite::dbGetQuery(con, "PRAGMA table_info(calendar)"),
+              data.frame(cid = 0:10,
+                         name = c("service_id", "monday", "tuesday", "wednesday",
+                                  "thursday", "friday", "saturday", "sunday",
+                                  "start_date", "end_date", "version"),
+                         type = c("TEXT", "INTEGER", "INTEGER", "INTEGER", "INTEGER",
+                                  "INTEGER", "INTEGER", "INTEGER", "TEXT", "TEXT",
+                                  "DOUBLE"),
+                         notnull = 0L, dflt_value = as.logical(NA),
+                         pk = c(1L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L),
+                         stringsAsFactors = FALSE))
 }

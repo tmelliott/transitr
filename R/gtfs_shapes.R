@@ -1,10 +1,9 @@
-create_shapes <- function(object) {
-    con <- object$connection
+create_shapes <- function(con) {
     if (RSQLite::dbExistsTable(con, "shapes")) {
         stop("Shapes table already exists")
     }
 
-    res <- dbSendQuery(
+    res <- RSQLite::dbSendQuery(
         con,
         paste_nl(
             "CREATE TABLE shapes (",
@@ -16,11 +15,11 @@ create_shapes <- function(object) {
             "  version DOUBLE,",
             "  PRIMARY KEY (shape_id, shape_pt_sequence)",
             ")"))
-    dbClearResult(res)
+    RSQLite::dbClearResult(res)
 }
 
 update_shapes <- function(object, file) {
-    existing <- dbGetQuery(object$connection,
+    existing <- RSQLite::dbGetQuery(object$connection,
                            "SELECT shape_id FROM shapes")
     tbl <- read.csv(file, header = TRUE)
     shapes <- data.frame(shape_id = as.character(tbl$shape_id),
@@ -30,5 +29,17 @@ update_shapes <- function(object, file) {
                          shape_dist_traveled = as.double(tbl$shape_dist_traveled),
                          version = as.numeric(gsub(".+_v", "", tbl$shape_id)))
     shapes <- shapes[!shapes$shape_id %in% existing, ]
-    dbWriteTable(object$connection, "shapes", shapes, append = TRUE)
+    RSQLite::dbWriteTable(object$connection, "shapes", shapes, append = TRUE)
+}
+
+check_shapes <- function(con) {
+    identical(RSQLite::dbGetQuery(con, "PRAGMA table_info(shapes)"),
+              data.frame(cid = 0:5,
+                         name = c("shape_id", "shape_pt_lat", "shape_pt_lon",
+                                  "shape_pt_sequence", "shape_dist_traveled", "version"),
+                         type = c("TEXT", "DOUBLE", "DOUBLE", "INTEGER",
+                                  "DOUBLE", "DOUBLE"),
+                         notnull = 0L, dflt_value = as.logical(NA),
+                         pk = c(1L, 0L, 0L, 2L, 0L, 0L),
+                         stringsAsFactors = FALSE))
 }

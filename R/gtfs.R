@@ -13,7 +13,7 @@ create_gtfs <- function(from, to = tempfile()) {
         stop("Please install the `RSQLite` package first,\n",
              "  or connect to a database manually and use `load_gtfs` instead.")
     }
-    con <- RSQLite::dbConnect(SQLite(), to)
+    con <- RSQLite::dbConnect(RSQLite::SQLite(), to)
     create_tables(con)
     nw <- load_gtfs(con)
     if (!missing(from)) {
@@ -28,6 +28,13 @@ create_tables <- function(con) {
     })
 }
 
+check_tables <- function(con) {
+    res <- sapply(gtfs_tables(), function(tbl) {
+        eval(parse(text = sprintf("check_%s", tbl)))(con)
+    })
+    all(res)
+}
+
 ##' Load an existing GTFS database into R for use with transitr.
 ##'
 ##' @title Load GTFS database
@@ -36,7 +43,9 @@ create_tables <- function(con) {
 ##' @author Tom Elliott
 ##' @export
 load_gtfs <- function(con) {
-    check_tables(con)
+    if (!check_tables(con)) {
+        stop("Oops, some of the tables aren't right...")
+    }
     structure(list(connection = con),
               class = "trgtfs")
 }
@@ -109,7 +118,7 @@ get_table_name <- function(file) {
         warning("Unrecognised extension: ",
                 "transitr only knows how to handle txt and csv files")
     }
-    tools::file_name_sans_ext(basename(f))
+    tools::file_path_sans_ext(basename(file))
 }
 
 gtfs_tables <- function() {

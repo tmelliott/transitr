@@ -4,7 +4,6 @@ library(RSQLite)
 test_that("database created successfully", {
     nw <- create_gtfs()
     expect_is(nw, "trgtfs")
-
     dbDisconnect(nw$connection)
 })
 
@@ -29,9 +28,11 @@ test_that("database updates from directory", {
 })
 
 test_that("database updates from a zip file", {
-    expect_equal(nw, create_gtfs(fzip))
+    expect_identical(nw, create_gtfs(fzip))
 })
 
 test_that("database updates from a URL (remote ZIP file)", {
-    expect_equal(nw, create_gtfs(url))
+    expect_identical(nw, create_gtfs(url))
 })
+
+dbDisconnect(nw$connection)

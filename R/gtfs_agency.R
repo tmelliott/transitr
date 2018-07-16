@@ -3,7 +3,7 @@ create_agency <- function(con) {
         stop("Agency table already exists")
     }
 
-    res <- dbSendQuery(con,
+    res <- RSQLite::dbSendQuery(con,
                paste_nl(
                    "CREATE TABLE agency (",
                    "  agency_id TEXT PRIMARY KEY,",
@@ -13,11 +13,11 @@ create_agency <- function(con) {
                    "  agency_timezone TEXT,",
                    "  agency_lang TEXT",
                    ")"))
-    dbClearResult(res)
+    RSQLite::dbClearResult(res)
 }
 
 update_agency <- function(object, file) {
-    existing <- dbGetQuery(object$connection,
+    existing <- RSQLite::dbGetQuery(object$connection,
                            "SELECT agency_id FROM agency")
     tbl <- read.csv(file, header = TRUE)    
     agency <- data.frame(agency_id = as.character(tbl$agency_id),
@@ -28,5 +28,15 @@ update_agency <- function(object, file) {
                          agency_timezone = as.character(tbl$agency_timezone),
                          stringsAsFactors = FALSE)
     agency <- agency[!agency$agency_id %in% existing, ]
-    dbWriteTable(object$connection, "agency", agency, append = TRUE)
+    RSQLite::dbWriteTable(object$connection, "agency", agency, append = TRUE)
+}
+
+check_agency <- function(con) {
+    identical(RSQLite::dbGetQuery(con, "PRAGMA table_info(agency)"),
+              data.frame(cid = 0:5,
+                         name = c("agency_id", "agency_name", "agency_url",
+                                  "agency_phone", "agency_timezone", "agency_lang"),
+                         type = "TEXT", notnull = 0L, dflt_value = as.logical(NA),
+                         pk = c(1L, 0L, 0L, 0L, 0L, 0L),
+                         stringsAsFactors = FALSE))
 }

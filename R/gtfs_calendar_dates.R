@@ -1,33 +1,40 @@
-create_routes <- function(object) {
-    con <- object$connection
-    if (RSQLite::dbExistsTable(con, "routes")) {
-        stop("Routes table already exists")
+create_calendar_dates <- function(con) {
+    if (RSQLite::dbExistsTable(con, "calendar_dates")) {
+        stop("Calendar_Dates table already exists")
     }
 
-    res <- dbSendQuery(
+    res <- RSQLite::dbSendQuery(
         con,
         paste_nl(
-            "CREATE TABLE routes (",
-            "  route_id TEXT PRIMARY KEY,",
-            "  route_short_name TEXT,",
-            "  route_long_name TEXT,",
-            "  route_type INTEGER,",
-            "  agency_id TEXT,",
-            "  version DOUBLE",
+            "CREATE TABLE calendar_dates (",
+            "  service_id TEXT,",
+            "  date TEXT,",
+            "  exception_type INTEGER,",
+            "  PRIMARY KEY (service_id, date)",
             ")"))
-    dbClearResult(res)
+    RSQLite::dbClearResult(res)
 }
 
-update_routes <- function(object, file) {
-    existing <- dbGetQuery(object$connection,
-                           "SELECT route_id FROM routes")
+update_calendar_dates <- function(object, file) {
+    existing <- RSQLite::dbGetQuery(object$connection,
+                           "SELECT service_id || date FROM calendar_dates")
     tbl <- read.csv(file, header = TRUE)
-    routes <- data.frame(route_id = as.character(tbl$route_id),
-                         route_short_name = as.character(tbl$route_short_name),
-                         route_long_name = as.character(tbl$route_long_name),
-                         route_type = as.integer(tbl$route_type),
-                         agency_id = as.character(tbl$agency_id),
-                         version = as.numeric(gsub(".+_v", "", tbl$route_id)))
-    routes <- routes[!routes$route_id %in% existing, ]
-    dbWriteTable(object$connection, "routes", routes, append = TRUE)
+    calendar_dates <- data.frame(service_id = as.character(tbl$service_id),
+                                 date = as.character(tbl$date),
+                                 exception_type = as.integer(tbl$exception_type))
+    calendar_dates <-
+        calendar_dates[
+            !paste0(calendar_dates$service_id, calendar_dates$date) %in% existing, ]
+    RSQLite::dbWriteTable(object$connection, "calendar_dates",
+                          calendar_dates, append = TRUE)
+}
+
+check_calendar_dates <- function(con) {
+    identical(RSQLite::dbGetQuery(con, "PRAGMA table_info(calendar_dates)"),
+              data.frame(cid = 0:2,
+                         name = c("service_id", "date", "exception_type"),
+                         type = c("TEXT", "TEXT", "INTEGER"),
+                         notnull = 0L, dflt_value = as.logical(NA),
+                         pk = c(1L, 2L, 0L),
+                         stringsAsFactors = FALSE))
 }

@@ -1,10 +1,9 @@
-create_stop_times <- function(object) {
-    con <- object$connection
+create_stop_times <- function(con) {
     if (RSQLite::dbExistsTable(con, "stop_times")) {
         stop("Stop_Times table already exists")
     }
 
-    res <- dbSendQuery(
+    res <- RSQLite::dbSendQuery(
         con,
         paste_nl(
             "CREATE TABLE stop_times (",
@@ -19,11 +18,11 @@ create_stop_times <- function(object) {
             "  shape_dist_traveled DOUBLE,",
             "  PRIMARY KEY (trip_id, stop_id, stop_sequence)",
             ")"))
-    dbClearResult(res)
+    RSQLite::dbClearResult(res)
 }
 
 update_stop_times <- function(object, file) {
-    existing <- dbGetQuery(object$connection,
+    existing <- RSQLite::dbGetQuery(object$connection,
                            "SELECT trip_id || stop_id || stop_sequence FROM stop_times")
     tbl <- read.csv(file, header = TRUE)
     stop_times <- data.frame(trip_id = as.character(tbl$trip_id),
@@ -40,5 +39,18 @@ update_stop_times <- function(object, file) {
         stop_times[
             !paste0(stop_times$trip_id, stop_times$stop_id,
                     stop_times$stop_sequence) %in% existing, ]
-    dbWriteTable(object$connection, "stop_times", stop_times, append = TRUE)
+    RSQLite::dbWriteTable(object$connection, "stop_times", stop_times, append = TRUE)
+}
+
+check_stop_times <- function(con) {
+    identical(RSQLite::dbGetQuery(con, "PRAGMA table_info(stop_times)"),
+              data.frame(cid = 0:8,
+                         name = c("trip_id", "stop_id", "stop_sequence", "arrival_time",
+                                  "departure_time", "stop_headsign", "pickup_type",
+                                  "drop_off_type", "shape_dist_traveled"),
+                         type = c("TEXT", "TEXT", "INTEGER", "TEXT", "TEXT", "TEXT",
+                                  "INTEGER", "INTEGER", "DOUBLE"),
+                         notnull = 0L, dflt_value = as.logical(NA),
+                         pk = c(1L, 2L, 3L, 0L, 0L, 0L, 0L, 0L, 0L),
+                         stringsAsFactors = FALSE))
 }
