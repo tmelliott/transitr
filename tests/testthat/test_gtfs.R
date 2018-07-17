@@ -1,7 +1,6 @@
 context("Create and Load GTFS database")
 library(RSQLite)
 
-
 tmpdb <- NULL
 test_that("database created successfully", {
     nw <- create_gtfs()
@@ -11,17 +10,18 @@ test_that("database created successfully", {
 })
 
 test_that("database loaded successfully", {
-    con <- RSQLite::dbConnect(SQLite(), tmpdb)
+    con <- dbConnect(SQLite(), tmpdb)
     nw <- load_gtfs(con)
     expect_is(nw, "trgtfs")
-    RSQLite::dbDisconnect(con)
-    con <- RSQLite::dbConnect(SQLite(), tempfile())
+    dbDisconnect(con)
+    con <- dbConnect(SQLite(), tempfile())
     expect_error(load_gtfs(con))
-    RSQLite::dbDisconnect(con)
+    dbDisconnect(con)
 })
 
+
 test_that("duplicate tables are detected", {
-    con <- RSQLite::dbConnect(SQLite(), tmpdb)
+    con <- dbConnect(SQLite(), tmpdb)
     expect_error(create_agency(con))
     expect_error(create_routes(con))
     expect_error(create_trips(con))
@@ -31,13 +31,13 @@ test_that("duplicate tables are detected", {
     expect_error(create_calendar(con))
     expect_error(create_calendar_dates(con))
     expect_error(create_versions(con))
-    RSQLite::dbDisconnect(con)
+    dbDisconnect(con)
 })
 
 
 test_that("version API works", {
     if (Sys.getenv('APIKEY') == "") skip()
-    con <- RSQLite::dbConnect(SQLite(), tmpdb)
+    con <- dbConnect(SQLite(), tmpdb)
 
     nw <- load_gtfs(con) %>%
         version_api("https://api.at.govt.nz/v2/gtfs/versions")
@@ -50,7 +50,7 @@ test_that("version API works", {
     expect_true(has_version_api(nw))
     expect_output(update_versions(nw), "Versions updated")
 
-    RSQLite::dbDisconnect(con)
+    dbDisconnect(con)
 
     expect_error(send(1))
 })
