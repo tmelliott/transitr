@@ -30,7 +30,29 @@ test_that("duplicate tables are detected", {
     expect_error(create_stop_times(con))
     expect_error(create_calendar(con))
     expect_error(create_calendar_dates(con))
+    expect_error(create_versions(con))
     RSQLite::dbDisconnect(con)
+})
+
+
+test_that("version API works", {
+    if (Sys.getenv('APIKEY') == "") skip()
+    con <- RSQLite::dbConnect(SQLite(), tmpdb)
+
+    nw <- load_gtfs(con) %>%
+        version_api("https://api.at.govt.nz/v2/gtfs/versions")
+    expect_warning(update_versions(nw))
+    
+    nw <- load_gtfs(con) %>%
+        version_api("https://api.at.govt.nz/v2/gtfs/versions",
+                    headers =
+                        list('Ocp-Apim-Subscription-Key' = Sys.getenv('APIKEY')))
+    expect_true(has_version_api(nw))
+    expect_output(update_versions(nw), "Versions updated")
+
+    RSQLite::dbDisconnect(con)
+
+    expect_error(send(1))
 })
 
 

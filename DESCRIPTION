@@ -15,7 +15,9 @@ Imports: Rcpp,
     RSQLite,
     magrittr,
     stats,
-    utils
+    utils,
+    httr,
+    jsonlite
 RoxygenNote: 6.0.1
 Suggests: testthat,
     covr

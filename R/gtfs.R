@@ -28,6 +28,7 @@ create_tables <- function(con) {
     lapply(gtfs_tables(), function(tbl) {
         eval(parse(text = sprintf("create_%s", tbl)))(con)
     })
+    create_versions(con)
 }
 
 check_tables <- function(con) {
@@ -48,7 +49,8 @@ load_gtfs <- function(con) {
     if (!check_tables(con)) {
         stop("Oops, some of the tables aren't right...")
     }
-    structure(list(connection = con),
+    structure(list(connection = con,
+                   apis = list()),
               class = "trgtfs")
 }
 
@@ -80,6 +82,7 @@ update.trgtfs <- function(object, from, quiet = FALSE, ...) {
 
     ## Create a function call e.g., `.update_url(object, from)`
     eval(parse(text = sprintf(".update_%s", fn)))(object, from, quiet)
+    update_versions(object)
 }
 
 ### Update methods for various types of data location
@@ -130,4 +133,8 @@ gtfs_tables <- function() {
 
 check_valid_table <- function(name) {
     name %in% gtfs_tables()
+}
+
+has_version_api <- function(object) {
+    !is.null(object$apis$version)
 }
