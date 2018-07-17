@@ -8,7 +8,8 @@
 ##' @export
 construct <- function(nw) {
     shapes <- load_shapes(nw)
-    
+    create_network_tables(nw$connection)
+    construct_network(nw, shapes)
 }
 
 load_shapes <- function(nw) {
@@ -18,14 +19,50 @@ load_shapes <- function(nw) {
     shapes <- RSQLite::dbGetQuery(
         nw$connection,
         glue::glue(
-            "SELECT `shape_id`, `shape_pt_sequence`, `shape_pt_lat`, `shape_pt_lon`
+            "SELECT `shape_id`, `shape_pt_lat`, `shape_pt_lon`, `shape_pt_sequence`
                FROM `shapes` {where}")
     )
+    shapes$shape_id <- factor(shapes$shape_id)
 
     shapes_df_to_list(shapes)
 }
 
-shapes_df_to_list <- function(shapes) {
-    lapply(shapes$shape_id,
-           function(x) shapes[shapes$shape_id == x, ])
+create_network_tables <- function(con) {
+    if (RSQLite::dbExistsTable(con, "road_segments") ||
+        RSQLite::dbExistsTable(con, "intersections") ||
+        RSQLite::dbExistsTable(con, "trip_segments")) {
+        stop("Database already has network tables")
+    }
+    
+    res <- RSQLite::dbSendQuery(
+        con,
+        paste_nl(
+            "CREATE TABLE road_segments (",
+            "  road_segment_id INTEGER PRIMARY KEY,",
+            "  int_from INTEGER,",
+            "  int_to INTEGER,",
+            "  length DOUBLE",
+            ")"))
+    RSQLite::dbClearResult(res)
+        
+    res <- RSQLite::dbSendQuery(
+        con,
+        paste_nl(
+            "CREATE TABLE intersections (",
+            "  intersection_id INTEGER PRIMARY KEY,",
+            "  intersection_lat DOUBLE,",
+            "  intersection_lon DOUBLE",
+            ")"))
+    RSQLite::dbClearResult(res)
+        
+    res <- RSQLite::dbSendQuery(
+        con,
+        paste_nl(
+            "CREATE TABLE trip_segments (",
+            "  trip_id TEXT,",
+            "  road_segment_id INTEGER,",
+            "  trip_road_sequence INTEGER,",
+            "  distance_traveled DOUBLE",
+            ")"))
+    RSQLite::dbClearResult(res)
 }
