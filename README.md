@@ -1,6 +1,7 @@
 # transitr
 
 [![Travis build status](https://travis-ci.org/tmelliott/transitr.svg?branch=develop)](https://travis-ci.org/tmelliott/transitr)
+[![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/github/tmelliott/transitr?branch=develop&svg=true)](https://ci.appveyor.com/project/tmelliott/transitr)
 [![codecov](https://codecov.io/gh/tmelliott/transitr/branch/develop/graph/badge.svg)](https://codecov.io/gh/tmelliott/transitr)
 
 The goals of `transitr` are to make it easy to __load GTFS data__ into a database,
