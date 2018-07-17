@@ -2,3 +2,4 @@
 .env
 ^appveyor\.yml$
 ^data-raw$
+^tmp$

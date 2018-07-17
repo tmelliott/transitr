@@ -1,4 +1,3 @@
-// [[Rcpp::depends(BH)]]
 // [[Rcpp::plugins("cpp11")]]
 
 #include <vector>
@@ -11,6 +10,7 @@
 #include <boost/geometry/geometries/box.hpp>
 #include <boost/geometry/index/rtree.hpp>
 
+/**
 #include <sqlite3.h>
 
 #include <chrono>
@@ -36,6 +36,7 @@ int closest_node (Node& reference_node, std::vector<Node>* existing_nodes);
 int add_node (std::vector<Node>* nodes, Node& node);
 int add_edge (std::vector<Edge>* edges, int n1, int n2);
 node_t project_point (node_t n, edge_t e);
+
 
 // [[Rcpp::export]]
 List construct_network (List nw, List shapes)
@@ -301,3 +302,5 @@ node_t project_point (node_t n, edge_t e)
 {
   return n;
 }
+
+**/

@@ -3,18 +3,18 @@ sudo: false
 cache: packages
 
 r:
- - release
- - devel
+  - release
+  - devel
 
-addons:
-  apt:
-    update: true
-    sources:
-     - sourceline: 'ppa:mhier/libboost-latest'
-     - ubuntu-toolchain-r-test
-    packages:
-     - g++-6
-     - boost1.67
+# addons:
+#   apt:
+#     update: true
+#     sources:
+#      - sourceline: 'ppa:mhier/libboost-latest'
+#      - ubuntu-toolchain-r-test
+#     packages:
+#      - g++-6
+#      - boost1.67
 
 after_success:
- - Rscript -e 'covr::codecov()'
+  - Rscript -e 'covr::codecov()'

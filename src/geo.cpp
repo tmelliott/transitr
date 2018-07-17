@@ -1,3 +1,5 @@
+// [[Rcpp::plugins(cpp11)]]
+
 #include <Rcpp.h>
 #include <math.h>
 #include <cmath> 
@@ -53,7 +55,7 @@ double crossTrackDistance (double latd, double lond, double latp1d, double lonp1
 {
   double d13, t13, t12;
   d13 = distanceEarth (latp1d, lonp1d, latd, lond);
-  double d12 = distanceEarth (latp1d, lonp1d, latp2d, lonp2d);
+  // double d12 = distanceEarth (latp1d, lonp1d, latp2d, lonp2d);
 
   t13 = deg2rad (bearing (latp1d, lonp1d, latd, lond));
   t12 = deg2rad (bearing (latp1d, lonp1d, latp2d, lonp2d));
@@ -71,7 +73,7 @@ double alongTrackDistance (double latd, double lond, double latp1d, double lonp1
 
 Node destinationPoint (std::pair<double,double> start, double theta, double distance)
 {
-  double phi, lambda, d, phi2, lambda2;
+  double phi, lambda, phi2, lambda2;
   phi = deg2rad (std::get<1> (start));
   lambda = deg2rad (std::get<0> (start));
 

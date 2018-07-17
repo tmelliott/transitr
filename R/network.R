@@ -9,7 +9,7 @@
 construct <- function(nw) {
     shapes <- load_shapes(nw)
     create_network_tables(nw$connection)
-    construct_network(nw, shapes)
+    # construct_network(nw, shapes)
 }
 
 load_shapes <- function(nw) {
@@ -24,7 +24,7 @@ load_shapes <- function(nw) {
     )
     shapes$shape_id <- factor(shapes$shape_id)
 
-    shapes_df_to_list(shapes)
+    # shapes_df_to_list(shapes)
 }
 
 create_network_tables <- function(con) {

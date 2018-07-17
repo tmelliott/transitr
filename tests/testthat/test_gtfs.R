@@ -36,7 +36,7 @@ test_that("duplicate tables are detected", {
 
 
 test_that("version API works", {
-    if (Sys.getenv('APIKEY') == "") skip()
+    if (Sys.getenv('APIKEY') == "") skip("No API key")
     con <- dbConnect(SQLite(), tmpdb)
 
     nw <- load_gtfs(con) %>%

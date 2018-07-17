@@ -5,18 +5,6 @@
 
 using namespace Rcpp;
 
-// construct_network
-List construct_network(List nw, List shapes);
-RcppExport SEXP _transitr_construct_network(SEXP nwSEXP, SEXP shapesSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< List >::type nw(nwSEXP);
-    Rcpp::traits::input_parameter< List >::type shapes(shapesSEXP);
-    rcpp_result_gen = Rcpp::wrap(construct_network(nw, shapes));
-    return rcpp_result_gen;
-END_RCPP
-}
 // shapes_df_to_list
 List shapes_df_to_list(DataFrame x);
 RcppExport SEXP _transitr_shapes_df_to_list(SEXP xSEXP) {
@@ -30,7 +18,6 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_transitr_construct_network", (DL_FUNC) &_transitr_construct_network, 2},
     {"_transitr_shapes_df_to_list", (DL_FUNC) &_transitr_shapes_df_to_list, 1},
     {NULL, NULL, 0}
 };
