@@ -24,3 +24,8 @@ load_shapes <- function(nw) {
 
     shapes_df_to_list(shapes)
 }
+
+shapes_df_to_list <- function(shapes) {
+    lapply(shapes$shape_id,
+           function(x) shapes[shapes$shape_id == x, ])
+}

@@ -5,5 +5,5 @@ nw <- create_gtfs(system.file("extdata", "auckland_gtfs.zip", package = "transit
                   quiet = TRUE)
 
 test_that("network gets constructed correctly", {
-    expect_is(get_shapes(nw), "data.frame")
+    expect_is(load_shapes(nw), "list")
 })
