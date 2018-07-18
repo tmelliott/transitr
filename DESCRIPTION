@@ -4,13 +4,17 @@ Version: 0.0.0.9000
 Authors@R: person("Tom", "Elliott", email = "tom.elliott@auckland.ac.nz",
                   role = c("aut", "cre"))
 Description: GTFS is an API specification used globally for transit data, including realtime vehicle locations. This package allows users to a) construct a transit network, b) track vehicles in real time to update the network, and c) obtain arrival time predictions.
-SystemRequirements: C++11
-Depends: R (>= 3.4.0)
 License: GPL-3
+URL: https://github.com/tmelliott/transitr
+BugReports: https://github.com/tmelliott/transitr/issues
 Encoding: UTF-8
 LazyData: true
-LinkingTo: Rcpp
-Imports: Rcpp,
+SystemRequirements: 
+    C++11
+Depends: 
+    R (>= 3.4.0)
+Imports: 
+    Rcpp,
     ggplot2,
     tools,
     RSQLite,
@@ -20,6 +24,9 @@ Imports: Rcpp,
     httr,
     jsonlite,
     glue
-RoxygenNote: 6.0.1
-Suggests: testthat,
+Suggests: 
+    testthat,
     covr
+LinkingTo: Rcpp, 
+    BH
+RoxygenNote: 6.0.1
