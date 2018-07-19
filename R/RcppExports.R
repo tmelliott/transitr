@@ -2,10 +2,10 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 construct_network <- function(nw, shapes) {
-    .Call('_transitr_construct_network', PACKAGE = 'transitr', nw, shapes)
+    .Call(`_transitr_construct_network`, nw, shapes)
 }
 
 shapes_df_to_list <- function(x) {
-    .Call('_transitr_shapes_df_to_list', PACKAGE = 'transitr', x)
+    .Call(`_transitr_shapes_df_to_list`, x)
 }
 

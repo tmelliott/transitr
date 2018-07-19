@@ -22,10 +22,10 @@ double distanceEarth(double lat1d, double lon1d, double lat2d, double lon2d) {
   lon1r = deg2rad (lon1d);
   lat2r = deg2rad (lat2d);
   lon2r = deg2rad (lon2d);
-  u = sin(deg2rad(lat2d - lat1d)/2);
-  v = sin(deg2rad(lon2d - lon1d)/2);
+  u = sin(deg2rad(lat2d - lat1d) / 2.0);
+  v = sin(deg2rad(lon2d - lon1d) / 2.0);
   a = u * u + cos(lat1r) * cos(lat2r) * v * v;
-  c = 2.0 * atan2(sqrt(a), sqrt(1 - a));
+  c = 2.0 * atan2(sqrt(a), sqrt(1.0 - a));
   return earthRadius * c;
 }
 

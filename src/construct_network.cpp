@@ -40,7 +40,6 @@ node_t project_point (node_t n, edge_t e);
 List construct_network (List nw, List shapes)
 {
   // nw is used for writing the results to the database
-
   
   // NumericMatrix nodes;
   std::vector<Node> nodes;
@@ -65,7 +64,7 @@ List construct_network (List nw, List shapes)
             << edge_tree.size () - removed_edges.size () << " edges";
       NumericMatrix shape = ti;
       prevNode = -1;
-      for (unsigned int i=0; i<shape.nrow (); i++)
+      for (int i=0; i<shape.nrow (); i++)
         {
 	  // Rcout << "\n > Point " << (i+1) << ": ";
 	  // Query Rtree for nodes within 10m of proposed nodes
@@ -215,7 +214,7 @@ List construct_network (List nw, List shapes)
         << " * " << edge_tree.size () - removed_edges.size () << " edges\n";
 
   NumericMatrix Mnodes (nodes.size (), 2);
-  for (int i=0; i<nodes.size (); i++)
+  for (unsigned i=0; i<nodes.size (); i++)
     {
       NumericMatrix::Row ri = Mnodes ( i , _ );
       ri[0] = std::get<0> (nodes[i]);
@@ -223,7 +222,7 @@ List construct_network (List nw, List shapes)
     }
 
   IntegerMatrix Medges (edge_tree.size () - removed_edges.size (), 2);
-  int i=0;
+  unsigned i=0;
   for (auto it = edge_tree.qbegin ( bgi::satisfies ([&](evalue_t const& v) { return true; })); 
        it != edge_tree.qend (); ++it)
     {
@@ -268,7 +267,7 @@ int add_edge (std::vector<Edge>* edges, int n1, int n2)
       for (int i=0; i<M; i++)
         {
 	  Edge ei = (*edges)[i];
-	  for (int j=0; j<to.size (); j++)
+	  for (unsigned j=0; j<to.size (); j++)
             {
 	      if (std::get<1> (ei) == to[j])
                 {

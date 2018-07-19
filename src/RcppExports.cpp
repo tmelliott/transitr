@@ -29,9 +29,12 @@ BEGIN_RCPP
 END_RCPP
 }
 
+RcppExport SEXP run_testthat_tests();
+
 static const R_CallMethodDef CallEntries[] = {
     {"_transitr_construct_network", (DL_FUNC) &_transitr_construct_network, 2},
     {"_transitr_shapes_df_to_list", (DL_FUNC) &_transitr_shapes_df_to_list, 1},
+    {"run_testthat_tests",          (DL_FUNC) &run_testthat_tests,          0},
     {NULL, NULL, 0}
 };
 
