@@ -10,7 +10,7 @@
 #include <boost/geometry/geometries/box.hpp>
 #include <boost/geometry/index/rtree.hpp>
 
-#include <sqlite3.h>
+#include "vendor/sqlite3/sqlite3.h"
 
 #include <chrono>
 typedef std::chrono::high_resolution_clock Clock;

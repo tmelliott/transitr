@@ -12,18 +12,11 @@ install:
 
 cache:
   - C:\RLibrary
-  - c:\tools\vcpkg\installed\
 
 # Adapt as necessary starting from here
 
 build_script:
   - travis-tool.sh install_deps
-  - vcpkg install sqlite3:x86-windows
-  - vcpkg install sqlite3:x64-windows
-  - cd c:\tools\vcpkg
-  - vcpkg integrate install
-  - DIR /S
-  # - cd %APPVEYOR_BUILD_FOLDER%
 
 test_script:
   - travis-tool.sh run_tests

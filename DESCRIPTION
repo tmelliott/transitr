@@ -27,6 +27,7 @@ Imports:
 Suggests: 
     testthat,
     covr
-LinkingTo: Rcpp, 
+LinkingTo: 
+    Rcpp, 
     BH
 RoxygenNote: 6.0.1
