@@ -13,7 +13,7 @@ and __generate ETAs__.
 # install
 
 `transitr` is not (yet) on CRAN, so for you would need to use `devtools`:
-```{r}
+```r
 devtools::install_github('tmelliott/transitr')
 ```
 
@@ -26,7 +26,7 @@ usable release before trying to use this package.
 This here is just for demonstration of what it could be like at some point
 in the future.
 
-```{r}
+```r
 library(transitr)
 library(magrittr)
 
