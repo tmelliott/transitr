@@ -12,4 +12,8 @@ test_that("URL gets added to object", {
                          with_headers('Ocp-Apim-Subscription-Key' = Sys.getenv('APIKEY')),
                          response = "protobuf")
     expect_is(n1$apis$realtime, "trapi")
+    expect_equal(n1$apis$realtime$response, "json")
+    expect_is(n2$apis$realtime, "trapi")
+    expect_equal(n2$apis$realtime$response, "protobuf")
 })
+

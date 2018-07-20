@@ -35,10 +35,10 @@ dbname <- "realtime.db"
 nw <- create_gfts("https://cdn01.at.govt.nz/data/gtfs.zip", db = dbname) %>%
     construct() %>%
     realtime_feed("https://api.at.govt.nz/v2/public/realtime/vehiclelocations",
-                  with_headers("Ocp-Apim-Subscription-Key" = "mykey"))
+                  with_headers("Ocp-Apim-Subscription-Key" = "mykey"),
+                  response = "protobuf")
 
-## Set the model going - hopefully this will spawn a new child R process
-## that continually runs in the background ... (until you kill it)
+## Set the model running in realtime
 ## note: n.particles should be bigger than 500,
 ##       and cores should be as many as you have spare
 nw %>% model(cores = 2, n.particles = 500)

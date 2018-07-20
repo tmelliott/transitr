@@ -28,13 +28,26 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// run_realtime_model
+void run_realtime_model(List nw, int nparticles, int numcore);
+RcppExport SEXP _transitr_run_realtime_model(SEXP nwSEXP, SEXP nparticlesSEXP, SEXP numcoreSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< List >::type nw(nwSEXP);
+    Rcpp::traits::input_parameter< int >::type nparticles(nparticlesSEXP);
+    Rcpp::traits::input_parameter< int >::type numcore(numcoreSEXP);
+    run_realtime_model(nw, nparticles, numcore);
+    return R_NilValue;
+END_RCPP
+}
 
 RcppExport SEXP run_testthat_tests();
 
 static const R_CallMethodDef CallEntries[] = {
     {"_transitr_construct_network", (DL_FUNC) &_transitr_construct_network, 2},
     {"_transitr_shapes_df_to_list", (DL_FUNC) &_transitr_shapes_df_to_list, 1},
-    {"run_testthat_tests",          (DL_FUNC) &run_testthat_tests,          0},
+    {"_transitr_run_realtime_model", (DL_FUNC) &_transitr_run_realtime_model, 3},
+    {"run_testthat_tests",           (DL_FUNC) &run_testthat_tests,           0},
     {NULL, NULL, 0}
 };
 

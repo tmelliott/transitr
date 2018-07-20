@@ -3,7 +3,6 @@
 #include <vector>
 #include <Rcpp.h>
 
-#include <vector>
 #include <algorithm>
 #include <boost/geometry.hpp>
 #include <boost/geometry/geometries/point.hpp>
