@@ -3,6 +3,7 @@
 #include <vector>
 #include <Rcpp.h>
 #include <curl/curl.h>
+#include <curl/easy.h>
 
 #include "vendor/sqlite3/sqlite3.h"
 
@@ -38,6 +39,10 @@ void run_realtime_model (
     curl = curl_easy_init ();
     if (curl)
     {
+        // add the headers
+        struct curl_slist *chunk = NULL;
+
+
         curl_easy_setopt (curl, CURLOPT_URL, url.c_str ());
         res = curl_easy_perform (curl);
         if (res == CURLE_OK)
