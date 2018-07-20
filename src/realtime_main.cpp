@@ -71,7 +71,7 @@ void run_realtime_model (
 
         std::string readBuffer;
         curl_easy_setopt (curl, CURLOPT_URL, url.c_str ());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+        curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt (curl, CURLOPT_WRITEDATA, &readBuffer);
         res = curl_easy_perform (curl);
         if (res == CURLE_OK)
@@ -81,8 +81,8 @@ void run_realtime_model (
         }
         else
         {
-            fprintf(stderr, "curl_easy_perform() failed: %s\n",
-              curl_easy_strerror(res));
+            Rcerr << "curl_easy_perform() failed\n";
+              // curl_easy_strerror(res));
         }
         curl_easy_cleanup (curl);
         curl_slist_free_all (chunk);
