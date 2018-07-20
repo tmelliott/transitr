@@ -1,4 +1,5 @@
-create_trips <- function(con) {
+create_trips <- function(db) {
+    con <- db_connect(db)
     if (RSQLite::dbExistsTable(con, "trips")) {
         stop("Trips table already exists")
     }
@@ -17,11 +18,13 @@ create_trips <- function(con) {
             "  version DOUBLE",
             ")"))
     RSQLite::dbClearResult(res)
+
+    db_close(con)
 }
 
 update_trips <- function(object, file) {
-    existing <- RSQLite::dbGetQuery(object$connection,
-                           "SELECT trip_id FROM trips")
+	con <- db_connect(object$database)
+    existing <- RSQLite::dbGetQuery(con, "SELECT trip_id FROM trips")
     tbl <- utils::read.csv(file, header = TRUE)
     trips <- data.frame(trip_id = as.character(tbl$trip_id),
                         route_id = as.character(tbl$route_id),
@@ -32,11 +35,13 @@ update_trips <- function(object, file) {
                         trip_headsign = as.character(tbl$trip_headsign),
                         version = as.numeric(gsub(".+_v", "", tbl$route_id)))
     trips <- trips[!trips$trip_id %in% existing, ]
-    RSQLite::dbWriteTable(object$connection, "trips", trips, append = TRUE)
+    RSQLite::dbWriteTable(con, "trips", trips, append = TRUE)
+    db_close(con)
 }
 
-check_trips <- function(con) {
-    identical(RSQLite::dbGetQuery(con, "PRAGMA table_info(trips)"),
+check_trips <- function(db) {
+	con <- db_connect(db)
+    res <- identical(RSQLite::dbGetQuery(con, "PRAGMA table_info(trips)"),
               data.frame(cid = 0:7,
                          name = c("trip_id", "route_id", "shape_id", "service_id",
                                   "block_id", "direction_id", "trip_headsign",
@@ -46,4 +51,6 @@ check_trips <- function(con) {
                          notnull = 0L, dflt_value = as.logical(NA),
                          pk = c(1L, 0L, 0L, 0L, 0L, 0L, 0L, 0L),
                          stringsAsFactors = FALSE))
+    db_close(con)
+    res
 }

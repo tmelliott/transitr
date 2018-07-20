@@ -1,4 +1,5 @@
-create_versions <- function(con) {
+create_versions <- function(db) {
+    con <- db_connect(db)
     if (RSQLite::dbExistsTable(con, "versions")) {
         stop("Versions table already exists")
     }
@@ -13,6 +14,8 @@ create_versions <- function(con) {
             "  enddate TEXT",
             ")"))
     RSQLite::dbClearResult(res)
+
+    db_close(con)
 }
 
 update_versions <- function(object) {
@@ -28,7 +31,10 @@ update_versions <- function(object) {
     v$version <- as.numeric(gsub(".+_v", "", v$version))
     v$startdate <- format(as.POSIXct(v$startdate), "%Y%m%d")
     v$enddate <- format(as.POSIXct(v$enddate), "%Y%m%d")
-    RSQLite::dbWriteTable(object$connection, "versions", v, append = TRUE)
+
+    con <- db_connect(object$database)
+    RSQLite::dbWriteTable(con, "versions", v, append = TRUE)
+    db_close(con)
     cat("Versions updated\n")
 }
 

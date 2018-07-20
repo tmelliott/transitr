@@ -3,37 +3,39 @@
 ##' The GTFS data, if specified, should be specifided as a series of text files.
 ##' See \code{update} for more info.
 ##' @title Create GTFS database
-##' @param from where the GTFS data comes from
-##' @param to where the GTFS data is going to be stored
+##' @param source where the GTFS data comes from
+##' @param db where the GTFS data is going to be stored
 ##' @param quiet logical, if \code{TRUE} progress output will be suppressed
 ##' @return a \code{trgtfs} object
 ##' @author Tom Elliott
 ##' @importFrom stats update
 ##' @export
-create_gtfs <- function(from, to = tempfile(), quiet = FALSE) {
+create_gtfs <- function(source, db = tempfile(), quiet = FALSE) {
     if (!requireNamespace("RSQLite", quietly = TRUE)) {
         stop("Please install the `RSQLite` package first,\n",
              "  or connect to a database manually and use `load_gtfs` instead.")
     }
-    con <- RSQLite::dbConnect(RSQLite::SQLite(), to)
-    create_tables(con)
-    nw <- load_gtfs(con)
-    if (!missing(from)) {
-        update(nw, from, quiet = quiet)
+    
+    create_tables(db)
+    nw <- load_gtfs(db)
+    if (!missing(source)) {
+        update(nw, source, quiet = quiet)
     }
     nw
 }
 
-create_tables <- function(con) {
+create_tables <- function(db) {
     lapply(gtfs_tables(), function(tbl) {
-        eval(parse(text = sprintf("create_%s", tbl)))(con)
+        eval(parse(text = sprintf("create_%s", tbl)))(db)
     })
-    create_versions(con)
+    create_versions(db)
+
+    invisible(NULL)
 }
 
-check_tables <- function(con) {
+check_tables <- function(db) {
     res <- sapply(gtfs_tables(), function(tbl) {
-        eval(parse(text = sprintf("check_%s", tbl)))(con)
+        eval(parse(text = sprintf("check_%s", tbl)))(db)
     })
     all(res)
 }
@@ -41,16 +43,15 @@ check_tables <- function(con) {
 ##' Load an existing GTFS database into R for use with transitr.
 ##'
 ##' @title Load GTFS database
-##' @param con a database connection from \code{dbConnect}
+##' @param db a database connection from \code{dbConnect}
 ##' @return a \code{trgtfs} object
 ##' @author Tom Elliott
 ##' @export
-load_gtfs <- function(con) {
-    if (!check_tables(con)) {
+load_gtfs <- function(db) {
+    if (!check_tables(db)) {
         stop("Oops, some of the tables aren't right...")
     }
-    structure(list(connection = con,
-                   apis = list()),
+    structure(list(database = db, apis = apis()),
               class = "trgtfs")
 }
 
@@ -65,23 +66,23 @@ load_gtfs <- function(con) {
 ##' }
 ##' @title Update GTFS data
 ##' @param object the \code{trgtfs} database object to update
-##' @param from where the new data should come from
+##' @param source where the new data should come from
 ##' @param quiet logical, if \code{TRUE} progress output will be suppressed
 ##' @param ... additional arguments, ignored
 ##' @return a \code{trgtfs} object (with updated data)
 ##' @author Tom Elliott
 ##' @export
-update.trgtfs <- function(object, from, quiet = FALSE, ...) {
-    if (dir.exists(from)) {
+update.trgtfs <- function(object, source, quiet = FALSE, ...) {
+    if (dir.exists(source)) {
         fn <- "dir"
-    } else if (file.exists(from)) {
+    } else if (file.exists(source)) {
         fn <- "zip"
     } else {
         fn <- "url"
     }
 
-    ## Create a function call e.g., `.update_url(object, from)`
-    eval(parse(text = sprintf(".update_%s", fn)))(object, from, quiet)
+    ## Create a function call e.g., `.update_url(object, source)`
+    eval(parse(text = sprintf(".update_%s", fn)))(object, source, quiet)
     update_versions(object)
 }
 

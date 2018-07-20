@@ -1,4 +1,5 @@
-create_stop_times <- function(con) {
+create_stop_times <- function(db) {
+    con <- db_connect(db)
     if (RSQLite::dbExistsTable(con, "stop_times")) {
         stop("Stop_Times table already exists")
     }
@@ -19,11 +20,13 @@ create_stop_times <- function(con) {
             "  PRIMARY KEY (trip_id, stop_id, stop_sequence)",
             ")"))
     RSQLite::dbClearResult(res)
+
+    db_close(con)
 }
 
 update_stop_times <- function(object, file) {
-    existing <- RSQLite::dbGetQuery(object$connection,
-                           "SELECT trip_id || stop_id || stop_sequence FROM stop_times")
+    con <- db_connect(object$database)
+    existing <- RSQLite::dbGetQuery(con, "SELECT trip_id || stop_id || stop_sequence FROM stop_times")
     tbl <- utils::read.csv(file, header = TRUE)
     stop_times <- data.frame(trip_id = as.character(tbl$trip_id),
                              stop_id = as.character(tbl$stop_id),
@@ -39,11 +42,13 @@ update_stop_times <- function(object, file) {
         stop_times[
             !paste0(stop_times$trip_id, stop_times$stop_id,
                     stop_times$stop_sequence) %in% existing, ]
-    RSQLite::dbWriteTable(object$connection, "stop_times", stop_times, append = TRUE)
+    RSQLite::dbWriteTable(con, "stop_times", stop_times, append = TRUE)
+    db_close(con)
 }
 
-check_stop_times <- function(con) {
-    identical(RSQLite::dbGetQuery(con, "PRAGMA table_info(stop_times)"),
+check_stop_times <- function(db) {
+    con <- db_connect(db)
+    res <- identical(RSQLite::dbGetQuery(con, "PRAGMA table_info(stop_times)"),
               data.frame(cid = 0:8,
                          name = c("trip_id", "stop_id", "stop_sequence", "arrival_time",
                                   "departure_time", "stop_headsign", "pickup_type",
@@ -53,4 +58,6 @@ check_stop_times <- function(con) {
                          notnull = 0L, dflt_value = as.logical(NA),
                          pk = c(1L, 2L, 3L, 0L, 0L, 0L, 0L, 0L, 0L),
                          stringsAsFactors = FALSE))
+    db_close(con)
+    res
 }

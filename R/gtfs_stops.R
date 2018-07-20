@@ -1,4 +1,5 @@
-create_stops <- function(con) {
+create_stops <- function(db) {
+    con <- db_connect(db)
     if (RSQLite::dbExistsTable(con, "stops")) {
         stop("Stops table already exists")
     }
@@ -19,11 +20,13 @@ create_stops <- function(con) {
             "  version DOUBLE",
             ")"))
     RSQLite::dbClearResult(res)
+
+    db_close(con)
 }
 
 update_stops <- function(object, file) {
-    existing <- RSQLite::dbGetQuery(object$connection,
-                           "SELECT stop_id FROM stops")
+    con <- db_connect(object$database)
+    existing <- RSQLite::dbGetQuery(con, "SELECT stop_id FROM stops")
     tbl <- utils::read.csv(file, header = TRUE)
     stops <- data.frame(stop_id = as.character(tbl$stop_id),
                         stop_lat = as.numeric(tbl$stop_lat),
@@ -36,11 +39,13 @@ update_stops <- function(object, file) {
                         location_type = as.integer(tbl$location_type),
                         version = as.numeric(gsub(".+_v", "", tbl$stop_id)))
     stops <- stops[!stops$stop_id %in% existing, ]
-    RSQLite::dbWriteTable(object$connection, "stops", stops, append = TRUE)
+    RSQLite::dbWriteTable(con, "stops", stops, append = TRUE)
+    db_close(con)
 }
 
-check_stops <- function(con) {
-    identical(RSQLite::dbGetQuery(con, "PRAGMA table_info(stops)"),
+check_stops <- function(db) {
+    con <- db_connect(db)
+    res <- identical(RSQLite::dbGetQuery(con, "PRAGMA table_info(stops)"),
               data.frame(cid = 0:9,
                          name = c("stop_id", "stop_lat", "stop_lon", "stop_code",
                                   "stop_name", "stop_desc", "zone_id",
@@ -50,4 +55,6 @@ check_stops <- function(con) {
                          notnull = 0L, dflt_value = as.logical(NA),
                          pk = c(1L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L),
                          stringsAsFactors = FALSE))
+    db_close(con)
+    res
 }

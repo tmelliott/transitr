@@ -4,10 +4,10 @@
 \alias{load_gtfs}
 \title{Load GTFS database}
 \usage{
-load_gtfs(con)
+load_gtfs(db)
 }
 \arguments{
-\item{con}{a database connection from \code{dbConnect}}
+\item{db}{a database connection from \code{dbConnect}}
 }
 \value{
 a \code{trgtfs} object

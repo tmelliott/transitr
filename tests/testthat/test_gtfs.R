@@ -4,53 +4,42 @@ library(RSQLite)
 tmpdb <- NULL
 test_that("database created successfully", {
     nw <- create_gtfs()
-    tmpdb <<- attr(nw$connection, "dbname")
+    tmpdb <<- nw$database
     expect_is(nw, "trgtfs")
-    dbDisconnect(nw$connection)
 })
 
 test_that("database loaded successfully", {
-    con <- dbConnect(SQLite(), tmpdb)
-    nw <- load_gtfs(con)
+    nw <- load_gtfs(tmpdb)
     expect_is(nw, "trgtfs")
-    dbDisconnect(con)
-    con <- dbConnect(SQLite(), tempfile())
-    expect_error(load_gtfs(con))
-    dbDisconnect(con)
+    expect_error(load_gtfs(tempfile()))
 })
 
 
 test_that("duplicate tables are detected", {
-    con <- dbConnect(SQLite(), tmpdb)
-    expect_error(create_agency(con))
-    expect_error(create_routes(con))
-    expect_error(create_trips(con))
-    expect_error(create_shapes(con))
-    expect_error(create_stops(con))
-    expect_error(create_stop_times(con))
-    expect_error(create_calendar(con))
-    expect_error(create_calendar_dates(con))
-    expect_error(create_versions(con))
-    dbDisconnect(con)
+    expect_error(create_agency(tmpdb))
+    expect_error(create_routes(tmpdb))
+    expect_error(create_trips(tmpdb))
+    expect_error(create_shapes(tmpdb))
+    expect_error(create_stops(tmpdb))
+    expect_error(create_stop_times(tmpdb))
+    expect_error(create_calendar(tmpdb))
+    expect_error(create_calendar_dates(tmpdb))
+    expect_error(create_versions(tmpdb))
 })
 
 
 test_that("version API works", {
     if (Sys.getenv('APIKEY') == "") skip("No API key")
-    con <- dbConnect(SQLite(), tmpdb)
 
-    nw <- load_gtfs(con) %>%
+    nw <- load_gtfs(tmpdb) %>%
         version_api("https://api.at.govt.nz/v2/gtfs/versions")
     expect_warning(update_versions(nw))
     
-    nw <- load_gtfs(con) %>%
+    nw <- load_gtfs(tmpdb) %>%
         version_api("https://api.at.govt.nz/v2/gtfs/versions",
-                    headers =
-                        list('Ocp-Apim-Subscription-Key' = Sys.getenv('APIKEY')))
+                    with_headers('Ocp-Apim-Subscription-Key' = Sys.getenv('APIKEY')))
     expect_true(has_version_api(nw))
     expect_output(update_versions(nw), "Versions updated")
-
-    dbDisconnect(con)
 
     expect_error(send(1))
 })

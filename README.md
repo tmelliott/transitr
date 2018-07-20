@@ -31,10 +31,10 @@ library(transitr)
 library(magrittr)
 
 ## Create a database, construct network, and connect to a realtime feed
-nw <- create_nw("https://cdn01.at.govt.nz/data/gtfs.zip") %>%
-   construct() %>%
-   connect("https://api.at.govt.nz/v2/public/realtime/vehiclelocations") %>%
-   with_headers("Ocp-Apim-Subscription-Key" = "mykey")
+nw <- create_gfts("https://cdn01.at.govt.nz/data/gtfs.zip") %>%
+    construct() %>%
+    realtime_feed("https://api.at.govt.nz/v2/public/realtime/vehiclelocations",
+                  with_headers("Ocp-Apim-Subscription-Key" = "mykey"))
 
 ## Set the model going - hopefully this will spawn a new child R process
 ## that continually runs in the background ... (until you kill it)

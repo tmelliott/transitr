@@ -4,12 +4,12 @@
 \alias{update.trgtfs}
 \title{Update GTFS data}
 \usage{
-\method{update}{trgtfs}(object, from, quiet = FALSE, ...)
+\method{update}{trgtfs}(object, source, quiet = FALSE, ...)
 }
 \arguments{
 \item{object}{the \code{trgtfs} database object to update}
 
-\item{from}{where the new data should come from}
+\item{source}{where the new data should come from}
 
 \item{quiet}{logical, if \code{TRUE} progress output will be suppressed}
 
