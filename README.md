@@ -31,7 +31,8 @@ library(transitr)
 library(magrittr)
 
 ## Create a database, construct network, and connect to a realtime feed
-nw <- create_gfts("https://cdn01.at.govt.nz/data/gtfs.zip") %>%
+dbname <- "realtime.db"
+nw <- create_gfts("https://cdn01.at.govt.nz/data/gtfs.zip", db = dbname) %>%
     construct() %>%
     realtime_feed("https://api.at.govt.nz/v2/public/realtime/vehiclelocations",
                   with_headers("Ocp-Apim-Subscription-Key" = "mykey"))
@@ -41,15 +42,9 @@ nw <- create_gfts("https://cdn01.at.govt.nz/data/gtfs.zip") %>%
 ## note: n.particles should be bigger than 500,
 ##       and cores should be as many as you have spare
 nw %>% model(cores = 2, n.particles = 500)
+```
 
-## Once running, you can view ETAs for buses arriving at a stop
-nw %>% stop('1529') %>% etas()
-
-## or, maybe at some point this will open up a shiny app to explore all the things
-## in real time???
-nw %>% view()
-
-## and when finished
-nw %>% close()
-## will close the child process and free up your computers resources
+Once running, you can launch a new R session and view the shiny app:
+```r
+transitr::view_realtime("realtime.db")
 ```

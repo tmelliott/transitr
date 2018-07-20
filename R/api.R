@@ -1,5 +1,5 @@
-api <- function(url, headers) {
-    structure(list(url = url, headers = headers),
+api <- function(url, headers, response) {
+    structure(list(url = url, headers = headers, response = response),
               class = "trapi")
 }
 
@@ -32,7 +32,7 @@ print.trapi.list <- function(x, ...) {
         return()
     }
     for (i in seq_along(x)) {
-        cat(sep = "", " ", names(x)[i], ": ")
+        cat(sep="", " ", glue::glue("{names(x)[i]} ({x[[i]]$response}): "))
         print(x[[i]])
     }
     cat("\n")

@@ -39,6 +39,6 @@ update_versions <- function(object) {
 }
 
 version_api <- function(object, url, headers = list()) {
-    object$apis$version <- api(url, headers)
+    object$apis$version <- api(url, headers, "json")
     object
 }
