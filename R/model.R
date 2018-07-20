@@ -10,5 +10,10 @@ model <- function(nw, n.particles = 500, cores = 1L) {
     #     stop("Unable to access the API feed - have you added the key?")
     # }
 
+    ## modify headers ...
+    nw$apis$realtime$headers <- lapply(seq_along(nw$apis$realtime$headers), function(i) {
+        list(name = names(nw$apis$realtime$headers)[i], value = nw$apis$realtime$headers[[i]])
+    })
+    print(nw)
     run_realtime_model(nw, n.particles, cores)
 }

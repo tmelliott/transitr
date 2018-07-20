@@ -31,5 +31,6 @@ Suggests:
 LinkingTo: 
     Rcpp, 
     BH,
-    testthat
+    testthat,
+    RCurl
 RoxygenNote: 6.0.1
