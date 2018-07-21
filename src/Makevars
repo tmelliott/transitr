@@ -1,3 +1,0 @@
-CURL_LIBS=-lcurl
-
-PKG_LIBS=$(CURL_LIBS)

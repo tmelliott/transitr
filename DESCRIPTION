@@ -33,3 +33,4 @@ LinkingTo:
     BH,
     testthat
 RoxygenNote: 6.0.1
+Biarch: TRUE

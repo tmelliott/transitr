@@ -14,6 +14,6 @@ model <- function(nw, n.particles = 500, cores = 1L) {
     nw$apis$realtime$headers <- lapply(seq_along(nw$apis$realtime$headers), function(i) {
         list(name = names(nw$apis$realtime$headers)[i], value = nw$apis$realtime$headers[[i]])
     })
-    print(nw)
+
     run_realtime_model(nw, n.particles, cores)
 }

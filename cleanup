@@ -1,0 +1,6 @@
+#!/bin/sh
+
+rm -f config.* src/Makevars \
+    src/*.o src/*.d src/*.a src/*.dll src/*.so src/*.rc */*~ *~ 
+
+rm -rf inst/doc/auto autom4te.cache

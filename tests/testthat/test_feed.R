@@ -1,5 +1,6 @@
 context("Connect to realtime GTFS feed")
 
+library(magrittr)
 nw <- create_gtfs(system.file("extdata", "auckland_gtfs.zip", package = "transitr"),
                   quiet = TRUE) %>%
     construct()
