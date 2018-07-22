@@ -10,16 +10,16 @@ PKG_CPPFLAGS=@PKG_CPPFLAGS@
 PKG_LIBS=@PKG_LIBS@ $(CURL_LIBS)
 
 
-PROTOFILES = gtfs-realtime.pb.cc vendor/protobuf/gtfs-realtime.pb.h
+PROTOFILES = gtfs-realtime.pb.cpp vendor/protobuf/gtfs-realtime.pb.h
 .PHONY: $(shlib)
 
 all: $(shlib)
 
-realtime_main.o: $(PROTOFILES)
-SRC = $(wildcard *.cpp)
-OBJ = $(patsubst %.cpp, %.o, $(SRC))
-OBJECTS = gtfs-realtime.pb.o $(OBJ)
+OBJECTS = construct_network.o geo.o process_shape.o realtime_main.o \
+	test-geo.o test-runner.o RcppExports.o gtfs-realtime.pb.o
 
+realtime_main.o: gtfs-realtime.pb.o
+gtfs-realtime.pb.o: gtfs-realtime.pb.cpp
 $(PROTOFILES): vendor/protobuf/gtfs-realtime.proto
 	protoc -I=. --cpp_out=. $^
-	mv vendor/protobuf/gtfs-realtime.pb.cc .
+	mv vendor/protobuf/gtfs-realtime.pb.cc gtfs-realtime.pb.cpp

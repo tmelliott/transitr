@@ -3,5 +3,6 @@
 *.dll
 
 Makevars
-*.pb.cc 
+*.pb.cpp
+*.pb.cc
 vendor/protobuf/*.pb.h

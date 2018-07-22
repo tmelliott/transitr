@@ -114,6 +114,6 @@ void run_realtime_model (
     Gtfs gtfs (dbname);
 
 
-
+    // Rcout << "\n --> and we're done!\n";
 
 }
