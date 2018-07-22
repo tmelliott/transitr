@@ -6,6 +6,7 @@
 
 // Just make sure pb comes before Rcpp.h
 #include "vendor/protobuf/gtfs-realtime.pb.h"
+
 #include <Rcpp.h>
 #include <curl/curl.h>
 #include <curl/easy.h>
@@ -104,7 +105,7 @@ void run_realtime_model (
         Rcout << "done -> " << feed.entity_size () << " updates loaded.\n";
         if (feed.header ().has_timestamp ()) {
                 // auto filetime = feed.header ().timestamp ();
-                std::cout << " [ time = " << feed.header ().timestamp () << "]\n";
+                Rcout << " [ time = " << feed.header ().timestamp () << "]\n";
         }
     }
     Rcout << "\n ***\n";

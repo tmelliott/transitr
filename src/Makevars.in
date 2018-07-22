@@ -8,3 +8,18 @@ CURL_LIBS=-lcurl
 ## ProtoBuf headers and library via these variables
 PKG_CPPFLAGS=@PKG_CPPFLAGS@
 PKG_LIBS=@PKG_LIBS@ $(CURL_LIBS)
+
+
+PROTOFILES = gtfs-realtime.pb.cc vendor/protobuf/gtfs-realtime.pb.h
+.PHONY: $(shlib)
+
+all: $(shlib)
+
+realtime_main.o: $(PROTOFILES)
+SRC = $(wildcard *.cpp)
+OBJ = $(patsubst %.cpp, %.o, $(SRC))
+OBJECTS = gtfs-realtime.pb.o $(OBJ)
+
+$(PROTOFILES): vendor/protobuf/gtfs-realtime.proto
+	protoc -I=. --cpp_out=. $^
+	mv vendor/protobuf/gtfs-realtime.pb.cc .
