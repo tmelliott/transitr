@@ -41,79 +41,73 @@ void run_realtime_model (
     std::string dbname (dbname_raw);
     // std::string dbname (get_database_name (nw));
 
-    List apis = nw["apis"];
-    List rt = apis["realtime"];
-    String url_raw = rt["url"];
-    std::string url (url_raw);
-    List headers = rt["headers"];
-    // std::string url (get_feed_url (nw));
+    if (FALSE) {
+        List apis = nw["apis"];
+        List rt = apis["realtime"];
+        String url_raw = rt["url"];
+        std::string url (url_raw);
+        List headers = rt["headers"];
+        // std::string url (get_feed_url (nw));
 
-    Rcout << "Oh look, it's the API url! " << url << "\n";
-    CURL *curl;
-    CURLcode res;
-    curl_global_init (CURL_GLOBAL_DEFAULT);
-    curl = curl_easy_init ();
+        Rcout << "Oh look, it's the API url! " << url << "\n";
+        CURL *curl;
+        CURLcode res;
+        curl_global_init (CURL_GLOBAL_DEFAULT);
+        curl = curl_easy_init ();
 
-    std::string readBuffer;
-    if (curl)
-    {
-        // add the headers
-        struct curl_slist *chunk = NULL;
-
-        for (int i=0; i<headers.size (); i++)
+        std::string readBuffer;
+        if (curl)
         {
-            List hdr = headers[i];
-            String hdrn = hdr["name"];
-            String hdrv = hdr["value"];
-            std::ostringstream hss;
-            std::string header;
-            hss << (std::string)hdrn << ": " << (std::string)hdrv;
-            header = hss.str ();
-            // Rcout << header << "\n\n";
-            chunk = curl_slist_append (chunk, header.c_str ());
-        }
+            // add the headers
+            struct curl_slist *chunk = NULL;
 
-        res = curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
-        // curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+            for (int i=0; i<headers.size (); i++)
+            {
+                List hdr = headers[i];
+                String hdrn = hdr["name"];
+                String hdrv = hdr["value"];
+                std::ostringstream hss;
+                std::string header;
+                hss << (std::string)hdrn << ": " << (std::string)hdrv;
+                header = hss.str ();
+                // Rcout << header << "\n\n";
+                chunk = curl_slist_append (chunk, header.c_str ());
+            }
 
-        curl_easy_setopt (curl, CURLOPT_URL, url.c_str ());
-        curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-        curl_easy_setopt (curl, CURLOPT_WRITEDATA, &readBuffer);
-        res = curl_easy_perform (curl);
-        if (res == CURLE_OK)
-        {
-            Rcout << "OK!\n"
-                << readBuffer << "\n";
+            res = curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
+            // curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+
+            curl_easy_setopt (curl, CURLOPT_URL, url.c_str ());
+            curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+            curl_easy_setopt (curl, CURLOPT_WRITEDATA, &readBuffer);
+            res = curl_easy_perform (curl);
+            if (res != CURLE_OK)
+            {
+                Rcerr << "curl_easy_perform() failed\n";
+                return;
+                  // curl_easy_strerror(res));
+            }
+            curl_easy_cleanup (curl);
+            curl_slist_free_all (chunk);
         }
-        else
-        {
-            Rcerr << "curl_easy_perform() failed\n";
-              // curl_easy_strerror(res));
+        curl_global_cleanup ();
+
+        transit_realtime::FeedMessage feed;
+        std::istringstream buf (readBuffer);
+        Rcout << "\n ***\n Attempting to parse protobuf feed ... ";
+        if (!feed.ParseFromIstream (&buf)) {
+            Rcerr << "failed to parse GTFS realtime feed!\n";
+            return;
+        } else {
+            Rcout << "done -> " << feed.entity_size () << " updates loaded.\n";
+            if (feed.header ().has_timestamp ()) {
+                    // auto filetime = feed.header ().timestamp ();
+                    Rcout << " [ time = " << feed.header ().timestamp () << " ]\n";
+            }
         }
-        curl_easy_cleanup (curl);
-        curl_slist_free_all (chunk);
+        Rcout << "\n ***\n";
     }
-    curl_global_cleanup ();
 
-    transit_realtime::FeedMessage feed;
-    std::istringstream buf (readBuffer);
-    Rcout << "\n ***\n Attempting to parse protobuf feed ...\n";
-    if (!feed.ParseFromIstream (&buf)) {
-        Rcerr << "failed to parse GTFS realtime feed!\n";
-        return;
-    } else {
-        Rcout << "done -> " << feed.entity_size () << " updates loaded.\n";
-        if (feed.header ().has_timestamp ()) {
-                // auto filetime = feed.header ().timestamp ();
-                Rcout << " [ time = " << feed.header ().timestamp () << "]\n";
-        }
-    }
-    Rcout << "\n ***\n";
-    
     // Connect GTFS database
-    Gtfs gtfs (dbname);
-
-
-    // Rcout << "\n --> and we're done!\n";
-
+    Gtfs::Gtfs gtfs (dbname);
 }

@@ -32,7 +32,7 @@ library(magrittr)
 
 ## Create a database, construct network, and connect to a realtime feed
 dbname <- "realtime.db"
-nw <- create_gfts("https://cdn01.at.govt.nz/data/gtfs.zip", db = dbname) %>%
+nw <- create_gtfs("https://cdn01.at.govt.nz/data/gtfs.zip", db = dbname) %>%
     construct() %>%
     realtime_feed("https://api.at.govt.nz/v2/public/realtime/vehiclelocations",
                   with_headers("Ocp-Apim-Subscription-Key" = "mykey"),

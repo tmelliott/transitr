@@ -1,4 +1,12 @@
-api <- function(url, headers, response) {
+#' Create an API call
+#'
+#' @param url the url to request
+#' @param headers optional headers for the call
+#' @param response the type of response expected
+#' @return a \code{trapi} object
+#' @author Tom Elliott
+#' @export
+api <- function(url, headers = NULL, response = "text") {
     structure(list(url = url, headers = headers, response = response),
               class = "trapi")
 }
@@ -7,6 +15,9 @@ apis <- function() {
     structure(list(), class = "trapi.list")
 }
 
+#' @describeIn api Api Headers
+#' @param ... headers converted into a list
+#' @export
 with_headers <- function(...) list(...)
 
 send <- function(api) {

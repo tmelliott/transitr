@@ -1,3 +1,11 @@
+#' Run realtime transit model
+#'
+#' @param nw a loaded \code{trgtfs} object
+#' @param n.particles the number of particles to use to model each vehicle
+#' @param cores the number of cores to use in parallel
+#' @return NULL (in fact, it never returns anything ...)
+#' @author Tom Elliott
+#' @export
 model <- function(nw, n.particles = 500, cores = 1L) {
     if (!inherits(nw, "trgtfs")) stop("Not a GTFS transit object. See ?create_gtfs")
 

@@ -3,11 +3,12 @@
 CXX_STD=CXX11
 
 CURL_LIBS=-lcurl
+#SQLITE_LIBS= vendor/sqlite3/sqlite3.o
 
 ## Configure tells us about locations for ## both Rcpp (ie libRcpp.so and Rcpp.h) and 
 ## ProtoBuf headers and library via these variables
-PKG_CPPFLAGS=@PKG_CPPFLAGS@
-PKG_LIBS=@PKG_LIBS@ $(CURL_LIBS)
+PKG_CPPFLAGS=@PKG_CPPFLAGS@ -Wno-deprecated-declarations
+PKG_LIBS=@PKG_LIBS@ $(CURL_LIBS) 
 
 
 PROTOFILES = gtfs-realtime.pb.cpp vendor/protobuf/gtfs-realtime.pb.h
@@ -15,8 +16,9 @@ PROTOFILES = gtfs-realtime.pb.cpp vendor/protobuf/gtfs-realtime.pb.h
 
 all: $(shlib)
 
-OBJECTS = construct_network.o geo.o process_shape.o realtime_main.o \
-	test-geo.o test-runner.o RcppExports.o gtfs-realtime.pb.o
+OBJECTS = construct_network.o geo.o gtfs.o process_shape.o realtime_main.o \
+	test-geo.o test-runner.o RcppExports.o gtfs-realtime.pb.o \
+	vendor/sqlite3/sqlite3.o
 
 realtime_main.o: gtfs-realtime.pb.o
 gtfs-realtime.pb.o: gtfs-realtime.pb.cpp
