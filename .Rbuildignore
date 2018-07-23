@@ -5,3 +5,4 @@
 ^tmp$
 ^Makefile$
 ^scripts$
+^codecov\.yml$
