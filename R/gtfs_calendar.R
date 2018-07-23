@@ -1,5 +1,6 @@
 create_calendar <- function(db) {
     con <- db_connect(db)
+    on.exit(db_close(con))
     if (RSQLite::dbExistsTable(con, "calendar")) {
         stop("Calendar table already exists")
     }
@@ -21,12 +22,11 @@ create_calendar <- function(db) {
             "  version DOUBLE",
             ")"))
     RSQLite::dbClearResult(res)
-
-    db_close(con)
 }
 
 update_calendar <- function(object, file) {
     con <- db_connect(object$database)
+    on.exit(db_close(con))
     existing <- RSQLite::dbGetQuery(con, "SELECT service_id FROM calendar")
     tbl <- utils::read.csv(file, header = TRUE)
     calendar <- data.frame(service_id = as.character(tbl$service_id),
@@ -40,11 +40,11 @@ update_calendar <- function(object, file) {
                            version = as.numeric(gsub(".+_v", "", tbl$service_id)))
     calendar <- calendar[!calendar$service_id %in% existing, ]
     RSQLite::dbWriteTable(con, "calendar", calendar, append = TRUE)
-    db_close(con)
 }
 
 check_calendar <- function(db) {
     con <- db_connect(db)
+    on.exit(db_close(con))
     res <- identical(RSQLite::dbGetQuery(con, "PRAGMA table_info(calendar)"),
               data.frame(cid = 0:10,
                          name = c("service_id", "monday", "tuesday", "wednesday",
@@ -56,6 +56,5 @@ check_calendar <- function(db) {
                          notnull = 0L, dflt_value = as.logical(NA),
                          pk = c(1L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L),
                          stringsAsFactors = FALSE))
-    db_close(con)
     res
 }

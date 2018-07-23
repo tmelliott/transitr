@@ -12,6 +12,7 @@ addons:
     sources:
       - sourceline: 'ppa:edd/misc'
     packages:
+      - autotools-dev
       - libcurl4-openssl-dev
       - libprotobuf-dev 
       - libprotoc-dev 

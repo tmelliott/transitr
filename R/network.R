@@ -32,6 +32,7 @@ load_shapes <- function(nw) {
 
 create_network_tables <- function(nw) {
     con <- db_connect(nw$database)
+    on.exit(db_close(con))
     if (RSQLite::dbExistsTable(con, "road_segments") ||
         RSQLite::dbExistsTable(con, "intersections") ||
         RSQLite::dbExistsTable(con, "trip_segments")) {
@@ -69,8 +70,6 @@ create_network_tables <- function(nw) {
             "  distance_traveled DOUBLE",
             ")"))
     RSQLite::dbClearResult(res)
-
-    db_close(con)
 }
 
 load_table <- function(nw, tbl) {

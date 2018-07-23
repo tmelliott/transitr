@@ -1,5 +1,6 @@
 create_routes <- function(db) {
     con <- db_connect(db)
+    on.exit(db_close(con))
     if (RSQLite::dbExistsTable(con, "routes")) {
         stop("Routes table already exists")
     }
@@ -16,12 +17,11 @@ create_routes <- function(db) {
             "  version DOUBLE",
             ")"))
     RSQLite::dbClearResult(res)
-
-    db_close(con)
 }
 
 update_routes <- function(object, file) {
     con <- db_connect(object$database)
+    on.exit(db_close(con))
     existing <- RSQLite::dbGetQuery(con, "SELECT route_id FROM routes")
     tbl <- utils::read.csv(file, header = TRUE)
     routes <- data.frame(route_id = as.character(tbl$route_id),
@@ -32,11 +32,11 @@ update_routes <- function(object, file) {
                          version = as.numeric(gsub(".+_v", "", tbl$route_id)))
     routes <- routes[!routes$route_id %in% existing, ]
     RSQLite::dbWriteTable(con, "routes", routes, append = TRUE)
-    db_close(con)
 }
 
 check_routes <- function(db) {
     con <- db_connect(db)
+    on.exit(db_close(con))
     identical(RSQLite::dbGetQuery(con, "PRAGMA table_info(routes)"),
               data.frame(cid = 0:5,
                          name = c("route_id", "route_short_name", "route_long_name",
@@ -45,5 +45,4 @@ check_routes <- function(db) {
                          notnull = 0L, dflt_value = as.logical(NA),
                          pk = c(1L, 0L, 0L, 0L, 0L, 0L),
                          stringsAsFactors = FALSE))
-    db_close(con)
 }

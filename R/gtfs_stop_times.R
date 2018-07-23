@@ -1,5 +1,6 @@
 create_stop_times <- function(db) {
     con <- db_connect(db)
+    on.exit(db_close(con))
     if (RSQLite::dbExistsTable(con, "stop_times")) {
         stop("Stop_Times table already exists")
     }
@@ -20,12 +21,11 @@ create_stop_times <- function(db) {
             "  PRIMARY KEY (trip_id, stop_id, stop_sequence)",
             ")"))
     RSQLite::dbClearResult(res)
-
-    db_close(con)
 }
 
 update_stop_times <- function(object, file) {
     con <- db_connect(object$database)
+    on.exit(db_close(con))
     existing <- RSQLite::dbGetQuery(con, "SELECT trip_id || stop_id || stop_sequence FROM stop_times")
     tbl <- utils::read.csv(file, header = TRUE)
     stop_times <- data.frame(trip_id = as.character(tbl$trip_id),
@@ -43,11 +43,11 @@ update_stop_times <- function(object, file) {
             !paste0(stop_times$trip_id, stop_times$stop_id,
                     stop_times$stop_sequence) %in% existing, ]
     RSQLite::dbWriteTable(con, "stop_times", stop_times, append = TRUE)
-    db_close(con)
 }
 
 check_stop_times <- function(db) {
     con <- db_connect(db)
+    on.exit(db_close(con))
     res <- identical(RSQLite::dbGetQuery(con, "PRAGMA table_info(stop_times)"),
               data.frame(cid = 0:8,
                          name = c("trip_id", "stop_id", "stop_sequence", "arrival_time",
@@ -58,6 +58,5 @@ check_stop_times <- function(db) {
                          notnull = 0L, dflt_value = as.logical(NA),
                          pk = c(1L, 2L, 3L, 0L, 0L, 0L, 0L, 0L, 0L),
                          stringsAsFactors = FALSE))
-    db_close(con)
     res
 }
