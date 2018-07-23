@@ -8,7 +8,7 @@
 # Portions Copyright (C) 2016  Craig Radcliffe
 
 # require at least autoconf 2.61
-AC_PREREQ(2.61)
+AC_PREREQ(2.69)
 
 # Process this file with autoconf to produce a configure script.
 AC_INIT([transitr],[0.0.0.9000])
