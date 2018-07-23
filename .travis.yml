@@ -17,7 +17,5 @@ addons:
       - libprotoc-dev 
       - protobuf-compiler 
 
-
-
 after_success:
   - Rscript -e 'covr::codecov()'

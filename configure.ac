@@ -132,4 +132,6 @@ transitr $PACKAGE_VERSION
 
 cflags:  ${PKG_CPPFLAGS} 
 libs:    ${PKG_LIBS}
+cppflags: ${CPPFLAGS}
+cxxflags: ${CXXFLAGS}
 "
