@@ -49,19 +49,23 @@ url <- "https://github.com/tmelliott/transitr/raw/develop/inst/extdata/auckland_
 fzip <- tempfile(fileext = ".zip")
 fdir <- file.path(tempdir(), "data")
 
-download.file(url, fzip, quiet = TRUE)
-unzip(fzip, exdir = fdir)
+skip <- inherits(try(download.file(url, fzip, quiet = TRUE)), "try-error")
+if (!skip) unzip(fzip, exdir = fdir)
 
 test_that("database updates from directory", {
+    if (skip) skip("Couldn't download file")
     expect_is(create_gtfs(fdir, quiet = TRUE), "trgtfs")
     expect_output(create_gtfs(fdir))
 })
 
 test_that("database updates from a zip file", {
+    if (skip) skip("Couldn't download file")
     expect_is(create_gtfs(fzip, quiet = TRUE), "trgtfs")
 })
 
 test_that("database updates from a URL (remote ZIP file)", {
+    x <- try(create_gtfs(url, quiet = TRUE))
+    if (inherits(x, "try-error")) skip("Couldn't download file")
     expect_is(create_gtfs(url, quiet = TRUE), "trgtfs")
 })
 

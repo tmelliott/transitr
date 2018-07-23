@@ -7,7 +7,8 @@ CURL_LIBS=-lcurl
 
 ## Configure tells us about locations for ## both Rcpp (ie libRcpp.so and Rcpp.h) and 
 ## ProtoBuf headers and library via these variables
-PKG_CPPFLAGS=@PKG_CPPFLAGS@ -Wno-deprecated-declarations
+PKG_CPPFLAGS=@PKG_CPPFLAGS@ 
+#-Wno-deprecated-declarations
 PKG_LIBS=@PKG_LIBS@ $(CURL_LIBS) 
 
 
@@ -20,7 +21,7 @@ OBJECTS = construct_network.o geo.o gtfs.o process_shape.o realtime_main.o \
 	test-geo.o test-runner.o RcppExports.o gtfs-realtime.pb.o \
 	vendor/sqlite3/sqlite3.o
 
-realtime_main.o: gtfs-realtime.pb.o
+realtime_main.o: gtfs-realtime.pb.o vendor/sqlite3/sqlite3.o
 gtfs-realtime.pb.o: gtfs-realtime.pb.cpp
 $(PROTOFILES): vendor/protobuf/gtfs-realtime.proto
 	protoc -I=. --cpp_out=. $^

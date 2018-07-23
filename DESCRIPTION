@@ -16,7 +16,6 @@ Depends:
     R (>= 3.4.0)
 Imports: 
     Rcpp,
-    ggplot2,
     tools,
     RSQLite,
     magrittr,

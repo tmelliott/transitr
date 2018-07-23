@@ -3,6 +3,7 @@
 rm -f config.* src/Makevars \
     src/*.o src/*.d src/*.a src/*.dll src/*.so src/*.rc */*~ *~ \
     src/gtfs-realtime.pb.cpp \
-    src/vendor/protobuf/gtfs-realtime.pb.h
+    src/vendor/protobuf/gtfs-realtime.pb.o \
+    src/vendor/sqlite3/sqlite3.o
 
 rm -rf inst/doc/auto autom4te.cache

@@ -77,7 +77,7 @@ namespace Gtfs
 
     /***************************************************** Agency */
     Agency::Agency (std::string& id, Gtfs* gtfs) : 
-        _agency_id (id), gtfs (gtfs)
+        gtfs (gtfs), _agency_id (id)
     {
         Rcpp::Rcout << " + Create Agency " << _agency_id << "\n";
     }
@@ -177,7 +177,7 @@ namespace Gtfs
 
     /***************************************************** Route */
     Route::Route (std::string& id, Gtfs* gtfs) : 
-        _route_id (id), gtfs (gtfs)
+        gtfs (gtfs), _route_id (id)
     {
         Rcpp::Rcout << " + Create Route " << _route_id << "\n";
     }
@@ -278,7 +278,7 @@ namespace Gtfs
 
     /***************************************************** Trip */
     Trip::Trip (std::string& id, Gtfs* gtfs) : 
-        _trip_id (id), gtfs (gtfs)
+        gtfs (gtfs), _trip_id (id)
     {
         Rcpp::Rcout << " + Create Trip " << _trip_id << "\n";
     }
