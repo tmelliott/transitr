@@ -1,4 +1,5 @@
 library(transitr)
+
 library(magrittr)
 
 nw <- create_gtfs(system.file("extdata", "auckland_gtfs.zip", 

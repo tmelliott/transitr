@@ -110,4 +110,6 @@ void run_realtime_model (
 
     // Connect GTFS database
     Gtfs::Gtfs gtfs (dbname);
+
+    Rcout << "\n --- Finished ---\n\n";
 }
