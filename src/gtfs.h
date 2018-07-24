@@ -6,15 +6,44 @@
 #include <unordered_map>
 
 #include "geo.h"
+#include "time.h"
 
 namespace Gtfs 
 {
+
+    struct ShapePt;
+    struct ShapeSegment;
+    struct StopTime;
 
     class Gtfs;
     class Agency;
     class Route;
     class Trip;
     class Shape;
+    class Stop;
+
+    struct ShapePt
+    {
+        latlng pt;
+        double distance;
+        ShapePt (double x, double y, double d);
+    };
+    struct ShapeSegment
+    {
+        // Segment* segment;
+        double distance;
+    };
+    struct StopTime
+    {
+        Stop* stop;
+        Trip* trip;
+        Time arrival_time;
+        Time departure_time;
+        std::string stop_headsign;
+        int pickup_type;
+        int dropoff_type;
+        double distance;
+    };
 
     class Agency 
     {
@@ -82,6 +111,7 @@ namespace Gtfs
         Route* _route;
         Shape* _shape;
         // Calendar* _calendar;
+        std::vector<StopTime> _stops;
         std::string _block_id;
         bool _direction_id; // 0 or 1
         std::string _trip_headsign;
@@ -101,23 +131,13 @@ namespace Gtfs
         Route* route ();
         Shape* shape ();
         // Calendar* calendar ();
+        std::vector<StopTime> stops ();
         std::string& block_id ();
         bool direction_id ();
         std::string& trip_headsign ();
         float version ();
     };
 
-    struct ShapePt
-    {
-        latlng pt;
-        double distance;
-        ShapePt (double x, double y, double d);
-    };
-    struct ShapeSegment
-    {
-        // Segment* segment;
-        double distance;
-    };
     class Shape
     {
     private:
@@ -140,6 +160,42 @@ namespace Gtfs
         std::string& shape_id ();
         std::vector<ShapePt>& path ();
         std::vector<ShapeSegment>& segments ();
+        float version ();
+    };
+
+
+    class Stop
+    {
+    private:
+        Gtfs* gtfs;
+        std::string _stop_id;
+        latlng _stop_position;
+        std::string _stop_code;
+        std::string _stop_name;
+        std::string _stop_desc;
+        std::string _zone_id;
+        std::string _parent_station;
+        int _location_type;
+        float _version;
+
+        bool loaded = false;
+        bool completed = false;
+
+    public:
+        Stop (std::string& id, Gtfs* gtfs);
+
+        void load ();
+        void unload ();
+        void unload (bool complete);
+
+        std::string& stop_id ();
+        latlng& stop_position ();
+        std::string& stop_code ();
+        std::string& stop_name ();
+        std::string& stop_desc ();
+        std::string& zone_id ();
+        std::string& parent_station ();
+        int location_type ();
         float version ();
     };
 
