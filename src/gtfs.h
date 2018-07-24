@@ -5,6 +5,8 @@
 #include <string>
 #include <unordered_map>
 
+#include "geo.h"
+
 namespace Gtfs 
 {
 
@@ -12,6 +14,7 @@ namespace Gtfs
     class Agency;
     class Route;
     class Trip;
+    class Shape;
 
     class Agency 
     {
@@ -53,8 +56,8 @@ namespace Gtfs
         Agency* _agency;
         float _version;
 
-        bool loaded;
-        bool completed;
+        bool loaded = false;
+        bool completed = false;
 
     public:
         Route (std::string& id, Gtfs* gtfs);
@@ -77,15 +80,15 @@ namespace Gtfs
         Gtfs* gtfs;
         std::string _trip_id;
         Route* _route;
-        // Shape* _shape;
+        Shape* _shape;
         // Calendar* _calendar;
         std::string _block_id;
         bool _direction_id; // 0 or 1
         std::string _trip_headsign;
         float _version;
 
-        bool loaded;
-        bool completed;
+        bool loaded = false;
+        bool completed = false;
 
     public:
         Trip (std::string& id, Gtfs* gtfs);
@@ -96,11 +99,47 @@ namespace Gtfs
 
         std::string& trip_id ();
         Route* route ();
-        // Shape* shape ();
+        Shape* shape ();
         // Calendar* calendar ();
         std::string& block_id ();
         bool direction_id ();
         std::string& trip_headsign ();
+        float version ();
+    };
+
+    struct ShapePt
+    {
+        latlng pt;
+        double distance;
+        ShapePt (double x, double y, double d);
+    };
+    struct ShapeSegment
+    {
+        // Segment* segment;
+        double distance;
+    };
+    class Shape
+    {
+    private:
+        Gtfs* gtfs;
+        std::string _shape_id;
+        std::vector<ShapePt> _path;
+        std::vector<ShapeSegment> _segments;
+        float _version;
+
+        bool loaded = false;
+        bool completed = false;
+
+    public:
+        Shape (std::string& id, Gtfs* gtfs);
+
+        void load ();
+        void unload ();
+        void unload (bool complete);
+
+        std::string& shape_id ();
+        std::vector<ShapePt>& path ();
+        std::vector<ShapeSegment>& segments ();
         float version ();
     };
 
@@ -112,6 +151,7 @@ namespace Gtfs
         std::unordered_map<std::string, Agency> _agencies;
         std::unordered_map<std::string, Route> _routes;
         std::unordered_map<std::string, Trip> _trips;
+        std::unordered_map<std::string, Shape> _shapes;
 
 
     public:
@@ -123,9 +163,7 @@ namespace Gtfs
         Agency* find_agency (std::string& id);
         Route* find_route (std::string& id);
         Trip* find_trip (std::string& id);
-
-
-
+        Shape* find_shape (std::string& id);
     };
 
 

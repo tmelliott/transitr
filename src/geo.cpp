@@ -8,6 +8,17 @@
 #include "node.h"
 #include "geo.h"
 
+latlng::latlng ()
+{
+  latitude = 0.0;
+  longitude = 0.0;
+}
+latlng::latlng (double lat, double lng)
+{
+  latitude = lat;
+  longitude = lng;
+}
+
 double deg2rad(double deg) {
   return (deg * M_PI / 180.0);
 }

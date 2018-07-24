@@ -5,6 +5,13 @@
 
 #define earthRadius 6371000
 
+struct latlng {
+    double latitude;
+    double longitude;
+    latlng ();
+    latlng (double lat, double lng);
+};
+
 double deg2rad (double deg);
 double rad2deg (double rad);
 
