@@ -3461,8 +3461,6 @@ ac_link='$CXX -o conftest$ac_exeext $CXXFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ex
 ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 
 
-## simpler alternative to test below:  AC_PATH_PROG(PROTOC, protoc)
-
 
 # Extract the first word of "pkg-config", so it can be a program name with args.
 set dummy pkg-config; ac_word=$2
@@ -3512,10 +3510,21 @@ if test x"${PKGCONFIG}" == x"yes"; then
     protobuf_cxxflags=""
     protobuf_libs="-lprotobuf"
   fi
+
+  if pkg-config --exists libcurl; then
+    curl_cxxflags=`pkg-config --cflags libcurl`
+    curl_libs=`pkg-config --libs libcurl`
+  else
+    curl_cxxflags=""
+    curl_libs="-libcurl"
+  fi
 else
-  # Add a reasonable default of -lprotobuf if we don't have pkg-config
+  # Add a reasonable default of -lprotobuf and -lcurl if we don't have pkg-config
   protobuf_cxxflags=""
   protobuf_libs="-lprotobuf"
+
+  curl_cxxflags=""
+  curl_libs="-libcurl"
 fi
 
 ## And make sure these flags are used for the tests below.
@@ -3569,12 +3578,6 @@ if test x"${PROTOC}" == x"no" ; then
 "
     exit 1
 fi
-
-## look for protobuf headers -- now use pkg-config which even does minimum version
-##
-## next two lines break witha autoconf 2.65 :-/
-#PROTOBUF_VERSION="2.2.0"
-#PKG_CHECK_MODULES(ProtoBuf, protobuf >= 2.2.0, , AC_MSG_ERROR(Protobuf version 2.2.0 required))
 
 ## check for header and ability to link
 ## first for headers Debian has in libprotobuf-dev
@@ -3879,8 +3882,6 @@ fi
 
 
 ## third check the lib itself
-#pb_savedlibs="$LIBS"
-# LIBS="$LIBS -lprotoc -lprotobuf -lpthread"
 LIBS="$LIBS $protobuf_libs"
 
 ## also check for minimum version
@@ -3957,18 +3958,10 @@ fi
 
 
 
-## With thanks to Kurt
-: ${R_HOME=`R RHOME`}
-if test -z "${R_HOME}"; then
-    as_fn_error $? "Could not determine R_HOME." "$LINENO" 5
-fi
-R_CXXFLAGS=`"${R_HOME}/bin/R" CMD config CXXFLAGS`
-CXXFLAGS="${CXXFLAGS} ${R_CXXFLAGS}"
+# ## now use all these
+PKG_CPPFLAGS="${PKG_CPPFLAGS} ${CXXFLAGS} ${protobuf_cxxflags} ${curl_cxxflags}"
 
-## now use all these
-PKG_CPPFLAGS="${PKG_CPPFLAGS} ${CXXFLAGS} ${protobuf_cxxflags}"
-
-PKG_LIBS="${PKG_LIBS} ${protobuf_libs}"
+PKG_LIBS="${PKG_LIBS} ${protobuf_libs} ${curl_libs}"
 
 ac_config_files="$ac_config_files src/Makevars"
 
@@ -5132,8 +5125,8 @@ echo "
 transitr $PACKAGE_VERSION
 =========================
 
-cflags:  ${PKG_CPPFLAGS}
-libs:    ${PKG_LIBS}
+cflags:   ${PKG_CPPFLAGS}
+libs:     ${PKG_LIBS}
 cppflags: ${CPPFLAGS}
 cxxflags: ${CXXFLAGS}
 "

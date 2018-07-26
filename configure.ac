@@ -7,7 +7,7 @@
 # Portions Copyright (C) 2013  Murray Stokely
 # Portions Copyright (C) 2016  Craig Radcliffe
 
-# require at least autoconf 2.61
+# require at least autoconf 2.69
 AC_PREREQ(2.69)
 
 # Process this file with autoconf to produce a configure script.
@@ -18,8 +18,6 @@ AC_LANG(C++)
 AC_REQUIRE_CPP
 AC_PROG_CC
 AC_PROG_CXX
-
-## simpler alternative to test below:  AC_PATH_PROG(PROTOC, protoc)
 
 AC_DEFUN([AC_PROG_PKGCONFIG], [AC_CHECK_PROG(PKGCONFIG,pkg-config,yes)])
 AC_PROG_PKGCONFIG
@@ -34,10 +32,21 @@ if test x"${PKGCONFIG}" == x"yes"; then
     protobuf_cxxflags=""
     protobuf_libs="-lprotobuf"
   fi
+
+  if pkg-config --exists libcurl; then
+    curl_cxxflags=`pkg-config --cflags libcurl`
+    curl_libs=`pkg-config --libs libcurl`
+  else
+    curl_cxxflags=""
+    curl_libs="-libcurl"
+  fi
 else
-  # Add a reasonable default of -lprotobuf if we don't have pkg-config
+  # Add a reasonable default of -lprotobuf and -lcurl if we don't have pkg-config
   protobuf_cxxflags=""
   protobuf_libs="-lprotobuf"
+
+  curl_cxxflags=""
+  curl_libs="-libcurl"
 fi
 
 ## And make sure these flags are used for the tests below.
@@ -55,12 +64,6 @@ if test x"${PROTOC}" == x"no" ; then
 "
     exit 1
 fi
-
-## look for protobuf headers -- now use pkg-config which even does minimum version
-##
-## next two lines break witha autoconf 2.65 :-/
-#PROTOBUF_VERSION="2.2.0"
-#PKG_CHECK_MODULES(ProtoBuf, protobuf >= 2.2.0, , AC_MSG_ERROR(Protobuf version 2.2.0 required))
 
 ## check for header and ability to link
 ## first for headers Debian has in libprotobuf-dev
@@ -84,8 +87,6 @@ AC_CHECK_HEADER([$protobuf_common_header],,
 AC_CHECK_HEADER(google/protobuf/compiler/code_generator.h,,
                 [AC_MSG_ERROR([ERROR: ProtoBuf compiler headers required; use '-Iincludedir' in CXXFLAGS for unusual locations.])])
 ## third check the lib itself
-#pb_savedlibs="$LIBS"
-# LIBS="$LIBS -lprotoc -lprotobuf -lpthread"
 LIBS="$LIBS $protobuf_libs"
 
 ## also check for minimum version
@@ -112,17 +113,9 @@ fi
 AC_DEFUN([AC_PROG_R], [AC_CHECK_PROG(R,R,yes)])
 AC_PROG_R
 
-## With thanks to Kurt
-: ${R_HOME=`R RHOME`}
-if test -z "${R_HOME}"; then
-    AC_MSG_ERROR([Could not determine R_HOME.])   
-fi
-R_CXXFLAGS=`"${R_HOME}/bin/R" CMD config CXXFLAGS`
-CXXFLAGS="${CXXFLAGS} ${R_CXXFLAGS}"
-
-## now use all these
-AC_SUBST([PKG_CPPFLAGS],["${PKG_CPPFLAGS} ${CXXFLAGS} ${protobuf_cxxflags}"])
-AC_SUBST([PKG_LIBS],["${PKG_LIBS} ${protobuf_libs}"])
+# ## now use all these
+AC_SUBST([PKG_CPPFLAGS],["${PKG_CPPFLAGS} ${CXXFLAGS} ${protobuf_cxxflags} ${curl_cxxflags}"])
+AC_SUBST([PKG_LIBS],["${PKG_LIBS} ${protobuf_libs} ${curl_libs}"])
 AC_CONFIG_FILES([src/Makevars])
 AC_OUTPUT
 
@@ -130,8 +123,8 @@ echo "
 transitr $PACKAGE_VERSION
 =========================
 
-cflags:  ${PKG_CPPFLAGS} 
-libs:    ${PKG_LIBS}
+cflags:   ${PKG_CPPFLAGS} 
+libs:     ${PKG_LIBS}
 cppflags: ${CPPFLAGS}
 cxxflags: ${CXXFLAGS}
 "

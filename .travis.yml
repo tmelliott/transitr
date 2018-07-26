@@ -19,3 +19,9 @@ addons:
 
 after_success:
   - Rscript -e 'covr::codecov()'
+
+notifications:
+  email:
+    on_success: change
+    on_failure: change
+    
