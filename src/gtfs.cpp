@@ -157,34 +157,107 @@ namespace Gtfs
             sqlite3_finalize (stmt);
             Rcpp::Rcout << " + Created " << _shapes.size () << " shapes\n";
         }
+        // load STOPS
+        {
+            if (sqlite3_prepare_v2 (db, "SELECT count(distinct stop_id) FROM stops",
+                                    -1, &stmt, 0) != SQLITE_OK)
+            {
+                Rcpp::Rcerr << " x Can't prepare query\n  "
+                    << sqlite3_errmsg (db) << "\n";
+                sqlite3_finalize (stmt);
+                sqlite3_close (db);
+                return;
+            }
+            _stops.reserve (sqlite3_column_int (stmt, 0));
+            sqlite3_finalize (stmt);
+
+            if (sqlite3_prepare_v2 (db, "SELECT distinct stop_id FROM stops",
+                                    -1, &stmt, 0) != SQLITE_OK)
+            {
+                Rcpp::Rcerr << " x Can't prepare query\n  "
+                    << sqlite3_errmsg (db) << "\n";
+                sqlite3_finalize (stmt);
+                sqlite3_close (db);
+                return;
+            }
+            std::string sid;
+            while (sqlite3_step (stmt) == SQLITE_ROW)
+            {
+                sid = (char*)sqlite3_column_text (stmt, 0);
+                _stops.emplace (std::piecewise_construct,
+                                 std::forward_as_tuple (sid),
+                                 std::forward_as_tuple (sid, this));
+            }
+            sqlite3_finalize (stmt);
+            Rcpp::Rcout << " + Created " << _stops.size () << " stops\n";
+        }
+        // load CALENDAR
+        {
+            if (sqlite3_prepare_v2 (db, "SELECT count(service_id) FROM calendar",
+                                    -1, &stmt, 0) != SQLITE_OK)
+            {
+                Rcpp::Rcerr << " x Can't prepare query\n  "
+                    << sqlite3_errmsg (db) << "\n";
+                sqlite3_finalize (stmt);
+                sqlite3_close (db);
+                return;
+            }
+            _calendar.reserve (sqlite3_column_int (stmt, 0));
+            sqlite3_finalize (stmt);
+
+            if (sqlite3_prepare_v2 (db, "SELECT service_id FROM calendar",
+                                    -1, &stmt, 0) != SQLITE_OK)
+            {
+                Rcpp::Rcerr << " x Can't prepare query\n  "
+                    << sqlite3_errmsg (db) << "\n";
+                sqlite3_finalize (stmt);
+                sqlite3_close (db);
+                return;
+            }
+            std::string cid;
+            while (sqlite3_step (stmt) == SQLITE_ROW)
+            {
+                cid = (char*)sqlite3_column_text (stmt, 0);
+                _calendar.emplace (std::piecewise_construct,
+                                   std::forward_as_tuple (cid),
+                                   std::forward_as_tuple (cid, this));
+            }
+            sqlite3_finalize (stmt);
+            Rcpp::Rcout << " + Created " << _calendar.size () << " services\n";
+        }
+
 
         sqlite3_close (db);
 
 
         
         //  --- testing
-        Rcpp::Rcout << "\n *** test creating some things ...\n";
-
-        // std::string tid ("1141101952-20180702170310_v67.28");
-        
-        // _agencies.emplace (std::piecewise_construct,
-        //                    std::forward_as_tuple (aid),
-        //                    std::forward_as_tuple (aid, this));
-        // _routes.emplace (std::piecewise_construct,
-        //                  std::forward_as_tuple (rid),
-        //                  std::forward_as_tuple (rid, this));
-        // _trips.emplace (std::piecewise_construct,
-        //                 std::forward_as_tuple (tid),
-        //                 std::forward_as_tuple (tid, this));
-
-
         Rcpp::Rcout << "\n\n *** Request information -> load ...\n";
+        Trip* atrip = &(_trips.begin ()->second);
         Rcpp::Rcout << "\n\n > Trip is run by "
-            << _trips.begin ()->second.route ()
-                    ->agency ()->agency_name ()
+            << atrip->route ()->agency ()->agency_name ()
             << " and has "
-            << _trips.begin ()->second.shape ()->path ().size ()
-            << " points in its path\n";
+            << atrip->shape ()->path ().size ()
+            << " points in its path and "
+            << atrip->stops ().size ()
+            << " stops.\n"
+            << " > Service: " << atrip->calendar ()->start_date ()
+            << " - " << atrip->calendar ()->end_date ()
+            << "\n";
+
+        Rcpp::Rcout << " > Departs first stop ["
+            << atrip->stops ().begin ()->stop->stop_code () 
+            << "] at "
+            << atrip->stops ().begin ()->departure_time
+            << " and arrives last stop ["
+            << atrip->stops ().back ().stop->stop_code ()
+            << "] at "
+            << atrip->stops ().back ().arrival_time
+            << ".\n\n";
+
+        Stop* astop = atrip->stops ().back ().stop;
+        Rcpp::Rcout << " > Stop " << astop->stop_code ()
+            << " has " << astop->trips ().size () << " trips loaded.\n\n";
     }
 
     std::string& Gtfs::dbname () 
@@ -226,6 +299,26 @@ namespace Gtfs
     {
         auto search = _shapes.find (id);
         if (search != _shapes.end ())
+        {
+            return &(search->second);
+        }
+        return nullptr;
+    }
+
+    Stop* Gtfs::find_stop (std::string& id)
+    {
+        auto search = _stops.find (id);
+        if (search != _stops.end ())
+        {
+            return &(search->second);
+        }
+        return nullptr;
+    }
+
+    Calendar* Gtfs::find_calendar (std::string& id)
+    {
+        auto search = _calendar.find (id);
+        if (search != _calendar.end ())
         {
             return &(search->second);
         }
@@ -494,6 +587,7 @@ namespace Gtfs
         std::string shapeid = (char*)sqlite3_column_text (stmt, 1);
         _shape = gtfs->find_shape (shapeid);
         std::string serviceid = (char*)sqlite3_column_text (stmt, 2);
+        _calendar = gtfs->find_calendar (serviceid);
         if (sqlite3_column_type (stmt, 3) != SQLITE_NULL)
         {
             _block_id = (char*)sqlite3_column_text (stmt, 3);
@@ -509,6 +603,80 @@ namespace Gtfs
         _version = (float)sqlite3_column_double (stmt, 6);
 
         sqlite3_finalize (stmt);
+
+        // Load stops
+        { 
+            sqlite3_stmt* stmt;
+            if (sqlite3_prepare_v2 (db, "SELECT count(stop_id) FROM stop_times WHERE trip_id=?",
+                                    -1, &stmt, 0) != SQLITE_OK)
+            {
+                Rcpp::Rcerr << " x Can't prepare query\n  "
+                    << sqlite3_errmsg (db) << "\n";
+                sqlite3_finalize (stmt);
+                sqlite3_close (db);
+                return;
+            }
+            if (sqlite3_bind_text (stmt, 1, _trip_id.c_str (),
+                                   -1, SQLITE_STATIC) != SQLITE_OK)
+            {
+                Rcpp::Rcerr << " x Can't bind stop id to query\n  "
+                    << sqlite3_errmsg (db) << "\n";
+                sqlite3_finalize (stmt);
+                sqlite3_close (db);
+                return; 
+            }
+            if (sqlite3_step (stmt) != SQLITE_ROW)
+            {
+                Rcpp::Rcerr << " x Couldn't get row count from db\n  "
+                    << sqlite3_errmsg (db) << "\n";
+                sqlite3_finalize (stmt);
+                sqlite3_close (db);
+                return;
+            }
+            _stops.reserve (sqlite3_column_int (stmt, 0));
+            sqlite3_finalize (stmt);
+
+            if (sqlite3_prepare_v2(db, "SELECT stop_id, arrival_time, departure_time, stop_headsign, pickup_type, drop_off_type, shape_dist_traveled FROM stop_times WHERE trip_id=? ORDER BY stop_sequence",
+                                   -1, &stmt, 0) != SQLITE_OK)
+            {
+                Rcpp::Rcerr << " x Can't prepare query\n  "
+                    << sqlite3_errmsg (db) << "\n";
+                sqlite3_finalize (stmt);
+                sqlite3_close (db);
+                return;
+            }
+            if (sqlite3_bind_text (stmt, 1, _trip_id.c_str (),
+                                   -1, SQLITE_STATIC) != SQLITE_OK)
+            {
+                Rcpp::Rcerr << " x Can't bind trip id to query\n  "
+                    << sqlite3_errmsg (db) << "\n";
+                sqlite3_finalize (stmt);
+                sqlite3_close (db);
+                return; 
+            }
+            
+            while (sqlite3_step (stmt) == SQLITE_ROW)
+            {
+                std::string stopid = (char*)sqlite3_column_text (stmt, 0);
+                std::string arr = (char*)sqlite3_column_text (stmt, 1);
+                std::string dep = (char*)sqlite3_column_text (stmt, 2);
+                std::string head;
+                if (sqlite3_column_type (stmt, 3) != SQLITE_NULL)
+                {
+                    head = (char*)sqlite3_column_text (stmt, 3);
+                }
+
+                _stops.emplace_back (stopid, this, arr, dep, head,
+                                     sqlite3_column_int (stmt, 4),
+                                     sqlite3_column_int (stmt, 5),
+                                     sqlite3_column_double (stmt, 6),
+                                     gtfs);
+            }
+            _version = (float)sqlite3_column_double (stmt, 3);
+            
+            sqlite3_finalize (stmt);
+        }
+
         sqlite3_close (db);
 
         loaded = true;
@@ -527,7 +695,7 @@ namespace Gtfs
         loaded = false;
         _route = nullptr;
         _shape = nullptr;
-        // _calendar = nullptr;
+        _calendar = nullptr;
         _block_id = "";
         _trip_headsign = "";
         Rcpp::Rcout << " + Trip " << _trip_id << " is unloaded\n";
@@ -545,10 +713,15 @@ namespace Gtfs
         if (!loaded) load ();
         return _shape; 
     }
-    // Calendar* Trip::calendar () { 
-    //     if (!loaded) load ();
-    //     return &_calendar; 
-    // }
+    Calendar* Trip::calendar () { 
+        if (!loaded) load ();
+        return _calendar; 
+    }
+    std::vector<StopTime>& Trip::stops ()
+    {
+        if (!loaded) load ();
+        return _stops;
+    }
     std::string& Trip::block_id () { 
         if (!loaded) load ();
         return _block_id; 
@@ -566,6 +739,24 @@ namespace Gtfs
         return _version; 
     }
 
+
+    /***************************************************** Stoptime */
+    StopTime::StopTime (std::string& stop_id, Trip* tr, 
+                        std::string& at, std::string& dt, 
+                        std::string& headsign, 
+                        int pickup, int dropoff, double dist,
+                        Gtfs* gtfs)
+    {
+        stop = gtfs->find_stop (stop_id);
+        trip = tr;
+        stop->add_trip (trip);
+        arrival_time = Time (at);
+        departure_time = Time (dt);
+        stop_headsign = headsign;
+        pickup_type = pickup;
+        dropoff_type = dropoff;
+        distance = dist;
+    }
 
 
     /***************************************************** ShapePt */
@@ -681,6 +872,324 @@ namespace Gtfs
         if (!loaded) load ();
         return _version; 
     }
+
+
+    /***************************************************** Stop */
+    Stop::Stop (std::string& id, Gtfs* gtfs) : 
+        gtfs (gtfs), _stop_id (id) {}
+
+    void Stop::load ()
+    {
+        sqlite3* db;
+        if (sqlite3_open (gtfs->dbname ().c_str (), &db))
+        {
+            Rcpp::Rcerr << " x Unable to connect to database\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_close (db);
+            return;
+        }
+
+        sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(db, "SELECT stop_lat, stop_lon, stop_code, stop_name, stop_desc, zone_id, parent_station, location_type, version FROM stops WHERE stop_id=?",
+                               -1, &stmt, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            sqlite3_close (db);
+            return;
+        }
+        if (sqlite3_bind_text (stmt, 1, _stop_id.c_str (),
+                               -1, SQLITE_STATIC) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't bind stop id to query\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            sqlite3_close (db);
+            return; 
+        }
+        if (sqlite3_step (stmt) != SQLITE_ROW)
+        {
+            Rcpp::Rcerr << " x Couldn't get stop from db\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            sqlite3_close (db);
+            return;
+        }
+
+        _stop_position = latlng (sqlite3_column_double (stmt, 0),
+                                 sqlite3_column_double (stmt, 1));
+        std::string serviceid = (char*)sqlite3_column_text (stmt, 2);
+        if (sqlite3_column_type (stmt, 2) != SQLITE_NULL)
+        {
+            _stop_code = (char*)sqlite3_column_text (stmt, 2);
+        }
+        if (sqlite3_column_type (stmt, 3) != SQLITE_NULL)
+        {
+            _stop_name = (char*)sqlite3_column_text (stmt, 3);
+        }
+        if (sqlite3_column_type (stmt, 4) != SQLITE_NULL)
+        {
+            _stop_desc = (char*)sqlite3_column_text (stmt, 4);
+        }
+        if (sqlite3_column_type (stmt, 5) != SQLITE_NULL)
+        {
+            _zone_id = (char*)sqlite3_column_text (stmt, 5);
+        }
+        if (sqlite3_column_type (stmt, 6) != SQLITE_NULL)
+        {
+            _parent_station = (char*)sqlite3_column_text (stmt, 6);
+        }
+        if (sqlite3_column_type (stmt, 7) != SQLITE_NULL)
+        {
+            _location_type = sqlite3_column_int (stmt, 7);
+        }
+        _version = (float)sqlite3_column_double (stmt, 8);
+
+        sqlite3_finalize (stmt);
+        sqlite3_close (db);
+
+        loaded = true;
+        Rcpp::Rcout << " + Stop " << _stop_id << " is loaded"
+            << "\n   - Position: ["
+            << _stop_position.latitude << ", " << _stop_position.longitude << "]"
+            << "\n   - Code: " << _stop_code
+            << "\n   - Name: " << _stop_name
+            << "\n   - Desc: " << _stop_desc
+            << "\n   - Version: " << _version << "\n";
+    }
+
+    void Stop::unload () { unload (false); }
+
+    void Stop::unload (bool complete)
+    {
+        completed = complete;
+        loaded = false;
+        _stop_code = "";
+        _stop_name = "";
+        _stop_desc = "";
+        _zone_id = "";
+        _parent_station = "";
+        _trips.clear ();
+        Rcpp::Rcout << " + Stop " << _stop_id << " is unloaded\n";
+    }
+
+    std::string& Stop::stop_id () {
+        if (!loaded) load ();
+        return _stop_id; 
+    }
+    latlng& Stop::stop_position ()
+    {
+        if (!loaded) load ();
+        return _stop_position;
+    }
+    std::string& Stop::stop_code ()
+    {
+        if (!loaded) load ();
+        return _stop_code;
+    }
+    std::string& Stop::stop_name ()
+    {
+        if (!loaded) load ();
+        return _stop_name;
+    }
+    std::string& Stop::stop_desc ()
+    {
+        if (!loaded) load ();
+        return _stop_desc;
+    }
+    std::string& Stop::zone_id ()
+    {
+        if (!loaded) load ();
+        return _zone_id;
+    }
+    std::string& Stop::parent_station ()
+    {
+        if (!loaded) load ();
+        return _parent_station;
+    }
+    int Stop::location_type ()
+    {
+        if (!loaded) load ();
+        return _location_type;
+    }
+    std::vector<Trip*>& Stop::trips ()
+    {
+        if (!loaded) load ();
+        return _trips;
+    }
+    float Stop::version () { 
+        if (!loaded) load ();
+        return _version; 
+    }
+
+    void Stop::add_trip (Trip* t)
+    {
+        // if (!loaded) load ();
+        // this line leaks
+        _trips.push_back (*(&t));
+    }
+
+
+    /***************************************************** CalendarDate */
+    CalendarDate::CalendarDate (std::string& date, int type) :
+    date (date), exception_type (type)
+    {
+
+    }
+
+
+    /***************************************************** Calendar */
+    Calendar::Calendar (std::string& id, Gtfs* gtfs) : 
+        gtfs (gtfs), _service_id (id)
+    {
+    }
+
+    void Calendar::load ()
+    {
+        sqlite3* db;
+        if (sqlite3_open (gtfs->dbname ().c_str (), &db))
+        {
+            Rcpp::Rcerr << " x Unable to connect to database\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_close (db);
+            return;
+        }
+
+        sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(db, "SELECT monday, tuesday, wednesday, thursday, friday, saturday, sunday, start_date, end_date, version FROM calendar WHERE service_id=?",
+                               -1, &stmt, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            sqlite3_close (db);
+            return;
+        }
+        if (sqlite3_bind_text (stmt, 1, _service_id.c_str (),
+                               -1, SQLITE_STATIC) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't bind service id to query\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            sqlite3_close (db);
+            return; 
+        }
+        if (sqlite3_step (stmt) != SQLITE_ROW)
+        {
+            Rcpp::Rcerr << " x Couldn't get calendar from db\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            sqlite3_close (db);
+            return;
+        }
+
+        _monday = (bool)sqlite3_column_int (stmt, 0);
+        _tuesday = (bool)sqlite3_column_int (stmt, 1);
+        _wednesday = (bool)sqlite3_column_int (stmt, 2);
+        _thursday = (bool)sqlite3_column_int (stmt, 3);
+        _friday = (bool)sqlite3_column_int (stmt, 4);
+        _saturday = (bool)sqlite3_column_int (stmt, 5);
+        _sunday = (bool)sqlite3_column_int (stmt, 6);
+        if (sqlite3_column_type (stmt, 7) != SQLITE_NULL)
+        {
+            _start_date = (char*)sqlite3_column_text (stmt, 7);
+        }
+        if (sqlite3_column_type (stmt, 8) != SQLITE_NULL)
+        {
+            _end_date = (char*)sqlite3_column_text (stmt, 8);
+        }
+        _version = (float)sqlite3_column_double (stmt, 9);
+
+        sqlite3_finalize (stmt);
+        sqlite3_close (db);
+
+        loaded = true;
+        Rcpp::Rcout << " + Calendar " << _service_id << " is loaded"
+            << "\n   - Days: "
+            << (_monday ? "M" : "-")
+            << (_tuesday ? "T" : "-")
+            << (_wednesday ? "W" : "-")
+            << (_thursday ? "T" : "-")
+            << (_friday ? "F" : "-")
+            << (_saturday ? "S" : "-")
+            << (_sunday ? "S" : "-")
+            << "\n   - Version: " << _version << "\n";
+    }
+
+    void Calendar::unload () { unload (false); }
+
+    void Calendar::unload (bool complete)
+    {
+        // only makes sense to unload things with a size
+        completed = complete;
+        loaded = false;
+        _start_date = "";
+        _end_date = "";
+        Rcpp::Rcout << " + Calendar " << _service_id << " is unloaded\n";
+    }
+
+    std::string& Calendar::service_id () { 
+        if (!loaded) load();
+        return _service_id; 
+    }
+    bool Calendar::monday ()
+    {
+        if (!loaded) load ();
+        return _monday;
+    }
+    bool Calendar::tuesday ()
+    {
+        if (!loaded) load ();
+        return _tuesday;
+    }
+    bool Calendar::wednesday ()
+    {
+        if (!loaded) load ();
+        return _wednesday;
+    }
+    bool Calendar::thursday ()
+    {
+        if (!loaded) load ();
+        return _thursday;
+    }
+    bool Calendar::friday ()
+    {
+        if (!loaded) load ();
+        return _friday;
+    }
+    bool Calendar::saturday ()
+    {
+        if (!loaded) load ();
+        return _saturday;
+    }
+    bool Calendar::sunday ()
+    {
+        if (!loaded) load ();
+        return _sunday;
+    }
+    std::string& Calendar::start_date ()
+    {
+        if (!loaded) load ();
+        return _start_date;
+    }
+    std::string& Calendar::end_date ()
+    {
+        if (!loaded) load ();
+        return _end_date;
+    }
+    float Calendar::version () { 
+        if (!loaded) load();
+        return _version; 
+    }
+
+    bool Calendar::weekdays ()
+    {
+        if (!loaded) load();
+        return _monday && _tuesday && _wednesday &&
+            _thursday && _friday;
+    }
+
 
 
 }; // namespace Gtfs

@@ -4,6 +4,11 @@
 
 #include <Rcpp.h>
 
+Time::Time ()
+{
+    _seconds = 0;
+}
+
 Time::Time (int s)
 {
     if (s < 0)
@@ -35,7 +40,11 @@ Time::Time (int h, int m, int s)
 Time::Time (std::string& t)
 {
     // not yet implemented
-    Time (0);
+    struct tm tm;
+    strptime (t.c_str (), "%H:%M:%S", &tm);
+    int sec = tm.tm_hour * SECONDS_IN_HOUR + 
+        tm.tm_min * SECONDS_IN_MIN + tm.tm_sec;
+    _seconds = sec;
 }
 
 Time Time::now ()

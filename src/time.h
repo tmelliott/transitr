@@ -13,6 +13,7 @@ private:
     static const int SECONDS_IN_MIN = 60;
 
 public:
+    Time ();
     Time (int s);
     Time (int h, int m, int s);
     Time (std::string& t);
