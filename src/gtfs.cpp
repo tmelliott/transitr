@@ -265,6 +265,31 @@ namespace Gtfs
         return _dbname;
     }
 
+    std::unordered_map<std::string, Agency>& Gtfs::agencies ()
+    {
+        return _agencies;
+    }
+    std::unordered_map<std::string, Route>& Gtfs::routes ()
+    {
+        return _routes;
+    }
+    std::unordered_map<std::string, Trip>& Gtfs::trips ()
+    {
+        return _trips;
+    }
+    std::unordered_map<std::string, Shape>& Gtfs::shapes ()
+    {
+        return _shapes;
+    }
+    std::unordered_map<std::string, Stop>& Gtfs::stops ()
+    {
+        return _stops;
+    }
+    std::unordered_map<std::string, Calendar>& Gtfs::calendar ()
+    {
+        return _calendar;
+    }
+
     Agency* Gtfs::find_agency (std::string& id)
     {
         auto search = _agencies.find (id);

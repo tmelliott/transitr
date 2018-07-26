@@ -277,6 +277,12 @@ namespace Gtfs
         Gtfs (std::string& name);
 
         std::string& dbname ();
+        std::unordered_map<std::string, Agency>& agencies ();
+        std::unordered_map<std::string, Route>& routes ();
+        std::unordered_map<std::string, Trip>& trips ();
+        std::unordered_map<std::string, Shape>& shapes ();
+        std::unordered_map<std::string, Stop>& stops ();
+        std::unordered_map<std::string, Calendar>& calendar ();
 
         // "Find" functions
         Agency* find_agency (std::string& id);
