@@ -1,6 +1,6 @@
 COMPILED_BY ?= gcc-4.6.3
 PKG_CPPFLAGS= -I../windows/protobuf-3.5.1/include
-PKG_LIBS= -L../windows/protobuf-3.5.1/lib${subst gcc,,${COMPILED_BY}}${R_ARCH} -lprotobuf
+PKG_LIBS= -L../windows/protobuf-3.5.1/lib${subst gcc,,${COMPILED_BY}}${R_ARCH} -lprotobuf -lcurl
 PROTOC=../windows/protobuf-3.5.1/bin64/protoc.exe
 
 ## Make this C++11 so that we get better int64 support and more
@@ -27,7 +27,7 @@ OBJECTS =  \
 	RcppExports.o
 
 PROTOFILES = gtfs-realtime.pb.cpp vendor/protobuf/gtfs-realtime.pb.h
-realtime_main.o: $(PROTOFILES)
+gtfs-realtime.pb.o: $(PROTOFILES)
 $(PROTOFILES): vendor/protobuf/gtfs-realtime.proto winlibs
 	$(PROTOC) -I=. --cpp_out=. $<
 	mv vendor/protobuf/gtfs-realtime.pb.cc gtfs-realtime.pb.cpp
