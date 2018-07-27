@@ -10,15 +10,16 @@ PKG_CPPFLAGS=  #-g -O2 -Wall -g -O2
 
 $(SHLIB): $(OBJECTS)
 
-OBJECTS =  geo.o gtfs.o time.o \
+OBJECTS = \
+	gtfs-realtime.pb.o vendor/sqlite3/sqlite3.o \
+	geo.o gtfs.o time.o \
 	process_shape.o construct_network.o \
 	realtime_main.o \
-	test-time.o test-geo.o test-gtfs.o test-runner.o RcppExports.o \
-	gtfs-realtime.pb.o \
-	vendor/sqlite3/sqlite3.o
+	test-time.o test-geo.o test-gtfs.o test-runner.o \
+	RcppExports.o
 
 PROTOFILES = gtfs-realtime.pb.cpp vendor/protobuf/gtfs-realtime.pb.h
-realtime_main.o: $(PROTOFILES)
+gtfs-realtime.pb.o: $(PROTOFILES)
 $(PROTOFILES): vendor/protobuf/gtfs-realtime.proto
 	protoc -I=. --cpp_out=. $^
 	mv vendor/protobuf/gtfs-realtime.pb.cc gtfs-realtime.pb.cpp

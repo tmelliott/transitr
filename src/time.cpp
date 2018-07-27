@@ -1,6 +1,4 @@
 #include "time.h"
-#include <sstream>
-#include <iomanip>
 #include <ctime>
 #include <stdexcept>
 
@@ -41,15 +39,27 @@ Time::Time (int h, int m, int s)
 
 Time::Time (std::string& t)
 {
-    struct std::tm tm;
-    std::istringstream input (t);
-    input >> std::get_time (&tm, "%H:%M:%S");
-    if (input.fail ())
-    {
-        throw std::runtime_error ("Unable to read the time :(");
-    }
+#ifdef __LINUX__
+    struct tm tm;
+    strptime (t.c_str (), "%H:%M:%S", &tm);
     int sec = tm.tm_hour * SECONDS_IN_HOUR + 
         tm.tm_min * SECONDS_IN_MIN + tm.tm_sec;
+#else
+    // necessary to manually pull apart the string 
+    std::string delim = ":";
+    size_t pos = 0;
+    std::string token;
+    std::vector<int> tmv;
+    while ((pos = t.find (delim)) != std::string::npos)
+    {
+        token = t.substr (0, pos);
+        tmv.push_back (stoi (token));
+        t.erase (0, pos + delim.length ());
+    }
+    int sec = tmv[0] * SECONDS_IN_HOUR +
+        tmv[1] * SECONDS_IN_MIN * tmv[2];
+#endif
+
     _seconds = sec;
 }
 

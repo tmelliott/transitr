@@ -4,6 +4,8 @@
 #include <string>
 #include <iostream>
 
+char *strptime(const char * __restrict, const char * __restrict, struct tm * __restrict);
+
 class Time {
 private:
     int _seconds;
