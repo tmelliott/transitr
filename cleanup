@@ -8,4 +8,4 @@ rm -f config.* \
     src/vendor/sqlite3/sqlite3.o \
     transitr_*.tar.gz
 
-rm -rf inst/doc/auto autom4te.cache transitr.Rcheck 
+rm -rf inst/doc/auto autom4te.cache transitr.Rcheck windows
