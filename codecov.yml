@@ -1,7 +1,10 @@
 comment: false
 
+# some files we don't develop outselves, so why test them ...? 
+# (yes, probably should, but, ...)
 ignore:
   - "src/vendor/**/*"
+  - "src/gtfs-realtime.pb.cpp"
 
 coverage:
   status:

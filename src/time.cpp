@@ -1,4 +1,5 @@
 #include "time.h"
+#include <sstream>
 #include <iomanip>
 #include <ctime>
 #include <stdexcept>
@@ -42,7 +43,7 @@ Time::Time (std::string& t)
 {
     struct std::tm tm;
     std::istringstream input (t);
-    input >> std::get_time(&tm, "%H:%M:%S");
+    input >> std::get_time (&tm, "%H:%M:%S");
     if (input.fail ())
     {
         throw std::runtime_error ("Unable to read the time :(");
