@@ -9,22 +9,22 @@ CXX_STD=CXX11
 all: clean winlibs
 
 clean:
-    rm -f $(OBJECTS) $(SHLIB)
+	rm -f $(OBJECTS) $(SHLIB)
 
 winlibs:
-    "${R_HOME}/bin${R_ARCH_BIN}/Rscript.exe" "../tools/winlibs.R"
+	"${R_HOME}/bin${R_ARCH_BIN}/Rscript.exe" "../tools/winlibs.R"
 
 $(SHLIB): $(OBJECTS)
 
 OBJECTS =  geo.o gtfs.o time.o \
-    process_shape.o construct_network.o \
-    realtime_main.o \
-    test-time.o test-geo.o test-gtfs.o test-runner.o RcppExports.o \
-    gtfs-realtime.pb.o \
-    vendor/sqlite3/sqlite3.o
+	process_shape.o construct_network.o \
+	realtime_main.o \
+	test-time.o test-geo.o test-gtfs.o test-runner.o RcppExports.o \
+	gtfs-realtime.pb.o \
+	vendor/sqlite3/sqlite3.o
 
 PROTOFILES = gtfs-realtime.pb.cpp vendor/protobuf/gtfs-realtime.pb.h
 realtime_main.o: $(PROTOFILES)
 $(PROTOFILES): vendor/protobuf/gtfs-realtime.proto
-    $(PROTOC) -I=. --cpp_out=. $^
-    mv vendor/protobuf/gtfs-realtime.pb.cc gtfs-realtime.pb.cpp
+	$(PROTOC) -I=. --cpp_out=. $^
+	mv vendor/protobuf/gtfs-realtime.pb.cc gtfs-realtime.pb.cpp
