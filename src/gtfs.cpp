@@ -893,6 +893,12 @@ namespace Gtfs
         return _path;
     }
 
+    std::vector<ShapeSegment>& Shape::segments ()
+    {
+        if (!loaded) load ();
+        return _segments;
+    }
+
     float Shape::version () { 
         if (!loaded) load ();
         return _version; 
@@ -1051,8 +1057,8 @@ namespace Gtfs
     void Stop::add_trip (Trip* t)
     {
         // if (!loaded) load ();
-        // this line leaks
-        _trips.push_back (*(&t));
+        // this line leaks (??)
+        // _trips.push_back (*(&t));
     }
 
 
@@ -1127,6 +1133,9 @@ namespace Gtfs
         _version = (float)sqlite3_column_double (stmt, 9);
 
         sqlite3_finalize (stmt);
+
+        // Load exceptions
+        
         sqlite3_close (db);
 
         loaded = true;
@@ -1206,6 +1215,12 @@ namespace Gtfs
     float Calendar::version () { 
         if (!loaded) load();
         return _version; 
+    }
+
+    std::vector<CalendarDate*>& Calendar::exceptions ()
+    {
+        if (!loaded) load();
+        return _exceptions;
     }
 
     bool Calendar::weekdays ()

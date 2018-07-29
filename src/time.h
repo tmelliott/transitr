@@ -27,8 +27,6 @@ public:
     int minute () const;
     int second () const;
     int seconds () const;
-
-    void print () const;
 };
 
 inline bool operator==(const Time& lhs, const Time& rhs)

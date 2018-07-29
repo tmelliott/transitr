@@ -111,9 +111,5 @@ void run_realtime_model (
     // Connect GTFS database
     Gtfs::Gtfs gtfs (dbname);
 
-    std::string a0n ("NZB");
-    Gtfs::Agency* a0 = gtfs.find_agency (a0n);
-    std::cout << a0->agency_name ();
-
     Rcout << "\n --- Finished ---\n\n";
 }

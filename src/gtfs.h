@@ -256,6 +256,7 @@ namespace Gtfs
         std::string& start_date ();
         std::string& end_date ();
         float version ();
+        std::vector<CalendarDate*>& exceptions ();
 
         bool weekdays ();
     };

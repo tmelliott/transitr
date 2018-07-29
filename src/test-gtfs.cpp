@@ -18,9 +18,19 @@ context("GTFS classes") {
     }
 
     test_that("objects load on request") {
-        std::string a0n ("NZB");
-        Gtfs::Agency* a0 = gtfs.find_agency (a0n);
-        expect_true (a0->agency_name () == "New Zealand Bus");
+        std::string t ("1141101952-20180702170310_v67.28");
+        Gtfs::Trip* t0 = gtfs.find_trip (t);
+        expect_true (t0->trip_id () == t);
+        expect_true (t0->trip_headsign () == "Britomart");
+        expect_true (t0->route ()->route_short_name () == "70");
+        expect_true (t0->route ()->agency ()->agency_name () == "Howick and Eastern");
+
+
+        expect_true (t0->shape ()->path ().size () == 1030);
+        // expect_true (t0->shape ()->segments ().size () == 1);
+        expect_true (t0->calendar ()->monday ());
+        // expect_true (t0->calendar ()->exceptions ().size () == 0);
+        expect_true (t0->stops ().size () == 48);
     }
 
 }

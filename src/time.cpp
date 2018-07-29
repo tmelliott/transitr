@@ -39,6 +39,10 @@ Time::Time (int h, int m, int s)
 
 Time::Time (std::string& t)
 {
+    if (t.length () != 8)
+    {
+        throw std::invalid_argument ("Time should be in the form HH:MM:SS");
+    }
 #ifdef __linux__
     struct tm tm;
     strptime (t.c_str (), "%H:%M:%S", &tm);
@@ -55,6 +59,10 @@ Time::Time (std::string& t)
         token = t.substr (0, pos);
         tmv.push_back (stoi (token));
         t.erase (0, pos + delim.length ());
+    }
+    if (tmv.size () != 2)
+    {
+        throw std::invalid_argument ("Time string should be of the form HH:MM:SS");
     }
     // should leave the seconds as the remaining characters in `t`
     int sec = tmv[0] * SECONDS_IN_HOUR +
@@ -89,9 +97,4 @@ int Time::second () const
 int Time::seconds () const
 {
     return _seconds;
-}
-
-void Time::print () const
-{
-    Rcpp::Rcout << _seconds;
 }
