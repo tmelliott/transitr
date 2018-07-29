@@ -1,11 +1,17 @@
 #include <testthat.h>
 #include <string>
+#include <unistd.h>
+#define GetCurrentDir getcwd
 
 #include "gtfs.h"
 
 context("GTFS classes") {
     // run tests from tests/testthat/ directory
-    std::string dbname ("../../inst/extdata/auckland_gtfs.db");
+    char buff[FILENAME_MAX];
+    GetCurrentDir( buff, FILENAME_MAX );
+    std::string current_working_dir(buff);
+    std::cout << "\nCurrent path is " << current_working_dir << "\n";
+    std::string dbname ("auckland_gtfs.db");
     Gtfs::Gtfs gtfs (dbname);
 
     test_that("database connects and loads templates") {
