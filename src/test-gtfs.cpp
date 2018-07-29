@@ -33,4 +33,13 @@ context("GTFS classes") {
         expect_true (t0->stops ().size () == 48);
     }
 
+    test_that("Invalid requests return nullptrs") {
+        std::string ne ("nonexistent");
+        expect_true (gtfs.find_trip (ne) == nullptr);
+        expect_true (gtfs.find_route (ne) == nullptr);
+        expect_true (gtfs.find_agency (ne) == nullptr);
+        expect_true (gtfs.find_shape (ne) == nullptr);
+        expect_true (gtfs.find_calendar (ne) == nullptr);
+    }
+
 }

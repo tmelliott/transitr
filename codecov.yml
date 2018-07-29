@@ -5,6 +5,7 @@ comment: false
 ignore:
   - "src/vendor/**/*"
   - "src/gtfs-realtime.pb.cpp"
+  - "src/realtime_main.cpp"   # cannot be tested (runs indefinitely)
 
 coverage:
   status:
