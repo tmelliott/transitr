@@ -21,4 +21,7 @@ clean:
 
 run:
 	R -f scripts/run_model.R
+
+coverage:
+	R -e "covr::report()"
 	
