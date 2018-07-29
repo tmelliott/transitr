@@ -39,7 +39,7 @@ Time::Time (int h, int m, int s)
 
 Time::Time (std::string& t)
 {
-#ifdef __LINUX__
+#ifdef __linux__
     struct tm tm;
     strptime (t.c_str (), "%H:%M:%S", &tm);
     int sec = tm.tm_hour * SECONDS_IN_HOUR + 
@@ -56,8 +56,9 @@ Time::Time (std::string& t)
         tmv.push_back (stoi (token));
         t.erase (0, pos + delim.length ());
     }
+    // should leave the seconds as the remaining characters in `t`
     int sec = tmv[0] * SECONDS_IN_HOUR +
-        tmv[1] * SECONDS_IN_MIN * tmv[2];
+        tmv[1] * SECONDS_IN_MIN + stoi (t);
 #endif
 
     _seconds = sec;
