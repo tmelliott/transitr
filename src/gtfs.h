@@ -1,12 +1,16 @@
 #ifndef GTFS_H
 #define GTFS_H
 
-#include <Rcpp.h>
 #include <string>
+#include <memory>
 #include <unordered_map>
 
 #include "geo.h"
 #include "time.h"
+
+#include "vendor/protobuf/gtfs-realtime.pb.h"
+#include <Rcpp.h>
+
 
 namespace Gtfs 
 {
@@ -23,6 +27,8 @@ namespace Gtfs
     class Shape;
     class Stop;
     class Calendar;
+
+    class Vehicle;
 
     struct ShapePt
     {
@@ -131,6 +137,8 @@ namespace Gtfs
         std::string _trip_headsign;
         float _version;
 
+        std::weak_ptr<Vehicle> _vehicle;
+
         bool loaded = false;
         bool completed = false;
 
@@ -140,6 +148,7 @@ namespace Gtfs
         void load ();
         void unload ();              // default is completed = false
         void unload (bool complete);
+        void complete ();
 
         std::string& trip_id ();
         Route* route ();
@@ -150,6 +159,9 @@ namespace Gtfs
         bool direction_id ();
         std::string& trip_headsign ();
         float version ();
+
+        std::weak_ptr<Vehicle> vehicle ();
+        void assign_vehicle (std::shared_ptr<Vehicle> vehicle);
     };
 
     class Shape
@@ -292,6 +304,27 @@ namespace Gtfs
         Shape* find_shape (std::string& id);
         Stop* find_stop (std::string& id);
         Calendar* find_calendar (std::string& id);
+    };
+
+
+    class Vehicle {
+        private:
+            std::string _vehicle_id;
+            Trip* _trip = nullptr;
+            latlng _position;
+            uint64_t _timestamp = 0;
+            unsigned _delta;
+
+        public:
+            Vehicle (std::string& id);
+
+            std::string& vehicle_id ();
+            latlng& position ();
+            Trip* trip ();
+
+            void set_trip (Trip* trip);
+            void update (const transit_realtime::VehiclePosition& vp,
+                         Gtfs* gtfs);
     };
 
 

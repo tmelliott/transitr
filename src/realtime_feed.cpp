@@ -71,3 +71,28 @@ transit_realtime::FeedMessage* RealtimeFeed::feed ()
 {
     return &_feed;
 }
+
+void load_vehicles (std::unordered_map<std::string, std::shared_ptr<Gtfs::Vehicle> >* vehicles,
+                    transit_realtime::FeedMessage* feed,
+                    Gtfs::Gtfs* gtfs)
+{
+    for (int i=0; i<feed->entity_size (); ++i)
+    {
+        auto ent = feed->entity (i);
+        if (!ent.has_vehicle ()) continue;
+        if (!ent.vehicle ().has_vehicle ()) continue;
+        std::string id (ent.vehicle ().vehicle ().id ());
+        auto vs = vehicles->find (id);
+        if (vs == vehicles->end ())
+        {
+            auto ret = vehicles->insert (std::make_pair (
+                id, std::make_shared<Gtfs::Vehicle> (id)
+            ));
+        }
+        vs = vehicles->find (id);
+        if (vs != vehicles->end ())
+        {
+            vs->second->update (ent.vehicle (), &(*gtfs));
+        }
+    }
+}

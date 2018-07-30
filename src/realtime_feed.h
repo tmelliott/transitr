@@ -7,7 +7,7 @@
 #include <curl/curl.h>
 #include <curl/easy.h>
 
-#include "vendor/protobuf/gtfs-realtime.pb.h"
+#include "gtfs.h"
 
 #include <Rcpp.h>
 
@@ -28,6 +28,11 @@ public:
     transit_realtime::FeedMessage* feed ();
     
 };
+
+
+void load_vehicles (std::unordered_map<std::string, std::shared_ptr<Gtfs::Vehicle> >* vehicles,
+                    transit_realtime::FeedMessage* feed,
+                    Gtfs::Gtfs* gtfs);
 
 
 #endif

@@ -47,13 +47,33 @@ void run_realtime_model (
     // Connect GTFS database
     Gtfs::Gtfs gtfs (dbname);
 
-    for (auto tr : gtfs.trips ())
-    {
-        Gtfs::Trip* ti = &(tr.second);
-        std::cout << "\n" << ti->trip_id ()
-            << " starts at "
-            << ti->stops ().begin ()->arrival_time;
-    }
+
+    // Initialize vehicles
+    std::unordered_map<std::string, std::shared_ptr<Gtfs::Vehicle> > vehicles;
+    load_vehicles (&vehicles, rtfeed.feed (), &gtfs);
+    Rcout << "\n * loaded " << vehicles.size () << " vehicles\n";
+    // for (auto v: vehicles)
+    // {
+    //     Rcout << "\n + " << v.second->vehicle_id ()
+    //         << " (" << v.second->position ().latitude
+    //         << ", " << v.second->position ().longitude
+    //         << ")";
+    //     if (v.second->trip () != nullptr)
+    //     {
+    //         Rcout << " operating trip "
+    //             << v.second->trip ()->trip_id ();
+    //     }
+    // }
+
+
+    // Initialize active trips
+    // for (auto tr : gtfs.trips ())
+    // {
+    //     Gtfs::Trip* ti = &(tr.second);
+    //     std::cout << "\n" << ti->trip_id ()
+    //         << " starts at "
+    //         << ti->stops ().begin ()->arrival_time;
+    // }
 
     Rcout << "\n --- Finished ---\n\n";
 }

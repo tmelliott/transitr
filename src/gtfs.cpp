@@ -724,6 +724,11 @@ namespace Gtfs
         Rcpp::Rcout << " + Trip " << _trip_id << " is unloaded\n";
     }
 
+    void Trip::complete ()
+    {
+        completed = true;
+    }
+
     std::string& Trip::trip_id () { 
         return _trip_id; 
     }
@@ -1224,6 +1229,67 @@ namespace Gtfs
             _thursday && _friday;
     }
 
+
+
+
+
+
+    Vehicle::Vehicle (std::string& id) : 
+    _vehicle_id (id) 
+    {
+
+    }
+
+    std::string& Vehicle::vehicle_id ()
+    {
+        return _vehicle_id;
+    }
+
+    latlng& Vehicle::position ()
+    {
+        return _position;
+    }
+
+    Trip* Vehicle::trip ()
+    {
+        return _trip;
+    }
+
+    void Vehicle::set_trip (Trip* trip)
+    {
+        if (_trip != nullptr)
+        {
+            // remove exiting trip first
+            _trip->complete ();
+            _trip = trip;
+            std::cout << _trip->trip_id ();
+        }
+    }
+
+    void Vehicle::update (const transit_realtime::VehiclePosition& vp,
+                          Gtfs* gtfs)
+    {
+        if (!vp.has_trip ()) return;
+        if (!vp.trip ().has_trip_id ()) return;
+        if (!vp.has_position ()) return;
+        if (!vp.has_timestamp ()) return;
+
+        if (vp.timestamp () <= _timestamp) return;
+
+        if (_trip == nullptr ||
+            _trip->trip_id () != vp.trip ().trip_id ())
+        {
+            // assign trip <--> vehicle
+            std::string tid = vp.trip ().trip_id ();
+            set_trip (gtfs->find_trip (tid));
+        }
+
+        _position = latlng (vp.position ().latitude (),
+                            vp.position ().longitude ());
+
+        _delta = vp.timestamp () - _timestamp;
+        _timestamp = vp.timestamp ();
+    }
 
 
 }; // namespace Gtfs
