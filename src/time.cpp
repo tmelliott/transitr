@@ -43,12 +43,12 @@ Time::Time (std::string& t)
     {
         throw std::invalid_argument ("Time should be in the form HH:MM:SS");
     }
-#ifdef __linux__
-    struct tm tm;
-    strptime (t.c_str (), "%H:%M:%S", &tm);
-    int sec = tm.tm_hour * SECONDS_IN_HOUR + 
-        tm.tm_min * SECONDS_IN_MIN + tm.tm_sec;
-#else
+// #ifdef __linux__
+//     struct tm tm;
+//     strptime (t.c_str (), "%H:%M:%S", &tm);
+//     int sec = tm.tm_hour * SECONDS_IN_HOUR + 
+//         tm.tm_min * SECONDS_IN_MIN + tm.tm_sec;
+// #else
     // necessary to manually pull apart the string 
     std::string delim = ":";
     size_t pos = 0;
@@ -67,7 +67,7 @@ Time::Time (std::string& t)
     // should leave the seconds as the remaining characters in `t`
     int sec = tmv[0] * SECONDS_IN_HOUR +
         tmv[1] * SECONDS_IN_MIN + stoi (t);
-#endif
+// #endif
 
     _seconds = sec;
 }

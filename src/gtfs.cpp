@@ -231,33 +231,33 @@ namespace Gtfs
 
 
         
-        //  --- testing
-        Rcpp::Rcout << "\n\n *** Request information -> load ...\n";
-        Trip* atrip = &(_trips.begin ()->second);
-        Rcpp::Rcout << "\n\n > Trip is run by "
-            << atrip->route ()->agency ()->agency_name ()
-            << " and has "
-            << atrip->shape ()->path ().size ()
-            << " points in its path and "
-            << atrip->stops ().size ()
-            << " stops.\n"
-            << " > Service: " << atrip->calendar ()->start_date ()
-            << " - " << atrip->calendar ()->end_date ()
-            << "\n";
+        // //  --- testing
+        // Rcpp::Rcout << "\n\n *** Request information -> load ...\n";
+        // Trip* atrip = &(_trips.begin ()->second);
+        // Rcpp::Rcout << "\n\n > Trip is run by "
+        //     << atrip->route ()->agency ()->agency_name ()
+        //     << " and has "
+        //     << atrip->shape ()->path ().size ()
+        //     << " points in its path and "
+        //     << atrip->stops ().size ()
+        //     << " stops.\n"
+        //     << " > Service: " << atrip->calendar ()->start_date ()
+        //     << " - " << atrip->calendar ()->end_date ()
+        //     << "\n";
 
-        Rcpp::Rcout << " > Departs first stop ["
-            << atrip->stops ().begin ()->stop->stop_code () 
-            << "] at "
-            << atrip->stops ().begin ()->departure_time
-            << " and arrives last stop ["
-            << atrip->stops ().back ().stop->stop_code ()
-            << "] at "
-            << atrip->stops ().back ().arrival_time
-            << ".\n\n";
+        // Rcpp::Rcout << " > Departs first stop ["
+        //     << atrip->stops ().begin ()->stop->stop_code () 
+        //     << "] at "
+        //     << atrip->stops ().begin ()->departure_time
+        //     << " and arrives last stop ["
+        //     << atrip->stops ().back ().stop->stop_code ()
+        //     << "] at "
+        //     << atrip->stops ().back ().arrival_time
+        //     << ".\n\n";
 
-        Stop* astop = atrip->stops ().back ().stop;
-        Rcpp::Rcout << " > Stop " << astop->stop_code ()
-            << " has " << astop->trips ().size () << " trips loaded.\n\n";
+        // Stop* astop = atrip->stops ().back ().stop;
+        // Rcpp::Rcout << " > Stop " << astop->stop_code ()
+        //     << " has " << astop->trips ().size () << " trips loaded.\n\n";
     }
 
     std::string& Gtfs::dbname () 
@@ -407,12 +407,12 @@ namespace Gtfs
         sqlite3_close (db);
 
         loaded = true;
-        Rcpp::Rcout << " + Agency " << _agency_id << " is loaded"
-            << "\n   - Name: " << _agency_name 
-            << "\n   - URL: " << _agency_url
-            << "\n   - Phone: " << _agency_phone
-            << "\n   - TZ: " << _agency_timezone
-            << "\n   - Language: " << _agency_lang << "\n";
+        // Rcpp::Rcout << " + Agency " << _agency_id << " is loaded"
+        //     << "\n   - Name: " << _agency_name 
+        //     << "\n   - URL: " << _agency_url
+        //     << "\n   - Phone: " << _agency_phone
+        //     << "\n   - TZ: " << _agency_timezone
+        //     << "\n   - Language: " << _agency_lang << "\n";
 
     }
 
@@ -431,7 +431,6 @@ namespace Gtfs
     }
 
     std::string& Agency::agency_id () { 
-        if (!loaded) load();
         return _agency_id; 
     }
     std::string& Agency::agency_name () { 
@@ -514,12 +513,12 @@ namespace Gtfs
         sqlite3_close (db);
 
         loaded = true;
-        Rcpp::Rcout << " + Route " << _route_id << " is loaded"
-            << "\n   - Number: " << _route_short_name
-            << " " << _route_long_name
-            << "\n   - Agency: " 
-            << (_agency != nullptr ? _agency->agency_name () : "null")
-            << "\n   - Version: " << _version << "\n";
+        // Rcpp::Rcout << " + Route " << _route_id << " is loaded"
+        //     << "\n   - Number: " << _route_short_name
+        //     << " " << _route_long_name
+        //     << "\n   - Agency: " 
+        //     << (_agency != nullptr ? _agency->agency_name () : "null")
+        //     << "\n   - Version: " << _version << "\n";
     }
 
     void Route::unload () { unload (false); }
@@ -536,7 +535,6 @@ namespace Gtfs
     }
 
     std::string& Route::route_id () { 
-        if (!loaded) load();
         return _route_id; 
     }
     std::string& Route::route_short_name () { 
@@ -705,11 +703,11 @@ namespace Gtfs
         sqlite3_close (db);
 
         loaded = true;
-        Rcpp::Rcout << " + Trip " << _trip_id << " is loaded"
-            << "\n   - Route: "
-            << (_route != nullptr ? _route->route_short_name () : "missing")
-            << "\n   - Headsign: " << _trip_headsign
-            << "\n   - Version: " << _version << "\n";
+        // Rcpp::Rcout << " + Trip " << _trip_id << " is loaded"
+        //     << "\n   - Route: "
+        //     << (_route != nullptr ? _route->route_short_name () : "missing")
+        //     << "\n   - Headsign: " << _trip_headsign
+        //     << "\n   - Version: " << _version << "\n";
     }
 
     void Trip::unload () { unload (false); }
@@ -727,7 +725,6 @@ namespace Gtfs
     }
 
     std::string& Trip::trip_id () { 
-        if (!loaded) load ();
         return _trip_id; 
     }
     Route* Trip::route () { 
@@ -868,9 +865,9 @@ namespace Gtfs
         sqlite3_close (db);
 
         loaded = true;
-        Rcpp::Rcout << " + Shape " << _shape_id << " is loaded"
-            << "\n   - Path: " << _path.size () << " coordinates"
-            << "\n   - Version: " << _version << "\n";
+        // Rcpp::Rcout << " + Shape " << _shape_id << " is loaded"
+        //     << "\n   - Path: " << _path.size () << " coordinates"
+        //     << "\n   - Version: " << _version << "\n";
     }
 
     void Shape::unload () { unload (false); }
@@ -883,7 +880,6 @@ namespace Gtfs
     }
 
     std::string& Shape::shape_id () { 
-        if (!loaded) load ();
         return _shape_id; 
     }
 
@@ -981,13 +977,13 @@ namespace Gtfs
         sqlite3_close (db);
 
         loaded = true;
-        Rcpp::Rcout << " + Stop " << _stop_id << " is loaded"
-            << "\n   - Position: ["
-            << _stop_position.latitude << ", " << _stop_position.longitude << "]"
-            << "\n   - Code: " << _stop_code
-            << "\n   - Name: " << _stop_name
-            << "\n   - Desc: " << _stop_desc
-            << "\n   - Version: " << _version << "\n";
+        // Rcpp::Rcout << " + Stop " << _stop_id << " is loaded"
+        //     << "\n   - Position: ["
+        //     << _stop_position.latitude << ", " << _stop_position.longitude << "]"
+        //     << "\n   - Code: " << _stop_code
+        //     << "\n   - Name: " << _stop_name
+        //     << "\n   - Desc: " << _stop_desc
+        //     << "\n   - Version: " << _version << "\n";
     }
 
     void Stop::unload () { unload (false); }
@@ -1006,7 +1002,6 @@ namespace Gtfs
     }
 
     std::string& Stop::stop_id () {
-        if (!loaded) load ();
         return _stop_id; 
     }
     latlng& Stop::stop_position ()
@@ -1139,16 +1134,16 @@ namespace Gtfs
         sqlite3_close (db);
 
         loaded = true;
-        Rcpp::Rcout << " + Calendar " << _service_id << " is loaded"
-            << "\n   - Days: "
-            << (_monday ? "M" : "-")
-            << (_tuesday ? "T" : "-")
-            << (_wednesday ? "W" : "-")
-            << (_thursday ? "T" : "-")
-            << (_friday ? "F" : "-")
-            << (_saturday ? "S" : "-")
-            << (_sunday ? "S" : "-")
-            << "\n   - Version: " << _version << "\n";
+        // Rcpp::Rcout << " + Calendar " << _service_id << " is loaded"
+        //     << "\n   - Days: "
+        //     << (_monday ? "M" : "-")
+        //     << (_tuesday ? "T" : "-")
+        //     << (_wednesday ? "W" : "-")
+        //     << (_thursday ? "T" : "-")
+        //     << (_friday ? "F" : "-")
+        //     << (_saturday ? "S" : "-")
+        //     << (_sunday ? "S" : "-")
+        //     << "\n   - Version: " << _version << "\n";
     }
 
     void Calendar::unload () { unload (false); }
@@ -1164,7 +1159,6 @@ namespace Gtfs
     }
 
     std::string& Calendar::service_id () { 
-        if (!loaded) load();
         return _service_id; 
     }
     bool Calendar::monday ()

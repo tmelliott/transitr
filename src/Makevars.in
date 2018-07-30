@@ -11,6 +11,7 @@ OBJECTS = \
 	gtfs-realtime.pb.o vendor/sqlite3/sqlite3.o \
 	geo.o gtfs.o time.o \
 	process_shape.o construct_network.o \
+    realtime_feed.o \
 	realtime_main.o \
 	test-time.o test-geo.o test-gtfs.o test-runner.o \
 	RcppExports.o
