@@ -11,7 +11,6 @@
 #include "vendor/protobuf/gtfs-realtime.pb.h"
 #include <Rcpp.h>
 
-
 namespace Gtfs 
 {
 
@@ -137,7 +136,7 @@ namespace Gtfs
         std::string _trip_headsign;
         float _version;
 
-        std::weak_ptr<Vehicle> _vehicle;
+        Vehicle* _vehicle = nullptr;
 
         bool loaded = false;
         bool completed = false;
@@ -160,8 +159,8 @@ namespace Gtfs
         std::string& trip_headsign ();
         float version ();
 
-        std::weak_ptr<Vehicle> vehicle ();
-        void assign_vehicle (std::shared_ptr<Vehicle> vehicle);
+        Vehicle* vehicle ();
+        void assign_vehicle (Vehicle* vehicle);
     };
 
     class Shape
@@ -306,7 +305,7 @@ namespace Gtfs
         Calendar* find_calendar (std::string& id);
     };
 
-
+    typedef std::unordered_map<std::string, Vehicle> vehicle_map;
     class Vehicle {
         private:
             std::string _vehicle_id;
@@ -319,12 +318,15 @@ namespace Gtfs
             Vehicle (std::string& id);
 
             std::string& vehicle_id ();
-            latlng& position ();
             Trip* trip ();
+            latlng& position ();
+            uint64_t timestamp ();
+            unsigned delta ();
 
             void set_trip (Trip* trip);
             void update (const transit_realtime::VehiclePosition& vp,
                          Gtfs* gtfs);
+            bool valid ();
     };
 
 

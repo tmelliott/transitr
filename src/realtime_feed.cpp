@@ -72,7 +72,7 @@ transit_realtime::FeedMessage* RealtimeFeed::feed ()
     return &_feed;
 }
 
-void load_vehicles (std::unordered_map<std::string, std::shared_ptr<Gtfs::Vehicle> >* vehicles,
+void load_vehicles (Gtfs::vehicle_map* vehicles,
                     transit_realtime::FeedMessage* feed,
                     Gtfs::Gtfs* gtfs)
 {
@@ -81,18 +81,20 @@ void load_vehicles (std::unordered_map<std::string, std::shared_ptr<Gtfs::Vehicl
         auto ent = feed->entity (i);
         if (!ent.has_vehicle ()) continue;
         if (!ent.vehicle ().has_vehicle ()) continue;
+        
         std::string id (ent.vehicle ().vehicle ().id ());
         auto vs = vehicles->find (id);
         if (vs == vehicles->end ())
         {
-            auto ret = vehicles->insert (std::make_pair (
-                id, std::make_shared<Gtfs::Vehicle> (id)
-            ));
+            auto r = vehicles->emplace (id, id);
+            if (r.second)
+            {
+                r.first->second.update (ent.vehicle (), &(*gtfs));
+            }
         }
-        vs = vehicles->find (id);
-        if (vs != vehicles->end ())
+        else
         {
-            vs->second->update (ent.vehicle (), &(*gtfs));
+            vs->second.update (ent.vehicle (), &(*gtfs));
         }
     }
 }

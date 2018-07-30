@@ -30,7 +30,7 @@ public:
 };
 
 
-void load_vehicles (std::unordered_map<std::string, std::shared_ptr<Gtfs::Vehicle> >* vehicles,
+void load_vehicles (Gtfs::vehicle_map* vehicles,
                     transit_realtime::FeedMessage* feed,
                     Gtfs::Gtfs* gtfs);
 

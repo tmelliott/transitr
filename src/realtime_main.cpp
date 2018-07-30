@@ -8,11 +8,18 @@
 #include "vendor/sqlite3/sqlite3.h"
 
 #include <chrono>
+#include <thread>
 typedef std::chrono::high_resolution_clock Clock;
 
 #include "geo.h"
 #include "gtfs.h"
+#include "timing.h"
 
+#include <signal.h>
+static volatile int ongoing = 1;
+void intHandler (int dummy) {
+    ongoing = 0;
+}
 
 using namespace Rcpp;
 
@@ -37,34 +44,47 @@ void run_realtime_model (
     List headers = rt["headers"];
     RealtimeFeed rtfeed (url, headers);
 
-    // call the feed once and check the result is reasonable
-    if (rtfeed.update () != 0)
-    {
-        throw std::invalid_argument ("Unable to fetch that url");
-    }
-    Rcout << "\nWe have loaded " << rtfeed.feed ()->entity_size () << " locations.\n";
-
     // Connect GTFS database
     Gtfs::Gtfs gtfs (dbname);
 
+    // Create vehicle container
+    Gtfs::vehicle_map vehicles;
 
-    // Initialize vehicles
-    std::unordered_map<std::string, std::shared_ptr<Gtfs::Vehicle> > vehicles;
-    load_vehicles (&vehicles, rtfeed.feed (), &gtfs);
-    Rcout << "\n * loaded " << vehicles.size () << " vehicles\n";
-    // for (auto v: vehicles)
-    // {
-    //     Rcout << "\n + " << v.second->vehicle_id ()
-    //         << " (" << v.second->position ().latitude
-    //         << ", " << v.second->position ().longitude
-    //         << ")";
-    //     if (v.second->trip () != nullptr)
-    //     {
-    //         Rcout << " operating trip "
-    //             << v.second->trip ()->trip_id ();
-    //     }
-    // }
+    // Allow the program to be stopped gracefully    
+    signal (SIGINT, intHandler);
+    Timer timer;
+    while (ongoing)
+    {
+        Rcout << "\n --- Commence iteration ---\n";
+        timer.reset ();
+        
+        // call the feed once and check the result is reasonable
+        if (rtfeed.update () != 0)
+        {
+            throw std::invalid_argument ("Unable to fetch that url");
+        }
+        Rcout << "\n + loaded " 
+            << rtfeed.feed ()->entity_size () 
+            << " vehicle positions.\n";
+        timer.report ("loading vehicle positions");
 
+        // Loading vehicle positions, assigning trips
+        load_vehicles (&vehicles, rtfeed.feed (), &gtfs);
+        timer.report ("updating vehicle information");
+
+        // Update vehicle states
+        for (auto v: vehicles)
+        {
+            if (v.second.valid () && v.second.delta () > 0)
+            {
+
+            }
+        }
+
+        timer.end ();
+
+        std::this_thread::sleep_for (std::chrono::milliseconds (5 * 1000));
+    }
 
     // Initialize active trips
     // for (auto tr : gtfs.trips ())
@@ -74,6 +94,6 @@ void run_realtime_model (
     //         << " starts at "
     //         << ti->stops ().begin ()->arrival_time;
     // }
-
-    Rcout << "\n --- Finished ---\n\n";
+    
+    Rcout << "\n\n --- Finished ---\n\n";
 }

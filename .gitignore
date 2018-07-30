@@ -2,6 +2,7 @@
 # Created by https://www.gitignore.io/api/r,linux,macos,emacs
 
 windows
+fulldata.db
 
 ### Emacs ###
 # -*- mode: gitignore; -*-

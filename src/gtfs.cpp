@@ -563,7 +563,6 @@ namespace Gtfs
     Trip::Trip (std::string& id, Gtfs* gtfs) : 
         gtfs (gtfs), _trip_id (id)
     {
-        // Rcpp::Rcout << " + Create Trip " << _trip_id << "\n";
     }
 
     void Trip::load ()
@@ -721,12 +720,14 @@ namespace Gtfs
         _calendar = nullptr;
         _block_id = "";
         _trip_headsign = "";
+        _vehicle = nullptr;
         Rcpp::Rcout << " + Trip " << _trip_id << " is unloaded\n";
     }
 
     void Trip::complete ()
     {
         completed = true;
+        _vehicle = nullptr;
     }
 
     std::string& Trip::trip_id () { 
@@ -764,6 +765,20 @@ namespace Gtfs
     float Trip::version () { 
         if (!loaded) load ();
         return _version; 
+    }
+
+    Vehicle* Trip::vehicle ()
+    {
+        return _vehicle;
+    }
+    void Trip::assign_vehicle (Vehicle* vehicle)
+    {
+        // // remove any trips already pointing to the vehicle
+        // if (_vehicle != nullptr && _vehicle->trip () != nullptr)
+        // {
+        //     _vehicle->trip ()->assign_vehicle (nullptr);
+        // }
+        _vehicle = vehicle;
     }
 
 
@@ -1229,15 +1244,10 @@ namespace Gtfs
             _thursday && _friday;
     }
 
-
-
-
-
-
+    /***************************************************** Vehicle */
     Vehicle::Vehicle (std::string& id) : 
     _vehicle_id (id) 
     {
-
     }
 
     std::string& Vehicle::vehicle_id ()
@@ -1245,25 +1255,34 @@ namespace Gtfs
         return _vehicle_id;
     }
 
+    Trip* Vehicle::trip ()
+    {
+        return _trip;
+    }
+
     latlng& Vehicle::position ()
     {
         return _position;
     }
 
-    Trip* Vehicle::trip ()
+    uint64_t Vehicle::timestamp ()
     {
-        return _trip;
+        return _timestamp;
+    }
+
+    unsigned Vehicle::delta ()
+    {
+        return _delta;
     }
 
     void Vehicle::set_trip (Trip* trip)
     {
         if (_trip != nullptr)
         {
-            // remove exiting trip first
+            // exiting trip is "completed" (and forgets vehicle)
             _trip->complete ();
-            _trip = trip;
-            std::cout << _trip->trip_id ();
         }
+        _trip = trip;
     }
 
     void Vehicle::update (const transit_realtime::VehiclePosition& vp,
@@ -1274,7 +1293,11 @@ namespace Gtfs
         if (!vp.has_position ()) return;
         if (!vp.has_timestamp ()) return;
 
-        if (vp.timestamp () <= _timestamp) return;
+        if (vp.timestamp () <= _timestamp) 
+        {
+            _delta = 0;
+            return;
+        }
 
         if (_trip == nullptr ||
             _trip->trip_id () != vp.trip ().trip_id ())
@@ -1284,11 +1307,24 @@ namespace Gtfs
             set_trip (gtfs->find_trip (tid));
         }
 
+        if (_trip != nullptr)
+        {
+            _trip->route ()->load ();
+            _trip->shape ()->load ();
+        }
+
         _position = latlng (vp.position ().latitude (),
                             vp.position ().longitude ());
 
-        _delta = vp.timestamp () - _timestamp;
+        _delta = _timestamp == 0 ? 0 : vp.timestamp () - _timestamp;
         _timestamp = vp.timestamp ();
+    }
+
+    bool Vehicle::valid ()
+    {
+        return (_position.latitude != 0.0 || 
+                _position.longitude != 0.0) &&
+            _trip != nullptr && _timestamp != 0;
     }
 
 
