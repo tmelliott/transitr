@@ -19,12 +19,13 @@ class RealtimeFeed {
 private:
     std::string _url;
     std::vector<std::string> _headers;
-    uint64_t _timestamp;
+    transit_realtime::FeedMessage _feed;
 
 public:
     RealtimeFeed (std::string& url, List& hdrs);
 
-    transit_realtime::FeedMessage get ();
+    int update ();
+    transit_realtime::FeedMessage* feed ();
     
 };
 

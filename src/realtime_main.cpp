@@ -38,12 +38,11 @@ void run_realtime_model (
     RealtimeFeed rtfeed (url, headers);
 
     // call the feed once and check the result is reasonable
-    transit_realtime::FeedMessage feed = rtfeed.get ();
-    if (!feed.has_header ())
+    if (rtfeed.update () != 0)
     {
         throw std::invalid_argument ("Unable to fetch that url");
     }
-    Rcout << "\nWe have loaded " << feed.entity_size () << " locations.\n";
+    Rcout << "\nWe have loaded " << rtfeed.feed ()->entity_size () << " locations.\n";
 
     // Connect GTFS database
     Gtfs::Gtfs gtfs (dbname);

@@ -20,14 +20,14 @@ RealtimeFeed::RealtimeFeed (std::string& url, List& hdrs) : _url (url)
     }
 }
 
-transit_realtime::FeedMessage RealtimeFeed::get ()
+int RealtimeFeed::update ()
 {
     CURL *curl;
     CURLcode res;
     curl_global_init (CURL_GLOBAL_DEFAULT);
     curl = curl_easy_init ();
 
-    transit_realtime::FeedMessage feed;
+    _feed.Clear ();
 
     std::string readBuffer;
     if (curl)
@@ -50,8 +50,8 @@ transit_realtime::FeedMessage RealtimeFeed::get ()
         if (res != CURLE_OK)
         {
             Rcerr << "curl_easy_perform() failed\n";
-            return feed;
-              // curl_easy_strerror(res));
+            return 1;
+            // curl_easy_strerror(res));
         }
         curl_easy_cleanup (curl);
         curl_slist_free_all (chunk);
@@ -59,14 +59,15 @@ transit_realtime::FeedMessage RealtimeFeed::get ()
     curl_global_cleanup ();
 
     std::istringstream buf (readBuffer);
-    if (!feed.ParseFromIstream (&buf)) {
+    if (!_feed.ParseFromIstream (&buf)) {
         Rcerr << "\n x Failed to parse GTFS realtime feed!\n";
-        return feed;
-    } else {
-        if (feed.header ().has_timestamp ()) {
-            _timestamp = feed.header ().timestamp ();
-        }
+        return 2;
     }
 
-    return feed;
+    return 0;
+}
+
+transit_realtime::FeedMessage* RealtimeFeed::feed ()
+{
+    return &_feed;
 }
