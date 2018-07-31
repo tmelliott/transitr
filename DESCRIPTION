@@ -1,5 +1,5 @@
 Package: transitr
-Title: Predict transit vehicle arrival times using transit network
+Title: Predict Transit Vehicle Arrival Times using Transit Network
 Version: 0.0.0.9000
 Authors@R: person("Tom", "Elliott", email = "tom.elliott@auckland.ac.nz",
                   role = c("aut", "cre"))

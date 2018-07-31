@@ -6,3 +6,4 @@
 ^Makefile$
 ^scripts$
 ^codecov\.yml$
+^fulldata.db$
