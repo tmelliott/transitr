@@ -345,13 +345,16 @@ namespace Gtfs
 
     class Particle {
     private:
-        double d;
-        double v;
+        Vehicle* vehicle;
+        double distance;
+        double speed;
         std::vector<unsigned int> tt;
 
     public:
-        Particle ();
+        Particle (double d, double s, Vehicle* v);
         // Particle (&Particle p);
+        
+        double get_distance ();
     };
 
 }; // namespace Gtfs

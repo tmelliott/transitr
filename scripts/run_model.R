@@ -22,4 +22,4 @@ nw <- nw %>%
                   with_headers('Ocp-Apim-Subscription-Key' = Sys.getenv('APIKEY')),
                   response = "protobuf")
 
-model(nw)
+model(nw, 5)

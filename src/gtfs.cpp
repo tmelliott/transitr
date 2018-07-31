@@ -1314,8 +1314,17 @@ namespace Gtfs
     {
         if (_trip != nullptr)
         {
+            // std::cout << "\n -> Transfering "
+            //     << _vehicle_id << " from "
+            //     << _trip->route ()->route_short_name ()
+            //     << " (" << _trip->route ()->route_long_name () << ")";
             // exiting trip is "completed" (and forgets vehicle)
             _trip->complete ();
+            // if (trip)
+            // {
+            //     std::cout << " -> " << trip->route ()->route_short_name ()
+            //     << " (" << trip->route ()->route_long_name () << ")";
+            // }
         }
         _trip = trip;
     }

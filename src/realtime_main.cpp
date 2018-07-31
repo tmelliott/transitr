@@ -53,16 +53,21 @@ void run_realtime_model (
     // Allow the program to be stopped gracefully    
     signal (SIGINT, intHandler);
     Timer timer;
+    int tries = 0;
     while (ongoing)
     {
         Rcout << "\n --- Commence iteration ---\n";
         timer.reset ();
         
         // call the feed once and check the result is reasonable
-        if (rtfeed.update () != 0)
+        if (rtfeed.update () != 0 && tries < 10)
         {
-            throw std::invalid_argument ("Unable to fetch that url");
+            Rcout << "\n x Unable to fetch URL. Trying again ...\n";
+            tries++;
+            std::this_thread::sleep_for (std::chrono::milliseconds (5 * 1000));
+            continue;
         }
+        tries = 0;
         Rcout << "\n + loaded " 
             << rtfeed.feed ()->entity_size () 
             << " vehicle positions.\n";
@@ -75,6 +80,7 @@ void run_realtime_model (
         // Update vehicle states
         for (auto v: vehicles)
         {
+            // Rcout << "\n - vehicle " << v.second.vehicle_id ();
             if (v.second.valid () && v.second.delta () > 0)
             {
                 v.second.mutate ();

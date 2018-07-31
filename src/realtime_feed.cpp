@@ -98,5 +98,7 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
         {
             vs->second.update (ent.vehicle (), &(*gtfs));
         }
+        
+        // if (i >= 10) break;
     }
 }
