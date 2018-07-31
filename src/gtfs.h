@@ -28,6 +28,8 @@ namespace Gtfs
     class Calendar;
 
     class Vehicle;
+    class Particle;
+    class ETA;
 
     struct ShapePt
     {
@@ -51,7 +53,7 @@ namespace Gtfs
         int dropoff_type;
         double distance;
 
-        StopTime (std::string& stop_id, Trip* tr, 
+        StopTime (std::string& stop_id, std::string& trip_id,
                   std::string& at, std::string& dt, 
                   std::string& headsign, 
                   int pickup, int dropoff, double dist,
@@ -186,6 +188,8 @@ namespace Gtfs
         std::vector<ShapePt>& path ();
         std::vector<ShapeSegment>& segments ();
         float version ();
+
+        double distance_of (latlng& pt);
     };
 
 
@@ -314,8 +318,12 @@ namespace Gtfs
             uint64_t _timestamp = 0;
             unsigned _delta;
 
+            bool _newtrip = false;
+            int _N;
+            std::vector<Particle> _state;
+
         public:
-            Vehicle (std::string& id);
+            Vehicle (std::string& id, int n);
 
             std::string& vehicle_id ();
             Trip* trip ();
@@ -327,8 +335,24 @@ namespace Gtfs
             void update (const transit_realtime::VehiclePosition& vp,
                          Gtfs* gtfs);
             bool valid ();
+
+            // statistics things
+            void initialize ();
+            void mutate (); // mutate state
+            void select (); // select state (given data)
+            void reset ();
     };
 
+    class Particle {
+    private:
+        double d;
+        double v;
+        std::vector<unsigned int> tt;
+
+    public:
+        Particle ();
+        // Particle (&Particle p);
+    };
 
 }; // namespace Gtfs
 

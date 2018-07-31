@@ -28,6 +28,17 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// calculate_shape_distance
+NumericVector calculate_shape_distance(NumericMatrix x);
+RcppExport SEXP _transitr_calculate_shape_distance(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericMatrix >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(calculate_shape_distance(x));
+    return rcpp_result_gen;
+END_RCPP
+}
 // run_realtime_model
 void run_realtime_model(List nw, int nparticles, int numcore);
 RcppExport SEXP _transitr_run_realtime_model(SEXP nwSEXP, SEXP nparticlesSEXP, SEXP numcoreSEXP) {
@@ -46,6 +57,7 @@ RcppExport SEXP run_testthat_tests();
 static const R_CallMethodDef CallEntries[] = {
     {"_transitr_construct_network", (DL_FUNC) &_transitr_construct_network, 2},
     {"_transitr_shapes_df_to_list", (DL_FUNC) &_transitr_shapes_df_to_list, 1},
+    {"_transitr_calculate_shape_distance", (DL_FUNC) &_transitr_calculate_shape_distance, 1},
     {"_transitr_run_realtime_model", (DL_FUNC) &_transitr_run_realtime_model, 3},
     {"run_testthat_tests", (DL_FUNC) &run_testthat_tests, 0},
     {NULL, NULL, 0}

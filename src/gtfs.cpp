@@ -687,8 +687,7 @@ namespace Gtfs
                 {
                     head = (char*)sqlite3_column_text (stmt, 3);
                 }
-
-                _stops.emplace_back (stopid, this, arr, dep, head,
+                _stops.emplace_back (stopid, _trip_id, arr, dep, head,
                                      sqlite3_column_int (stmt, 4),
                                      sqlite3_column_int (stmt, 5),
                                      sqlite3_column_double (stmt, 6),
@@ -700,6 +699,16 @@ namespace Gtfs
         }
 
         sqlite3_close (db);
+
+        // now load stop distances ...
+        double d;
+        for (auto st : _stops)
+        {
+            if (st.stop && _shape && st.distance == 0)
+            {
+                d = _shape->distance_of (st.stop->stop_position ());
+            }
+        }
 
         loaded = true;
         // Rcpp::Rcout << " + Trip " << _trip_id << " is loaded"
@@ -783,14 +792,14 @@ namespace Gtfs
 
 
     /***************************************************** Stoptime */
-    StopTime::StopTime (std::string& stop_id, Trip* tr, 
+    StopTime::StopTime (std::string& stop_id, std::string& trip_id,
                         std::string& at, std::string& dt, 
                         std::string& headsign, 
                         int pickup, int dropoff, double dist,
                         Gtfs* gtfs)
     {
         stop = gtfs->find_stop (stop_id);
-        trip = tr;
+        trip = gtfs->find_trip (trip_id);
         stop->add_trip (trip);
         arrival_time = Time (at);
         departure_time = Time (dt);
@@ -873,11 +882,17 @@ namespace Gtfs
             return; 
         }
         
+        double d = 0.0;
+        latlng px;
         while (sqlite3_step (stmt) == SQLITE_ROW)
         {
-            _path.emplace_back (sqlite3_column_double (stmt, 0),
-                                sqlite3_column_double (stmt, 1),
-                                sqlite3_column_double (stmt, 2));
+            px.latitude = sqlite3_column_double (stmt, 0);
+            px.longitude = sqlite3_column_double (stmt, 1);
+            if (_path.size () > 0)
+            {
+                d += distanceEarth (_path.back ().pt, px);
+            }
+            _path.emplace_back (px.latitude, px.longitude, d);
         }
         _version = (float)sqlite3_column_double (stmt, 3);
         
@@ -885,9 +900,9 @@ namespace Gtfs
         sqlite3_close (db);
 
         loaded = true;
-        // Rcpp::Rcout << " + Shape " << _shape_id << " is loaded"
-        //     << "\n   - Path: " << _path.size () << " coordinates"
-        //     << "\n   - Version: " << _version << "\n";
+        // Rcpp::Rcout << "\n + Shape " << _shape_id << " is loaded ("
+        //     << _path.back ().distance << "m)";
+        
     }
 
     void Shape::unload () { unload (false); }
@@ -896,6 +911,8 @@ namespace Gtfs
     {
         completed = complete;
         loaded = false;
+        _path.clear ();
+        _segments.clear ();
         Rcpp::Rcout << " + Shape " << _shape_id << " is unloaded\n";
     }
 
@@ -918,6 +935,24 @@ namespace Gtfs
     float Shape::version () { 
         if (!loaded) load ();
         return _version; 
+    }
+
+    double Shape::distance_of (latlng& x)
+    {
+        if (!loaded) load ();
+        int closest = 0;
+        double dmin = 100000;
+        double di;
+        for (unsigned int i=0; i<_path.size (); ++i)
+        {
+            di = distanceEarth (_path[i].pt, x); 
+            if (di < dmin)
+            {
+                dmin = di;
+                closest = i;
+            }
+        }
+        return _path[closest].distance;
     }
 
 
@@ -1245,8 +1280,8 @@ namespace Gtfs
     }
 
     /***************************************************** Vehicle */
-    Vehicle::Vehicle (std::string& id) : 
-    _vehicle_id (id) 
+    Vehicle::Vehicle (std::string& id, int n) : 
+    _vehicle_id (id), _N (n)
     {
     }
 
@@ -1299,12 +1334,12 @@ namespace Gtfs
             return;
         }
 
-        if (_trip == nullptr ||
-            _trip->trip_id () != vp.trip ().trip_id ())
+        if (_trip == nullptr || _trip->trip_id () != vp.trip ().trip_id ())
         {
             // assign trip <--> vehicle
             std::string tid = vp.trip ().trip_id ();
             set_trip (gtfs->find_trip (tid));
+            _newtrip = _trip != nullptr;
         }
 
         if (_trip != nullptr)
@@ -1318,6 +1353,11 @@ namespace Gtfs
 
         _delta = _timestamp == 0 ? 0 : vp.timestamp () - _timestamp;
         _timestamp = vp.timestamp ();
+
+        if (_newtrip)
+        {
+            initialize ();
+        }
     }
 
     bool Vehicle::valid ()

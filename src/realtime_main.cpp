@@ -69,7 +69,7 @@ void run_realtime_model (
         timer.report ("loading vehicle positions");
 
         // Loading vehicle positions, assigning trips
-        load_vehicles (&vehicles, rtfeed.feed (), &gtfs);
+        load_vehicles (&vehicles, rtfeed.feed (), &gtfs, nparticles);
         timer.report ("updating vehicle information");
 
         // Update vehicle states
@@ -77,9 +77,10 @@ void run_realtime_model (
         {
             if (v.second.valid () && v.second.delta () > 0)
             {
-
+                v.second.mutate ();
             }
         }
+        timer.report ("loading shapes");
 
         timer.end ();
 
@@ -94,6 +95,6 @@ void run_realtime_model (
     //         << " starts at "
     //         << ti->stops ().begin ()->arrival_time;
     // }
-    
+
     Rcout << "\n\n --- Finished ---\n\n";
 }

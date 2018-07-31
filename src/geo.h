@@ -17,6 +17,7 @@ double rad2deg (double rad);
 
 double distanceEarth (double lat1d, double lon1d, double lat2d, double lon2d);
 double distanceEarth (Node* from, Node* to);
+double distanceEarth (latlng& p1, latlng& p2);
 
 double bearing (double lat1d, double lon1d, double lat2d, double lon2d);
 

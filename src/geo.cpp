@@ -49,6 +49,11 @@ double distanceEarth(Node* from, Node* to)
   return distanceEarth(lat1d, lon1d, lat2d, lon2d);
 }
 
+double distanceEarth (latlng& p1, latlng& p2)
+{
+  return distanceEarth (p1.latitude, p1.longitude, p2.latitude, p2.longitude);
+}
+
 double bearing (double lat1d, double lon1d, double lat2d, double lon2d) 
 {
   double lat1r, lon1r, lat2r, lon2r, y, x, th;

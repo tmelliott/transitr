@@ -60,24 +60,54 @@ NumericMatrix process_shape (NumericMatrix x, String id)
 {
     int L (x.nrow ());
 
-    NumericMatrix tmp (L, 2);
-    int k (0);
-    tmp (k, _ ) = x (0, _ );
+    // NumericMatrix out (L, 3);
+    NumericVector d (L);
 
-    double d;
+    // out (0, Range (0, 1) ) = x (0, _ );
+    // out (0, 2) = d;
+
+    d[0] = 0.0;
     for (int i=1; i<L; i++)
     {
-        d = distanceEarth(tmp (k, 1), tmp (k, 0), x (i, 1), x (i, 0));
-        if (d  < 5) continue;
-        k++;
-        tmp (k, _ ) = x (i, _ );
+        d[i] = d[i-1] + 
+            distanceEarth(x (i-1, 1), x (i-1, 0), x (i, 1), x (i, 0));
+        // out (i, Range (0, 1) ) = x (i, _ );
+        // out (i, 2) = d;
     }
 
-    NumericMatrix out (k + 1, 2);
-    out = tmp ( Range (0, k), _ );
+    // bind distance to coordinates
+    NumericMatrix out (L, 3);
+    out (_, 0) = x (_,0);
+    out (_, 1) = x (_,1);
+    out (_, 2) = d;
 
     out.attr ("class") = "network.shape";
     out.attr ("id") = id;
     return out;
 }
 
+// [[Rcpp::export]]
+NumericVector calculate_shape_distance (NumericMatrix x)
+{
+    int L (x.nrow ());
+    // NumericVector lat = x( _ , 0);
+    // NumericVector lng = x( _ , 1);
+    // NumericVector seq = x ( _ , 2);
+    // NumericMatrix y (L, 2);
+    // for (int i=0; i<L; i++)
+    // {
+    //     // place them in the order of seq(uence)
+    //     y (seq[i]-1, 0) = lat[i];
+    //     y (seq[i]-1, 1) = lng[i];
+    // }
+
+    NumericVector d (L);
+    d[0] = 0.0;
+    for (int i=1; i<L; i++)
+    {
+        d[i] = d[i-1] + 
+            distanceEarth(x (i-1, 1), x (i-1, 0), x (i, 1), x (i, 0));
+    }
+
+    return d;
+}

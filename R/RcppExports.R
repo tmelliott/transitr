@@ -9,6 +9,10 @@ shapes_df_to_list <- function(x) {
     .Call(`_transitr_shapes_df_to_list`, x)
 }
 
+calculate_shape_distance <- function(x) {
+    .Call(`_transitr_calculate_shape_distance`, x)
+}
+
 run_realtime_model <- function(nw, nparticles, numcore) {
     invisible(.Call(`_transitr_run_realtime_model`, nw, nparticles, numcore))
 }

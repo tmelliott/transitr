@@ -32,7 +32,7 @@ public:
 
 void load_vehicles (Gtfs::vehicle_map* vehicles,
                     transit_realtime::FeedMessage* feed,
-                    Gtfs::Gtfs* gtfs);
+                    Gtfs::Gtfs* gtfs, int n);
 
 
 #endif
