@@ -12,6 +12,8 @@ model(nw, n.particles = 500L, cores = 1L, error = 20)
 \item{n.particles}{the number of particles to use to model each vehicle}
 
 \item{cores}{the number of cores to use in parallel}
+
+\item{error}{the GPS error to use in the likelihood}
 }
 \value{
 NULL (in fact, it never returns anything ...)

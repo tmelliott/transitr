@@ -3,6 +3,7 @@
 #' @param nw a loaded \code{trgtfs} object
 #' @param n.particles the number of particles to use to model each vehicle
 #' @param cores the number of cores to use in parallel
+#' @param error the GPS error to use in the likelihood
 #' @return NULL (in fact, it never returns anything ...)
 #' @author Tom Elliott
 #' @export
