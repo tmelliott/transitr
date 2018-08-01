@@ -1280,8 +1280,8 @@ namespace Gtfs
     }
 
     /***************************************************** Vehicle */
-    Vehicle::Vehicle (std::string& id, int n) : 
-    _vehicle_id (id), _N (n)
+    Vehicle::Vehicle (std::string& id, int n, double err) : 
+    _vehicle_id (id), _N (n), _gpserror (err)
     {
     }
 
@@ -1363,10 +1363,10 @@ namespace Gtfs
         _delta = _timestamp == 0 ? 0 : vp.timestamp () - _timestamp;
         _timestamp = vp.timestamp ();
 
-        if (_newtrip)
-        {
-            initialize ();
-        }
+        // if (_newtrip)
+        // {
+        //     initialize ();
+        // }
     }
 
     bool Vehicle::valid ()

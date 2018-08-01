@@ -4,7 +4,7 @@
 \alias{model}
 \title{Run realtime transit model}
 \usage{
-model(nw, n.particles = 500, cores = 1L)
+model(nw, n.particles = 500L, cores = 1L, error = 20)
 }
 \arguments{
 \item{nw}{a loaded \code{trgtfs} object}

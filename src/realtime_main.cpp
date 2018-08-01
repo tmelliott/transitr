@@ -9,12 +9,14 @@
 
 #include <chrono>
 #include <thread>
+#include <omp.h>
 typedef std::chrono::high_resolution_clock Clock;
 
 #include "geo.h"
 #include "gtfs.h"
 #include "timing.h"
 
+// allow clean exit with C-c
 #include <signal.h>
 static volatile int ongoing = 1;
 void intHandler (int dummy) {
@@ -27,7 +29,8 @@ using namespace Rcpp;
 void run_realtime_model (
     List nw, 
     int nparticles,
-    int numcore)
+    int numcore,
+    double gpserror)
 {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
@@ -49,6 +52,9 @@ void run_realtime_model (
 
     // Create vehicle container
     Gtfs::vehicle_map vehicles;
+
+    // Initialize an RNG
+    Rcout << "\n * Running on " << numcore << " cores.\n";
 
     // Allow the program to be stopped gracefully    
     signal (SIGINT, intHandler);
@@ -74,19 +80,25 @@ void run_realtime_model (
         timer.report ("loading vehicle positions");
 
         // Loading vehicle positions, assigning trips
-        load_vehicles (&vehicles, rtfeed.feed (), &gtfs, nparticles);
+        load_vehicles (&vehicles, rtfeed.feed (), &gtfs, nparticles, gpserror);
         timer.report ("updating vehicle information");
 
         // Update vehicle states
-        for (auto v: vehicles)
-        {
-            // Rcout << "\n - vehicle " << v.second.vehicle_id ();
-            if (v.second.valid () && v.second.delta () > 0)
+        #pragma omp parallel for num_threads(numcore)
+        for (unsigned i=0; i<vehicles.bucket_count (); ++i)
+        {       
+            for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
             {
-                v.second.mutate ();
+                if (!v->second.valid () || v->second.delta () == 0) continue;
+
+                v->second.mutate ();
+                Rprintf ("\n - {%i/%i} vehicle %s: %.2f", 
+                         omp_get_thread_num (), numcore,
+                         v->second.vehicle_id ().c_str (), 
+                         v->second.distance ());
             }
         }
-        timer.report ("loading shapes");
+        timer.report ("updating vehicle states");
 
         timer.end ();
 

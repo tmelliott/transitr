@@ -19,6 +19,8 @@ AC_REQUIRE_CPP
 AC_PROG_CC
 AC_PROG_CXX
 
+AC_OPENMP
+
 AC_DEFUN([AC_PROG_PKGCONFIG], [AC_CHECK_PROG(PKGCONFIG,pkg-config,yes)])
 AC_PROG_PKGCONFIG
 
@@ -114,7 +116,7 @@ AC_DEFUN([AC_PROG_R], [AC_CHECK_PROG(R,R,yes)])
 AC_PROG_R
 
 # ## now use all these
-AC_SUBST([PKG_CPPFLAGS],["${PKG_CPPFLAGS} ${CXXFLAGS} ${protobuf_cxxflags} ${curl_cxxflags}"])
+AC_SUBST([PKG_CPPFLAGS],["${PKG_CPPFLAGS} ${CXXFLAGS} ${protobuf_cxxflags} ${curl_cxxflags} ${OPENMP_CXXFLAGS}"])
 AC_SUBST([PKG_LIBS],["${PKG_LIBS} ${protobuf_libs} ${curl_libs}"])
 AC_CONFIG_FILES([src/Makevars])
 AC_OUTPUT

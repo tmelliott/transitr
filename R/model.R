@@ -6,7 +6,7 @@
 #' @return NULL (in fact, it never returns anything ...)
 #' @author Tom Elliott
 #' @export
-model <- function(nw, n.particles = 500, cores = 1L) {
+model <- function(nw, n.particles = 500L, cores = 1L, error = 20) {
     if (!inherits(nw, "trgtfs")) stop("Not a GTFS transit object. See ?create_gtfs")
 
     if (!check_tables(nw)) stop("GTFS tables don't appear to be valid.")
@@ -23,5 +23,5 @@ model <- function(nw, n.particles = 500, cores = 1L) {
         list(name = names(nw$apis$realtime$headers)[i], value = nw$apis$realtime$headers[[i]])
     })
 
-    run_realtime_model(nw, n.particles, cores)
+    run_realtime_model(nw, n.particles, cores, error)
 }

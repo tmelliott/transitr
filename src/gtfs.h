@@ -317,13 +317,14 @@ namespace Gtfs
             latlng _position;
             uint64_t _timestamp = 0;
             unsigned _delta;
+            double _gpserror;
 
             bool _newtrip = false;
             int _N;
             std::vector<Particle> _state;
 
         public:
-            Vehicle (std::string& id, int n);
+            Vehicle (std::string& id, int n, double err);
 
             std::string& vehicle_id ();
             Trip* trip ();
@@ -341,6 +342,8 @@ namespace Gtfs
             void mutate (); // mutate state
             void select (); // select state (given data)
             void reset ();
+
+            double distance ();
     };
 
     class Particle {
@@ -350,11 +353,17 @@ namespace Gtfs
         double speed;
         std::vector<unsigned int> tt;
 
+        double log_likelihood;
+
     public:
         Particle (double d, double s, Vehicle* v);
         // Particle (&Particle p);
         
         double get_distance ();
+
+        void travel (unsigned delta);
+
+        double calculate_likelihood (latlng& y, std::vector<ShapePt>* path, double sigma);
     };
 
 }; // namespace Gtfs

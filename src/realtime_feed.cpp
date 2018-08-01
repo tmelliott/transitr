@@ -74,7 +74,7 @@ transit_realtime::FeedMessage* RealtimeFeed::feed ()
 
 void load_vehicles (Gtfs::vehicle_map* vehicles,
                     transit_realtime::FeedMessage* feed,
-                    Gtfs::Gtfs* gtfs, int n)
+                    Gtfs::Gtfs* gtfs, int n, double err)
 {
     for (int i=0; i<feed->entity_size (); ++i)
     {
@@ -88,7 +88,7 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
         {
             auto r = vehicles->emplace (std::piecewise_construct,
                                         std::forward_as_tuple (id), 
-                                        std::forward_as_tuple (id, n));
+                                        std::forward_as_tuple (id, n, err));
             if (r.second)
             {
                 r.first->second.update (ent.vehicle (), &(*gtfs));
@@ -98,7 +98,7 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
         {
             vs->second.update (ent.vehicle (), &(*gtfs));
         }
-        
-        // if (i >= 10) break;
+
+        if (i >= 10) break;
     }
 }
