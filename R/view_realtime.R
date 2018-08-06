@@ -2,17 +2,22 @@
 
 ## but not yet 
 
-#' @import ggplot2
-#' @export
+##' View the realtime state of vehicles
+##'
+##' @title View Realtime Vehicle States
+##' @param db SQLite database containing vehicle states, ETAs, etc
+##' @return NULL
+##' @author Tom Elliott
+##' @export 
 view_realtime <- function(db) {
     con <- db_connect(db)
     on.exit(db_close(con))
 
     vps <- RSQLite::dbReadTable(con, "vehicles")
 
-    p <- ggplot(vps, aes(progress, vehicle_id)) +
-        geom_point() +
-        xlim(0, 100)
+    p <- ggplot2::ggplot(vps, ggplot2::aes(progress, vehicle_id)) +
+        ggplot2::geom_point() +
+        ggplot2::xlim(0, 100)
     dev.hold()
     print(p)
     dev.flush()
