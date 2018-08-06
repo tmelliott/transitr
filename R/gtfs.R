@@ -29,12 +29,13 @@ create_tables <- function(db) {
         eval(parse(text = sprintf("create_%s", tbl)))(db)
     })
     create_versions(db)
+    create_vehicles(db)
 
     invisible(NULL)
 }
 
 check_tables <- function(db) {
-    res <- sapply(gtfs_tables(), function(tbl) {
+    res <- sapply(c(gtfs_tables(), "vehicles"), function(tbl) {
         eval(parse(text = sprintf("check_%s", tbl)))(db)
     })
     all(res)
