@@ -7,6 +7,7 @@
 
 #include "geo.h"
 #include "time.h"
+#include "rng.h"
 
 #include "vendor/protobuf/gtfs-realtime.pb.h"
 #include <Rcpp.h>
@@ -30,6 +31,8 @@ namespace Gtfs
     class Vehicle;
     class Particle;
     class ETA;
+
+    typedef std::unordered_map<std::string, Vehicle> vehicle_map;
 
     struct ShapePt
     {
@@ -307,9 +310,10 @@ namespace Gtfs
         Shape* find_shape (std::string& id);
         Stop* find_stop (std::string& id);
         Calendar* find_calendar (std::string& id);
+
+        void write_vehicles (vehicle_map* vehicles);
     };
 
-    typedef std::unordered_map<std::string, Vehicle> vehicle_map;
     class Vehicle {
         private:
             std::string _vehicle_id;
@@ -319,7 +323,7 @@ namespace Gtfs
             unsigned _delta;
             double _gpserror;
 
-            bool _newtrip = false;
+            bool _newtrip = true;
             int _N;
             std::vector<Particle> _state;
 
@@ -338,12 +342,14 @@ namespace Gtfs
             bool valid ();
 
             // statistics things
-            void initialize ();
-            void mutate (); // mutate state
-            void select (); // select state (given data)
+            void initialize (RNG& rng);
+            void mutate (RNG& rng); // mutate state
+            void select (RNG& rng); // select state (given data)
             void reset ();
 
             double distance ();
+            double speed ();
+            int progress ();
     };
 
     class Particle {
@@ -360,6 +366,7 @@ namespace Gtfs
         // Particle (&Particle p);
         
         double get_distance ();
+        double get_speed ();
 
         void travel (unsigned delta);
 

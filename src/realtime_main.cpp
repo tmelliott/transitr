@@ -9,12 +9,15 @@
 
 #include <chrono>
 #include <thread>
-#include <omp.h>
 typedef std::chrono::high_resolution_clock Clock;
+
+#include <omp.h>
+// [[Rcpp::plugins(openmp)]]
 
 #include "geo.h"
 #include "gtfs.h"
 #include "timing.h"
+#include "rng.h"
 
 // allow clean exit with C-c
 #include <signal.h>
@@ -54,7 +57,19 @@ void run_realtime_model (
     Gtfs::vehicle_map vehicles;
 
     // Initialize an RNG
-    Rcout << "\n * Running on " << numcore << " cores.\n";
+    Rcout << "\n * Running on " << numcore << " cores.";
+    Rcout << "\n * Initializing " << numcore << " independent RNGs. ";
+    std::vector<RNG> rngs (numcore);
+
+    unsigned int _seed = (unsigned int) time (0);
+    for (int i=0; i<numcore; ++i)
+    {
+        rngs.at (i).set_seed (_seed++);
+        // Rcout << "\n RNG" << i << ": " 
+        //     << rngs.at (i).rnorm () << ", "
+        //     << rngs.at (i).rnorm () << ", "
+        //     << rngs.at (i).rnorm () << ", ";
+    }
 
     // Allow the program to be stopped gracefully    
     signal (SIGINT, intHandler);
@@ -89,20 +104,30 @@ void run_realtime_model (
         {       
             for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
             {
-                if (!v->second.valid () || v->second.delta () == 0) continue;
-
-                v->second.mutate ();
-                Rprintf ("\n - {%i/%i} vehicle %s: %.2f", 
-                         omp_get_thread_num (), numcore,
-                         v->second.vehicle_id ().c_str (), 
-                         v->second.distance ());
+                v->second.mutate (rngs.at (omp_get_thread_num ()));
+                // printf ("\n - {%i/%i} vehicle %s: %.2f", 
+                //          omp_get_thread_num ()+1, numcore,
+                //          v->second.vehicle_id ().c_str (), 
+                //          v->second.distance ());
             }
         }
         timer.report ("updating vehicle states");
 
+        // Write vehicles to database
+        gtfs.write_vehicles (&vehicles);
+        for (auto v = vehicles.begin (); v != vehicles.end (); ++v)
+        {
+            
+            // printf ("\n - {%i/%i} vehicle %s: %.2f", 
+            //          omp_get_thread_num ()+1, numcore,
+            //          v->second.vehicle_id ().c_str (), 
+            //          v->second.distance ());
+        }
+        timer.report ("inserting vehicle states into database");
+
         timer.end ();
 
-        std::this_thread::sleep_for (std::chrono::milliseconds (5 * 1000));
+        std::this_thread::sleep_for (std::chrono::milliseconds (10 * 1000));
     }
 
     // Initialize active trips

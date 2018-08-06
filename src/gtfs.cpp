@@ -350,6 +350,157 @@ namespace Gtfs
         return nullptr;
     }
 
+    void Gtfs::write_vehicles (vehicle_map* vehicles)
+    {
+        sqlite3* db;
+        sqlite3_stmt* stmt_s;
+        sqlite3_stmt* stmt_i;
+        sqlite3_stmt* stmt_u;
+        if (sqlite3_open (_dbname.c_str (), &db))
+        {
+            Rcpp::Rcerr << " x Unable to connect to database\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_close (db);
+            return;
+        }
+
+        // we need three queries: 
+        if (sqlite3_prepare_v2 (db, "SELECT count(vehicle_id) FROM vehicles WHERE vehicle_id=?",
+                                -1, &stmt_s, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt_s);
+            sqlite3_close (db);
+            return;
+        }
+        if (sqlite3_prepare_v2 (db, "INSERT INTO vehicles VALUES (?,?,?,?,?,?,?,?)",
+                                -1, &stmt_i, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt_i);
+            sqlite3_close (db);
+            return;
+        }
+        if (sqlite3_prepare_v2 (db, "UPDATE vehicles SET trip_id=?, timestamp=?, position_latitude=?, position_longitude=?, distance=?, speed=?, progress=? WHERE vehicle_id=?",
+                                -1, &stmt_u, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt_u);
+            sqlite3_close (db);
+            return;
+        }
+
+        // loop over vehicles and insert/update
+        for (auto v = vehicles->begin (); v != vehicles->end (); ++v)
+        {
+            if (sqlite3_bind_text (stmt_s, 1, v->second.vehicle_id ().c_str (),
+                                   -1, SQLITE_STATIC) != SQLITE_OK)
+            {
+                Rcpp::Rcerr << " x Can't bind vehicle id to query\n  "
+                    << sqlite3_errmsg (db) << "\n";
+                sqlite3_finalize (stmt_s);
+                sqlite3_finalize (stmt_i);
+                sqlite3_finalize (stmt_u);
+                sqlite3_close (db);
+                return; 
+            }
+            if (sqlite3_step (stmt_s) != SQLITE_ROW)
+            {
+                Rcpp::Rcerr << " x Couldn't get vehicle from db\n  "
+                    << sqlite3_errmsg (db) << "\n";
+                sqlite3_finalize (stmt_s);
+                sqlite3_finalize (stmt_i);
+                sqlite3_finalize (stmt_u);
+                sqlite3_close (db);
+                return;
+            }
+            // vehicle ts needs to be a string
+            std::ostringstream ts;
+            ts << v->second.timestamp ();
+            if (sqlite3_column_int (stmt_s, 0) == 0)
+            {
+                // vehicle doesn't exist - insert
+                if (sqlite3_bind_text (stmt_i, 1, v->second.vehicle_id ().c_str (),
+                                       -1, SQLITE_STATIC) != SQLITE_OK ||
+                    sqlite3_bind_text (stmt_i, 2, v->second.trip ()->trip_id ().c_str (),
+                                       -1, SQLITE_STATIC) != SQLITE_OK ||
+                    sqlite3_bind_text (stmt_i, 3, ts.str ().c_str (),
+                                       -1, SQLITE_STATIC) != SQLITE_OK ||
+                    sqlite3_bind_double (stmt_i, 4, v->second.position ().latitude) != SQLITE_OK ||
+                    sqlite3_bind_double (stmt_i, 5, v->second.position ().longitude) != SQLITE_OK ||
+                    sqlite3_bind_double (stmt_i, 6, v->second.distance ()) != SQLITE_OK ||
+                    sqlite3_bind_double (stmt_i, 7, v->second.speed ()) != SQLITE_OK ||
+                    sqlite3_bind_int (stmt_i, 8, v->second.progress ()) != SQLITE_OK)
+                {
+                    Rcpp::Rcerr << " x Couldn't bind values to query\n  "
+                        << sqlite3_errmsg (db) << "\n";
+                    sqlite3_finalize (stmt_s);
+                    sqlite3_finalize (stmt_i);
+                    sqlite3_finalize (stmt_u);
+                    sqlite3_close (db);
+                    return;
+                }
+                if (sqlite3_step (stmt_i) != SQLITE_DONE)
+                {
+                    Rcpp::Rcerr << " x Couldn't insert values into database\n  "
+                        << sqlite3_errmsg (db) << "\n";
+                    sqlite3_finalize (stmt_s);
+                    sqlite3_finalize (stmt_i);
+                    sqlite3_finalize (stmt_u);
+                    sqlite3_close (db);
+                    return;
+                }
+                // std::cout << " - inserted";
+            }
+            else
+            {
+                // vehicles exists - update
+                if (sqlite3_bind_text (stmt_u, 1, v->second.trip ()->trip_id ().c_str (),
+                                       -1, SQLITE_STATIC) != SQLITE_OK ||
+                    sqlite3_bind_text (stmt_u, 2, ts.str ().c_str (),
+                                       -1, SQLITE_STATIC) != SQLITE_OK ||
+                    sqlite3_bind_double (stmt_u, 3, v->second.position ().latitude) != SQLITE_OK ||
+                    sqlite3_bind_double (stmt_u, 4, v->second.position ().longitude) != SQLITE_OK ||
+                    sqlite3_bind_double (stmt_u, 5, v->second.distance ()) != SQLITE_OK ||
+                    sqlite3_bind_double (stmt_u, 6, v->second.speed ()) != SQLITE_OK ||
+                    sqlite3_bind_int (stmt_u, 7, v->second.progress ()) != SQLITE_OK ||
+                    sqlite3_bind_text (stmt_u, 8, v->second.vehicle_id ().c_str (),
+                                       -1, SQLITE_STATIC) != SQLITE_OK)
+                {
+                    Rcpp::Rcerr << " x Couldn't bind values to query\n  "
+                        << sqlite3_errmsg (db) << "\n";
+                    sqlite3_finalize (stmt_s);
+                    sqlite3_finalize (stmt_i);
+                    sqlite3_finalize (stmt_u);
+                    sqlite3_close (db);
+                    return;
+                }
+                if (sqlite3_step (stmt_u) != SQLITE_DONE)
+                {
+                    Rcpp::Rcerr << " x Couldn't update values in database\n  "
+                        << sqlite3_errmsg (db) << "\n";
+                    sqlite3_finalize (stmt_s);
+                    sqlite3_finalize (stmt_i);
+                    sqlite3_finalize (stmt_u);
+                    sqlite3_close (db);
+                    return;
+                }
+                // std::cout << " - updated";
+            }
+            sqlite3_reset (stmt_s);
+            sqlite3_reset (stmt_i);
+            sqlite3_reset (stmt_u);
+        }
+        
+        sqlite3_finalize (stmt_s);
+        sqlite3_finalize (stmt_i);
+        sqlite3_finalize (stmt_u);
+        sqlite3_close (db);
+    }
+
 
     /***************************************************** Agency */
     Agency::Agency (std::string& id, Gtfs* gtfs) : 
@@ -1362,11 +1513,6 @@ namespace Gtfs
 
         _delta = _timestamp == 0 ? 0 : vp.timestamp () - _timestamp;
         _timestamp = vp.timestamp ();
-
-        // if (_newtrip)
-        // {
-        //     initialize ();
-        // }
     }
 
     bool Vehicle::valid ()

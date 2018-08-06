@@ -5,29 +5,34 @@
 
 namespace Gtfs {
 
-    void Vehicle::initialize ()
+    void Vehicle::initialize (RNG& rng)
     {
         _state.clear ();
         _state.reserve (_N);
         double dmax = _trip->shape ()->path ().back ().distance;
-        // std::cout << "\n + Initialize " << _vehicle_id << ": ";
+        // std::cout << "\n + Initialize " << _vehicle_id << " [N=" << _N << "]: ";
         for (int i=0; i<_N; ++i)
         {
-            // initialize each particle with a state X(i)
-            _state.emplace_back (10.0, 1.0, this);
-            // std::cout << " [" << _state.back ().get_distance () << "]";
+            // initialize each particle with a state X(i) - distance, speed
+            _state.emplace_back (rng.runif () * dmax,
+                                 rng.runif () * 30, 
+                                 this);
+            // std::cout << " [" << _state.back ().get_distance () << ", " 
+            //     << _state.back ().get_speed () << "]";
         }
 
         _newtrip = false;
     }
 
-    void Vehicle::mutate ()
+    void Vehicle::mutate (RNG& rng)
     {
         if (_newtrip)
         {
-            initialize ();
+            initialize (rng);
             return;
         }
+
+        if (!valid () || _delta == 0) return;
 
         // There probably need to be a bunch of checks here ...
         
@@ -38,7 +43,7 @@ namespace Gtfs {
         }
     }
 
-    void Vehicle::select ()
+    void Vehicle::select (RNG& rng)
     {
         // calculate loglikelihood of particles
         double sumlh = 0.0;
@@ -64,6 +69,20 @@ namespace Gtfs {
         return distance / (double)_state.size ();
     }
 
+    double Vehicle::speed ()
+    {
+        double speed = 0.0;
+        for (auto p = _state.begin (); p != _state.end (); ++p) speed += p->get_speed ();
+        return speed / (double)_state.size ();
+    }
+
+    int Vehicle::progress ()
+    {
+        double d = distance ();
+        double dmax = _trip->shape ()->path ().back ().distance;
+        return 100 * d / dmax + 0.5;
+    }
+
 
 
     Particle::Particle (double d, double s, Vehicle* v)
@@ -76,6 +95,11 @@ namespace Gtfs {
     double Particle::get_distance ()
     {
         return distance;
+    }
+
+    double Particle::get_speed ()
+    {
+        return speed;
     }
 
     void Particle::travel (unsigned delta)
