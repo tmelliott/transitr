@@ -10,11 +10,12 @@ create_vehicles <- function(db) {
                    "CREATE TABLE vehicles (",
                    "  vehicle_id TEXT PRIMARY KEY,",
                    "  trip_id TEXT,",
-                   "  timestamp INTEGER,",
+                   "  timestamp TEXT,",
                    "  position_latitude FLOAT,",
                    "  position_longitude FLOAT,",
                    "  distance FLOAT,",
-                   "  speed FLOAT",
+                   "  speed FLOAT,",
+                   "  progress INTEGER",
                    ")"))
     RSQLite::dbClearResult(res)
     res <- RSQLite::dbSendQuery(con, "PRAGMA journal_mode=wal")
@@ -25,12 +26,12 @@ check_vehicles <- function(db) {
     con <- db_connect(db)
     on.exit(db_close(con))
     res <- identical(RSQLite::dbGetQuery(con, "PRAGMA table_info(vehicles)"),
-              data.frame(cid = 0:6,
+              data.frame(cid = 0:7,
                          name = c("vehicle_id", "trip_id", "timestamp", "position_latitude",
-                                  "position_longitude", "distance", "speed"),
-                         type = c("TEXT", "TEXT", "INTEGER", "FLOAT", "FLOAT", "FLOAT", "FLOAT"),
+                                  "position_longitude", "distance", "speed", "progress"),
+                         type = c("TEXT", "TEXT", "TEXT", "FLOAT", "FLOAT", "FLOAT", "FLOAT", "INTEGER"),
                          notnull = 0L, dflt_value = as.logical(NA),
-                         pk = c(1L, 0L, 0L, 0L, 0L, 0L, 0L),
+                         pk = c(1L, 0L, 0L, 0L, 0L, 0L, 0L, 0L),
                          stringsAsFactors = FALSE))
     res
 }

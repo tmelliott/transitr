@@ -24,7 +24,8 @@ Imports:
     utils,
     httr,
     jsonlite,
-    glue
+    glue,
+    ggplot2
 Suggests: 
     testthat (>= 2.0.0),
     covr
