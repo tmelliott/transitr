@@ -39,8 +39,11 @@ namespace Gtfs {
         // do the transition ("mutation")
         for (auto p = _state.begin (); p != _state.end (); ++p)
         {
-            p->travel (_delta);
+            p->travel (_delta, rng);
         }
+
+        // update
+        select (rng);
     }
 
     void Vehicle::select (RNG& rng)
@@ -52,14 +55,42 @@ namespace Gtfs {
         {
             sumlh += p->calculate_likelihood (_position, path, _gpserror);
         }
-        std::cout << "\nsumlh = " << sumlh << " from "
-            << _state.size () << " particles";
 
         // compute particle (cumulative) weights ll - log(sum(likelihood)))
-        
+        std::vector<double> wt;
+        wt.reserve (_N+1);
+        wt.push_back (0);
+        double lsumlh (log (sumlh));
+        for (auto p = _state.begin (); p != _state.end (); ++p)
+        {
+            wt.push_back (wt.back () + exp (p->get_ll () - lsumlh));
+        }
+
+        // some condition for resampling (1/wt^2 < N? or something ...)
+
+
+        if (wt.back () < 0.99)
+        {
+            // bad bad bad
+            _state.clear ();
+            _newtrip = true;
+            return;
+        }
 
         // resample u \in [0, 1)
-        
+        double u;
+        unsigned int j;
+        std::vector<Particle> _newstate;
+        _newstate.reserve (_N);
+        for (int i=0; i<_N; ++i)
+        {
+            u = rng.runif ();
+            j = 0;
+            while (wt[j+1] <= u && j < _N) j++;
+            _newstate.emplace_back (_state[j]);
+        }
+        _state.clear ();
+        _state = std::move(_newstate);
     }
 
     double Vehicle::distance ()
@@ -80,7 +111,7 @@ namespace Gtfs {
     {
         double d = distance ();
         double dmax = _trip->shape ()->path ().back ().distance;
-        return 100 * d / dmax + 0.5;
+        return (100 * d / dmax) + 0.5;
     }
 
 
@@ -90,6 +121,15 @@ namespace Gtfs {
         vehicle = v;
         distance = d;
         speed = s;
+    }
+
+    Particle::Particle (const Particle &p)
+    {
+        vehicle = p.vehicle;
+        distance = p.distance;
+        speed = p.speed;
+        tt = p.tt;
+        log_likelihood = p.log_likelihood;
     }
 
     double Particle::get_distance ()
@@ -102,12 +142,23 @@ namespace Gtfs {
         return speed;
     }
 
-    void Particle::travel (unsigned delta)
+    double Particle::get_ll ()
+    {
+        return log_likelihood;
+    }
+
+    void Particle::travel (unsigned delta, RNG& rng)
     {
         // do the particle physics
         double Dmax = vehicle->trip ()->shape ()->path ().back ().distance;
         while (distance < Dmax && delta > 0)
         {
+            double speed_prop = -1;
+            while (speed_prop < 0 || speed_prop > 30)
+            {
+                speed_prop = speed + rng.rnorm () * 2.0;
+            }
+            speed = speed_prop;
             distance += speed;
             delta--;
         }
@@ -118,7 +169,13 @@ namespace Gtfs {
                                     std::vector<ShapePt>* path, 
                                     double sigma)
     {
-        log_likelihood = - log (sigma);
+        latlng ppos = vehicle->trip ()->shape ()->coordinates_of (distance);
+        // (log) distance between points
+        double ld = log (distanceEarth (ppos, vehicle->position ()));
+        // (log) (d/sigma)^2 ~ Chi2(2) ~ Exp(2)
+        double lX2 = 2 * (ld - log (sigma));
+        // log pdf of lX2 ~ Exp(2)
+        log_likelihood = log (0.5) - 0.5 * exp(lX2);
         return exp (log_likelihood);
     }
 

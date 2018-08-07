@@ -11,8 +11,7 @@ library(magrittr)
   }
 
 nw <- nw %>%
-    realtime_feed("https://api.at.govt.nz/v2/public/realtime/vehiclelocations",
-                  with_headers('Ocp-Apim-Subscription-Key' = Sys.getenv('APIKEY')),
+    realtime_feed("https://dl.dropboxusercontent.com/s/1fvto9ex649mkri/vehicle_locations.pb?dl=1", 
                   response = "protobuf")
 
 model(nw, 5000, 2)

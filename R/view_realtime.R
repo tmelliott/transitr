@@ -14,10 +14,13 @@ view_realtime <- function(db) {
     on.exit(db_close(con))
 
     vps <- RSQLite::dbReadTable(con, "vehicles")
-
-    p <- ggplot2::ggplot(vps, ggplot2::aes(progress, vehicle_id)) +
-        ggplot2::geom_point() +
-        ggplot2::xlim(0, 100)
+    
+    # p <- ggplot2::ggplot(NULL, ggplot2::aes(sort(vps$progress), 1:nrow(vps))) +
+    #     ggplot2::geom_point() +
+    #     ggplot2::xlim(0, 100)
+    p <- ggplot2::ggplot(vps, ggplot2::aes(position_longitude, position_latitude, colour = speed*60*60/1000)) + 
+        ggplot2::geom_point () +
+        ggplot2::scale_color_viridis_c()
     dev.hold()
     print(p)
     dev.flush()

@@ -1106,6 +1106,26 @@ namespace Gtfs
         return _path[closest].distance;
     }
 
+    latlng Shape::coordinates_of (double& d)
+    {
+        if (d <= 0)
+        {
+            return _path[0].pt;
+        }
+        if (d >= _path.back ().distance)
+        {
+            return _path.back ().pt;
+        }
+
+        // creep along the shape until d < d[i]
+        unsigned int i = 0;
+        while (d < _path[i+1].distance) i++;
+
+        // distance difference
+        
+        return _path[i].pt;
+    }
+
 
     /***************************************************** Stop */
     Stop::Stop (std::string& id, Gtfs* gtfs) : 

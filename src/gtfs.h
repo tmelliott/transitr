@@ -193,6 +193,7 @@ namespace Gtfs
         float version ();
 
         double distance_of (latlng& pt);
+        latlng coordinates_of (double& d);
     };
 
 
@@ -363,12 +364,13 @@ namespace Gtfs
 
     public:
         Particle (double d, double s, Vehicle* v);
-        // Particle (&Particle p);
+        Particle (const Particle &p);
         
         double get_distance ();
         double get_speed ();
+        double get_ll ();
 
-        void travel (unsigned delta);
+        void travel (unsigned delta, RNG& rng);
 
         double calculate_likelihood (latlng& y, std::vector<ShapePt>* path, double sigma);
     };
