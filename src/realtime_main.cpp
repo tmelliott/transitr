@@ -115,13 +115,9 @@ void run_realtime_model (
 
         // Write vehicles to database
         gtfs.write_vehicles (&vehicles);
-        for (auto v = vehicles.begin (); v != vehicles.end (); ++v)
+        // push sqlite -> remote postgresql
         {
-            
-            // printf ("\n - {%i/%i} vehicle %s: %.2f", 
-            //          omp_get_thread_num ()+1, numcore,
-            //          v->second.vehicle_id ().c_str (), 
-            //          v->second.distance ());
+            int rq = system ("R --slave -f scripts/copy_to_postgres.R > copy.out 2>&1 &");
         }
         timer.report ("inserting vehicle states into database");
 
