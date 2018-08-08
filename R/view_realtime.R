@@ -9,11 +9,8 @@
 ##' @return NULL
 ##' @author Tom Elliott
 ##' @export 
-view_realtime <- function(db) {
-    con <- db_connect(db)
-    on.exit(db_close(con))
-
-    vps <- RSQLite::dbReadTable(con, "vehicles")
+view_realtime <- function(host = Sys.getenv("transitr_host")) {
+    vps <- get_vehicle_positions(host)
     
     # p <- ggplot2::ggplot(NULL, ggplot2::aes(sort(vps$progress), 1:nrow(vps))) +
     #     ggplot2::geom_point() +
@@ -26,4 +23,14 @@ view_realtime <- function(db) {
     dev.flush()
 
     invisible(NULL)
+}
+
+
+
+get_vehicle_positions <- function(host) {
+    con <- RPostgreSQL::dbConnect(RPostgreSQL::PostgreSQL(), host = host, user="transitr", dbname="realtime")
+    vps <- RPostgreSQL::dbReadTable(con, "vehicles")
+    RPostgreSQL::dbDisconnect(con)
+
+    vps
 }

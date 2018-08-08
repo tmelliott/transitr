@@ -19,6 +19,7 @@ Imports:
     Rcpp,
     tools,
     RSQLite,
+    RPostgreSQL,
     magrittr,
     stats,
     utils,
