@@ -5,7 +5,7 @@
 ##' View the realtime state of vehicles
 ##'
 ##' @title View Realtime Vehicle States
-##' @param db SQLite database containing vehicle states, ETAs, etc
+##' @param host the host name for the database
 ##' @return NULL
 ##' @author Tom Elliott
 ##' @export 

@@ -4,10 +4,10 @@
 \alias{view_realtime}
 \title{View Realtime Vehicle States}
 \usage{
-view_realtime(db)
+view_realtime(host = Sys.getenv("transitr_host"))
 }
 \arguments{
-\item{db}{SQLite database containing vehicle states, ETAs, etc}
+\item{host}{the host name for the database}
 }
 \description{
 View the realtime state of vehicles
