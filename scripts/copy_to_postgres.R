@@ -14,7 +14,7 @@ if (HOST != "") {
                     user = "tell029", host = HOST, dbname = "realtime")
     dbGetQuery(c2, paste(
         "INSERT INTO vehicles_history",
-        "  SELECT * FROM vehicles"
+        "  SELECT * FROM vehicles",
         "ON CONFLICT DO NOTHING"))
     dbGetQuery(c2, "DELETE FROM vehicles")
     dbWriteTable(c2, "vehicles", vps, append = TRUE, row.names = FALSE)
