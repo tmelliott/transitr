@@ -3,6 +3,7 @@
 
 windows
 fulldata.db
+*.log
 
 ### Emacs ###
 # -*- mode: gitignore; -*-

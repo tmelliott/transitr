@@ -85,12 +85,19 @@ namespace Gtfs {
         for (int i=0; i<_N; ++i)
         {
             u = rng.runif ();
-            j = 0;
-            while (wt[j+1] <= u && j < _N) j++;
-            _newstate.emplace_back (_state[j]);
+            j = 1;
+            while (wt[j] <= u && j < _N) j++;
+            _newstate.emplace_back (_state[j-1]);
         }
+
+        // std::cout << "\n + vehicle " << _vehicle_id << ":\n";
+        // for (auto p = _state.begin (); p != _state.end (); ++p)
+        //     std::cout << "[" << p->get_distance () << ", " << p->get_speed () << "] ; ";
         _state.clear ();
         _state = std::move(_newstate);
+        // std::cout << "\n";
+        // for (auto p = _state.begin (); p != _state.end (); ++p)
+        //     std::cout << "[" << p->get_distance () << ", " << p->get_speed () << "] ; ";
     }
 
     double Vehicle::distance ()
@@ -115,37 +122,6 @@ namespace Gtfs {
     }
 
 
-
-    Particle::Particle (double d, double s, Vehicle* v)
-    {
-        vehicle = v;
-        distance = d;
-        speed = s;
-    }
-
-    Particle::Particle (const Particle &p)
-    {
-        vehicle = p.vehicle;
-        distance = p.distance;
-        speed = p.speed;
-        tt = p.tt;
-        log_likelihood = p.log_likelihood;
-    }
-
-    double Particle::get_distance ()
-    {
-        return distance;
-    }
-
-    double Particle::get_speed ()
-    {
-        return speed;
-    }
-
-    double Particle::get_ll ()
-    {
-        return log_likelihood;
-    }
 
     void Particle::travel (unsigned delta, RNG& rng)
     {

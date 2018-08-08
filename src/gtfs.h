@@ -356,8 +356,8 @@ namespace Gtfs
     class Particle {
     private:
         Vehicle* vehicle;
-        double distance;
-        double speed;
+        double distance = 0;
+        double speed = 0;
         std::vector<unsigned int> tt;
 
         double log_likelihood;
@@ -365,6 +365,7 @@ namespace Gtfs
     public:
         Particle (double d, double s, Vehicle* v);
         Particle (const Particle &p);
+        ~Particle ();
         
         double get_distance ();
         double get_speed ();

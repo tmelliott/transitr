@@ -1543,4 +1543,44 @@ namespace Gtfs
     }
 
 
+
+    Particle::Particle (double d, double s, Vehicle* v)
+    {
+        vehicle = v;
+        distance = d;
+        speed = s;
+    }
+
+    Particle::Particle (const Particle &p)
+    {
+        vehicle = p.vehicle;
+        distance = p.distance;
+        speed = p.speed;
+        tt = p.tt;
+        log_likelihood = p.log_likelihood;
+    }
+
+    Particle::~Particle ()
+    {
+        vehicle = nullptr;
+        tt.clear ();
+    }
+
+    double Particle::get_distance ()
+    {
+        return distance;
+    }
+
+    double Particle::get_speed ()
+    {
+        return speed;
+    }
+
+    double Particle::get_ll ()
+    {
+        return log_likelihood;
+    }
+
+
+
 }; // namespace Gtfs

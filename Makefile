@@ -24,4 +24,3 @@ run:
 
 coverage:
 	R -e "covr::report()"
-	

@@ -14,4 +14,4 @@ nw <- nw %>%
     realtime_feed("https://dl.dropboxusercontent.com/s/1fvto9ex649mkri/vehicle_locations.pb?dl=1", 
                   response = "protobuf")
 
-model(nw, 5000, 2)
+model(nw, 500, 2)
