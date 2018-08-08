@@ -28,6 +28,15 @@ void intHandler (int dummy) {
 
 using namespace Rcpp;
 
+void write_vehicles_in_parallel (Gtfs::Gtfs& gtfs, Gtfs::vehicle_map& vehicles)
+{
+    gtfs.write_vehicles (&vehicles);
+    // push sqlite -> remote postgresql
+    {
+        int rq = system ("R --slave -f scripts/copy_to_postgres.R > copy.out 2>&1 &");
+    }
+}
+
 // [[Rcpp::export]]
 void run_realtime_model (
     List nw, 
@@ -113,27 +122,21 @@ void run_realtime_model (
         }
         timer.report ("updating vehicle states");
 
-        // Write vehicles to database
-        gtfs.write_vehicles (&vehicles);
-        // push sqlite -> remote postgresql
-        {
-            int rq = system ("R --slave -f scripts/copy_to_postgres.R > copy.out 2>&1 &");
-        }
-        timer.report ("inserting vehicle states into database");
+        // Write vehicles to database on a separate thread while the network update occurs
+        std::thread writev (write_vehicles_in_parallel, std::ref (gtfs), std::ref (vehicles));
+        // timer.report ("inserting vehicle states into database");
+
+        // Now update the network state
+        // std::this_thread::sleep_for (std::chrono::milliseconds (1 * 1000));
+        // timer.report ("updating network state");
+
+        // Wait for vehicle writing to complete ...
+        writev.join ();
 
         timer.end ();
 
         std::this_thread::sleep_for (std::chrono::milliseconds (10 * 1000));
     }
-
-    // Initialize active trips
-    // for (auto tr : gtfs.trips ())
-    // {
-    //     Gtfs::Trip* ti = &(tr.second);
-    //     std::cout << "\n" << ti->trip_id ()
-    //         << " starts at "
-    //         << ti->stops ().begin ()->arrival_time;
-    // }
-
+    
     Rcout << "\n\n --- Finished ---\n\n";
 }
