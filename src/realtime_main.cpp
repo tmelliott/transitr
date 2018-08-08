@@ -33,6 +33,7 @@ void write_vehicles_in_parallel (Gtfs::Gtfs& gtfs, Gtfs::vehicle_map& vehicles)
     gtfs.write_vehicles (&vehicles);
     // push sqlite -> remote postgresql
     {
+        // write to postgres in the first place (issue #5)
         int rq = system ("R --slave -f scripts/copy_to_postgres.R > copy.out 2>&1 &");
     }
 }
@@ -69,16 +70,8 @@ void run_realtime_model (
     Rcout << "\n * Running on " << numcore << " cores.";
     Rcout << "\n * Initializing " << numcore << " independent RNGs. ";
     std::vector<RNG> rngs (numcore);
-
     unsigned int _seed = (unsigned int) time (0);
-    for (int i=0; i<numcore; ++i)
-    {
-        rngs.at (i).set_seed (_seed++);
-        // Rcout << "\n RNG" << i << ": " 
-        //     << rngs.at (i).rnorm () << ", "
-        //     << rngs.at (i).rnorm () << ", "
-        //     << rngs.at (i).rnorm () << ", ";
-    }
+    for (int i=0; i<numcore; ++i) rngs.at (i).set_seed (_seed++);
 
     // Allow the program to be stopped gracefully    
     signal (SIGINT, intHandler);
@@ -114,19 +107,14 @@ void run_realtime_model (
             for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
             {
                 v->second.mutate (rngs.at (omp_get_thread_num ()));
-                // printf ("\n - {%i/%i} vehicle %s: %.2f", 
-                //          omp_get_thread_num ()+1, numcore,
-                //          v->second.vehicle_id ().c_str (), 
-                //          v->second.distance ());
             }
         }
         timer.report ("updating vehicle states");
 
         // Write vehicles to database on a separate thread while the network update occurs
         std::thread writev (write_vehicles_in_parallel, std::ref (gtfs), std::ref (vehicles));
-        // timer.report ("inserting vehicle states into database");
 
-        // Now update the network state
+        // Now update the network state, using `numcore - 1` threads
         // std::this_thread::sleep_for (std::chrono::milliseconds (1 * 1000));
         // timer.report ("updating network state");
 
@@ -137,6 +125,6 @@ void run_realtime_model (
 
         std::this_thread::sleep_for (std::chrono::milliseconds (10 * 1000));
     }
-    
+
     Rcout << "\n\n --- Finished ---\n\n";
 }
