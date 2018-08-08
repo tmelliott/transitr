@@ -1,3 +1,4 @@
+DROP TABLE IF EXISTS vehicles;
 CREATE TABLE vehicles (
     vehicle_id VARCHAR(30) PRIMARY KEY NOT NULL,
     trip_id VARCHAR(80),
