@@ -127,6 +127,13 @@ namespace Gtfs {
     {
         // do the particle physics
         double Dmax = vehicle->trip ()->shape ()->path ().back ().distance;
+        
+        // get STOPS
+        
+        // get SEGMENTS
+
+        
+
         while (distance < Dmax && delta > 0)
         {
             double speed_prop = -1;
