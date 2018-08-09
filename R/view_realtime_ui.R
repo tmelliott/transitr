@@ -11,7 +11,7 @@ rt_ui <- function() {
         fluidRow(
             style = "height: 100%",
             column(2,
-                "sidebar"
+                textOutput("count")
             ),
             column(10,
                 style = "height: 100%",

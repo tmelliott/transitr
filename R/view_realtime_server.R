@@ -6,8 +6,10 @@ rt_server <- function(input, output, session) {
     #         geom_point () +
     #         scale_color_viridis_c()
     # )
+    vps <- get_vehicle_positions(options("transitr.host"))
+    vps <- vps[Sys.time() - vps$timestamp < 120, ]
+    output$count <- renderText(sprintf("Showing %i vehicle locations", nrow(vps)))
     output$vehicles <- renderLeaflet({
-        vps <- get_vehicle_positions(options("transitr.host"))
         m <- leaflet(vps)
         m <- addTiles(m)
         m <- addMarkers(m, ~position_longitude, ~position_latitude)
