@@ -32,6 +32,9 @@ namespace Gtfs
     class Particle;
     class ETA;
 
+    unsigned int 
+    find_stop_index (double distance, std::vector<StopTime>* stops);
+
     typedef std::unordered_map<std::string, Vehicle> vehicle_map;
 
     struct ShapePt
@@ -359,6 +362,8 @@ namespace Gtfs
         double distance = 0;
         double speed = 0;
         std::vector<unsigned int> tt;
+
+        bool complete = false;
 
         double log_likelihood;
 

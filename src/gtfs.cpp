@@ -852,21 +852,15 @@ namespace Gtfs
         sqlite3_close (db);
 
         // now load stop distances ...
-        double d;
-        for (auto st : _stops)
+        for (auto st = _stops.begin (); st != _stops.end (); ++st)
         {
-            if (st.stop && _shape && st.distance == 0)
+            if (st->stop && _shape && st->distance == 0)
             {
-                d = _shape->distance_of (st.stop->stop_position ());
+                st->distance = _shape->distance_of (st->stop->stop_position ());
             }
         }
 
         loaded = true;
-        // Rcpp::Rcout << " + Trip " << _trip_id << " is loaded"
-        //     << "\n   - Route: "
-        //     << (_route != nullptr ? _route->route_short_name () : "missing")
-        //     << "\n   - Headsign: " << _trip_headsign
-        //     << "\n   - Version: " << _version << "\n";
     }
 
     void Trip::unload () { unload (false); }
@@ -1557,6 +1551,7 @@ namespace Gtfs
         distance = p.distance;
         speed = p.speed;
         tt = p.tt;
+        complete = p.complete;
         log_likelihood = p.log_likelihood;
     }
 
@@ -1579,6 +1574,19 @@ namespace Gtfs
     double Particle::get_ll ()
     {
         return log_likelihood;
+    }
+
+
+
+
+    unsigned int 
+    find_stop_index (double distance, std::vector<StopTime>* stops)
+    {
+        if (distance <= 0) return 0;
+        if (distance >= stops->back ().distance) return stops->size () - 1;
+        unsigned int j = 0;
+        while (stops->at (j).distance < distance) j++;
+        return j;
     }
 
 

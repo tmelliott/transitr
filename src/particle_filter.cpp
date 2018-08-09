@@ -127,11 +127,29 @@ namespace Gtfs {
     {
         // do the particle physics
         double Dmax = vehicle->trip ()->shape ()->path ().back ().distance;
+        if (distance >= Dmax) 
+        {
+            distance = Dmax;
+            complete = true;
+            return;
+        }
         
         // get STOPS
+        std::vector<StopTime>* stops;
+        if (!vehicle || !vehicle->trip ()) return;
+        stops = &(vehicle->trip ()->stops ());
+        int M (stops->size ());
+        unsigned int m (find_stop_index (distance, stops));
+        if (m == M-1) 
+        {
+            distance = Dmax;
+            complete = true;
+            return;
+        }
+
+        double next_stop_d = stops->at (m).distance;
         
         // get SEGMENTS
-
         
 
         while (distance < Dmax && delta > 0)
@@ -139,9 +157,26 @@ namespace Gtfs {
             double speed_prop = -1;
             while (speed_prop < 0 || speed_prop > 30)
             {
-                speed_prop = speed + rng.rnorm () * 2.0;
+                speed_prop = speed + rng.rnorm () * 0.5;
             }
             speed = speed_prop;
+            if (distance + speed >= next_stop_d)
+            {
+                // about to reach a stop ... slow? stop? just drive past?
+                if (rng.runif () < 0.5)
+                {
+                    // stop dwell time ~ Exp(tau = 10)
+                    double gamma = 6;
+                    double tau = 10;
+                    double dwell = gamma - tau * log (rng.runif ());
+                    delta = fmax(0, delta - dwell);
+                    distance = next_stop_d;
+                    if (m == M-1) break;
+                    m++;
+                    next_stop_d = stops->at (m).distance;
+                    continue;
+                }
+            }
             distance += speed;
             delta--;
         }
