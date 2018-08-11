@@ -4,6 +4,7 @@
 #include <string>
 #include <memory>
 #include <unordered_map>
+#include <ctime>
 
 #include "geo.h"
 #include "time.h"
@@ -288,13 +289,14 @@ namespace Gtfs
     {
     private:
         std::string _dbname;
+        time_t _startdate;
+
         std::unordered_map<std::string, Agency> _agencies;
         std::unordered_map<std::string, Route> _routes;
         std::unordered_map<std::string, Trip> _trips;
         std::unordered_map<std::string, Shape> _shapes;
         std::unordered_map<std::string, Stop> _stops;
         std::unordered_map<std::string, Calendar> _calendar;
-
 
     public:
         Gtfs (std::string& name);
@@ -316,6 +318,8 @@ namespace Gtfs
         Calendar* find_calendar (std::string& id);
 
         void write_vehicles (vehicle_map* vehicles);
+
+        bool no_trips_remaining ();
     };
 
     class Vehicle {

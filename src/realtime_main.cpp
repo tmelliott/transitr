@@ -123,7 +123,17 @@ void run_realtime_model (
 
         timer.end ();
 
-        std::this_thread::sleep_for (std::chrono::milliseconds (10 * 1000));
+        // check for any remaining trips?
+        if (gtfs.no_trips_remaining ()) 
+        {
+            Rcout << "\n\n *** No more trips remaining for today ... goodnight!\n";
+            ongoing = 0;
+        }
+        else
+        {
+            std::this_thread::sleep_for (std::chrono::milliseconds (10 * 1000));
+        }
+
     }
 
     Rcout << "\n\n --- Finished ---\n\n";

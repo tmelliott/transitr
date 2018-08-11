@@ -5,7 +5,7 @@ namespace Gtfs
 {
 
     /***************************************************** GTFS */
-    Gtfs::Gtfs (std::string& name) : _dbname (name) 
+    Gtfs::Gtfs (std::string& name) : _dbname (name), _startdate (time (0))
     {
         Rcpp::Rcout << "Connected to GTFS database `"
             << _dbname << "`\n\n"
@@ -499,6 +499,53 @@ namespace Gtfs
         sqlite3_finalize (stmt_i);
         sqlite3_finalize (stmt_u);
         sqlite3_close (db);
+    }
+
+    bool Gtfs::no_trips_remaining ()
+    {
+        sqlite3* db;
+        if (sqlite3_open (_dbname.c_str (), &db))
+        {
+            Rcpp::Rcerr << " x Unable to connect to database\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_close (db);
+            return 0;
+        }
+
+        sqlite3_stmt* stmt;
+        std::ostringstream qry;
+        std::tm* tout = std::localtime (&_startdate);
+        std::vector<std::string> dows = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+        std::string dow = dows[tout->tm_wday];
+
+        qry << "SELECT COUNT(DISTINCT trip_id) AS n FROM stop_times " 
+            << "WHERE time(arrival_time) >= time('now', 'localtime') AND " 
+            << "      trip_id IN (SELECT trip_id FROM trips " 
+            << "                  WHERE service_id IN (SELECT service_id FROM calendar WHERE " << dow << "))";
+        if (sqlite3_prepare_v2(db, qry.str ().c_str (), -1, &stmt, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            sqlite3_close (db);
+            return 0;
+        }
+        if (sqlite3_step (stmt) != SQLITE_ROW)
+        {
+            Rcpp::Rcerr << " x Error running query\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            sqlite3_close (db);
+            return 0;
+        }
+
+        int ntrips = sqlite3_column_int (stmt, 0);
+        std::cout << "\nThere are " << ntrips << " trips remaining.";
+         
+        sqlite3_finalize (stmt);
+        sqlite3_close (db);
+
+        return ntrips == 0;
     }
 
 
