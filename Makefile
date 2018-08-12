@@ -3,8 +3,9 @@ default: install
 build:
 	R CMD build .
 
+FLAGS:=
 install:
-	R CMD INSTALL .
+	R CMD INSTALL --configure-args='CXXFLAGS=$(FLAGS)' .
 
 check:
 	R CMD build .

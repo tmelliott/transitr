@@ -6,7 +6,7 @@
 class RNG
 {
 private:
-    std::mt19937_64 gen;
+    std::mt19937 gen;
 
     std::uniform_real_distribution<double> uniform;
     std::normal_distribution<double> normal;

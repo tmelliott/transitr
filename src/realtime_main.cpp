@@ -47,6 +47,12 @@ void run_realtime_model (
 {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
+#if USE_HAVERSINE
+    Rcout << "\nNOTE: using Haversine distance formula, which is slower but more accurate.\n\n";
+#else
+    Rcout << "\nNOTE: using Equirectangular approxmiation distance formula, which is faster but less accurate.\n\n";
+#endif
+
     // Process nw components into c++ things
     String dbname_raw = nw["database"];
     std::string dbname (dbname_raw);
@@ -123,16 +129,7 @@ void run_realtime_model (
 
         timer.end ();
 
-        // check for any remaining trips?
-        if (gtfs.no_trips_remaining ()) 
-        {
-            Rcout << "\n\n *** No more trips remaining for today ... goodnight!\n";
-            ongoing = 0;
-        }
-        else
-        {
-            std::this_thread::sleep_for (std::chrono::milliseconds (10 * 1000));
-        }
+        std::this_thread::sleep_for (std::chrono::milliseconds (10 * 1000));
 
     }
 

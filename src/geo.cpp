@@ -1,5 +1,9 @@
 // [[Rcpp::plugins(cpp11)]]
 
+#ifndef USE_HAVERSINE
+#define USE_HAVERSINE 0
+#endif
+
 #include <Rcpp.h>
 #include <math.h>
 #include <cmath> 
@@ -28,16 +32,26 @@ double rad2deg(double rad) {
 }
 
 double distanceEarth(double lat1d, double lon1d, double lat2d, double lon2d) {
-  double lat1r, lon1r, lat2r, lon2r, u, v, a, c;
+  double lat1r, lon1r, lat2r, lon2r;
   lat1r = deg2rad (lat1d);
   lon1r = deg2rad (lon1d);
   lat2r = deg2rad (lat2d);
   lon2r = deg2rad (lon2d);
+#if USE_HAVERSINE
+  double u, v, a, c;
+  // this is a more computationally intensive calculation
   u = sin(deg2rad(lat2d - lat1d) / 2.0);
   v = sin(deg2rad(lon2d - lon1d) / 2.0);
   a = u * u + cos(lat1r) * cos(lat2r) * v * v;
   c = 2.0 * atan2(sqrt(a), sqrt(1.0 - a));
   return earthRadius * c;
+#else
+  // equirectangular approximation - fast, but lower accuracy (over long distances)
+  double x, y;
+  x = (lon2r - lon1r) * cos ((lat1r + lat2r) / 2);
+  y = lat2r - lat1r;
+  return sqrt(x * x + y * y) * earthRadius;
+#endif
 }
 
 double distanceEarth(Node* from, Node* to)

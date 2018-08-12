@@ -9,7 +9,11 @@ context("Geographical functions") {
   // unit test, and use 'expect_true()' and 'expect_false()'
   // to test the desired conditions.
   test_that("distanceEarth computes the right thing") {
+#if USE_HAVERSINE
     expect_true(distanceEarth(-33.2345, 173.2145, -33.2346, 173.2341) - 1822.9753132 < 0.000001);
+#else
+    expect_true(distanceEarth(-33.2345, 173.2145, -33.2346, 173.2341) - 1822.9753159 < 0.000001);
+#endif
   }
 
 }

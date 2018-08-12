@@ -91,7 +91,7 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
                                         std::forward_as_tuple (id, n, err));
             if (r.second)
             {
-                r.first->second.update (ent.vehicle (), &(*gtfs));
+                r.first->second.update (ent.vehicle (), gtfs);
             }
         }
         else
