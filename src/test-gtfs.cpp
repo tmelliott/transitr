@@ -42,4 +42,11 @@ context("GTFS classes") {
         expect_true (gtfs.find_calendar (ne) == nullptr);
     }
 
+    test_that("Shape distance functions return the correct values") {
+        Gtfs::Shape* s = &(gtfs.shapes ().begin (0)->second);
+        double d (1000);
+        latlng p = s->coordinates_of (d);
+        expect_true (fabs (s->distance_of (p) - d) < 0.001);
+    }
+
 }

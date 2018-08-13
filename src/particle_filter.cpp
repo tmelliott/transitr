@@ -40,6 +40,20 @@ namespace Gtfs {
         for (auto p = _state.begin (); p != _state.end (); ++p)
         {
             p->travel (_delta, rng);
+#if WRITE_PARTICLES
+            std::ostringstream fname;
+            fname << "history/vehicle_" << _vehicle_id << ".csv";
+            std::ofstream fout;
+            fout.open (fname.str ().c_str (), std::ofstream::app);
+            double d (p->get_distance ());
+            latlng ppos (_trip->shape ()->coordinates_of (d));
+            fout << _timestamp << ","
+                << p->get_distance () << ","
+                << p->get_speed () << ","
+                << std::setprecision(15)
+                << ppos.latitude << "," << ppos.longitude << "\n";
+            fout.close ();
+#endif
         }
 
         // update

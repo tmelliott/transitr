@@ -1147,11 +1147,41 @@ namespace Gtfs
                 closest = i;
             }
         }
-        return _path[closest].distance;
+        
+        if (dmin < 1)
+        {
+            return _path[closest].distance;
+        }
+
+        // pA -> pB -> pC
+        // p0B is closest, but on AB or BC?
+        bool forward (true);
+        if (closest >= _path.size () - 1)
+        {
+            forward = false;
+        }
+        else if (closest != 0)
+        {
+            double dA = distanceEarth (_path[closest-1].pt, x);
+            double dB = distanceEarth (_path[closest+1].pt, x);
+            forward = dB <= dA;
+        }
+
+        if (forward)
+        {
+            return _path[closest].distance + 
+                alongTrackDistance(x, _path[closest].pt, _path[closest+1].pt);
+        }
+        else
+        {
+            return _path[closest-1].distance +
+                alongTrackDistance(x, _path[closest-1].pt, _path[closest].pt);
+        }
     }
 
     latlng Shape::coordinates_of (double& d)
     {
+        if (!loaded) load();
         if (d <= 0)
         {
             return _path[0].pt;
@@ -1163,11 +1193,23 @@ namespace Gtfs
 
         // creep along the shape until d < d[i]
         unsigned int i = 0;
-        while (d < _path[i+1].distance) i++;
+        while (d >= _path[i+1].distance) i++;
+
+        if (i >= _path.size ()-1)
+        {
+            return _path.back ().pt;
+        }
+
+        double dd = d - _path[i].distance;
+        if (dd < 0.01)
+        {
+            return _path[i].pt;
+        }
 
         // distance difference
-        
-        return _path[i].pt;
+        double b = bearing (_path[i].pt, _path[i+1].pt);
+
+        return destinationPoint (_path[i].pt, b, dd);       
     }
 
 

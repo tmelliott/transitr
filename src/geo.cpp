@@ -80,6 +80,10 @@ double bearing (double lat1d, double lon1d, double lat2d, double lon2d)
   th = rad2deg (atan2(y, x));
   return std::fmod (th + 360.0, 360.0);
 }
+double bearing (latlng& p1, latlng& p2)
+{
+  return bearing (p1.latitude, p1.longitude, p2.latitude, p2.longitude);
+}
 
 double crossTrackDistance (double latd, double lond, double latp1d, double lonp1d, double latp2d, double lonp2d)
 {
@@ -100,12 +104,18 @@ double alongTrackDistance (double latd, double lond, double latp1d, double lonp1
 
   return acos (cos (d13 / earthRadius) / cos (dxt / earthRadius)) * earthRadius;
 }
+double alongTrackDistance (latlng& p, latlng& p1, latlng& p2)
+{
+  return alongTrackDistance (p.latitude, p.longitude, p1.latitude, p1.longitude,
+                             p2.latitude, p2.longitude);
+}
 
-Node destinationPoint (std::pair<double,double> start, double theta, double distance)
+
+latlng destinationPoint (latlng p0, double theta, double distance)
 {
   double phi, lambda, phi2, lambda2;
-  phi = deg2rad (std::get<1> (start));
-  lambda = deg2rad (std::get<0> (start));
+  phi = deg2rad (p0.latitude);
+  lambda = deg2rad (p0.longitude);
 
   phi2 = asin (sin (phi) * cos (distance / earthRadius) +
                cos (phi) * sin (distance / earthRadius) * cos (deg2rad (theta)));
@@ -113,5 +123,13 @@ Node destinationPoint (std::pair<double,double> start, double theta, double dist
                             cos (distance / earthRadius) - sin (phi) * sin (phi2));
 
   lambda2 = fmod(rad2deg (lambda2) + 540, 360) - 180;
-  return Node (lambda2, rad2deg (phi2));
+  return latlng (rad2deg (phi2), lambda2);
 }
+
+Node destinationPoint (std::pair<double,double> start, double theta, double distance)
+{
+  latlng p = destinationPoint(latlng (std::get<1> (start), std::get<0> (start)), 
+                              theta, distance);
+  return Node (p.longitude, p.latitude);
+}
+
