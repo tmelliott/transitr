@@ -4,8 +4,10 @@ build:
 	R CMD build .
 
 FLAGS:=
+CPPFLAGS:=
+CXXFLAGS:=
 install:
-	R CMD INSTALL --configure-args='CXXFLAGS=$(FLAGS)' .
+	R CMD INSTALL --configure-args='CPPFLAGS=$(FLAGS) $(CPPFLAGS) CXXFLAGS=$(FLAGS) $(CXXFLAGS)' .
 
 check:
 	R CMD build .
