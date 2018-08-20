@@ -353,6 +353,7 @@ namespace Gtfs
             void initialize (RNG& rng);
             void mutate (RNG& rng); // mutate state
             void select (RNG& rng); // select state (given data)
+            void predict_etas (RNG& rng);
             void reset ();
 
             double distance ();
@@ -365,7 +366,8 @@ namespace Gtfs
         Vehicle* vehicle;
         double distance = 0;
         double speed = 0;
-        std::vector<unsigned int> tt;
+        std::vector<unsigned int> tt; // segment travel times
+        std::vector<uint64_t> at; // stop arrival times
 
         bool complete = false;
 
@@ -379,9 +381,11 @@ namespace Gtfs
         double get_distance ();
         double get_speed ();
         double get_ll ();
+        std::vector<uint64_t>& get_arrival_times ();
 
         void travel (unsigned delta, RNG& rng);
-
+        void predict_etas (RNG& rng);
+        
         double calculate_likelihood (latlng& y, std::vector<ShapePt>* path, double sigma);
     };
 

@@ -48,10 +48,23 @@ namespace Gtfs {
             double d (p->get_distance ());
             latlng ppos (_trip->shape ()->coordinates_of (d));
             fout << _timestamp << ","
+                << _trip->trip_id () << ","
+                << _position.latitude << "," << _position.longitude << ","
                 << p->get_distance () << ","
                 << p->get_speed () << ","
                 << std::setprecision(15)
                 << ppos.latitude << "," << ppos.longitude << "\n";
+            fout.close ();
+
+            std::ostringstream fname2;
+            fname2 << "history/vehicle_" << _vehicle_id << "_particles.csv";
+            fout.open (fname2.str ().c_str (), std::ofstream::app);
+            fout << _timestamp;
+            for (auto ati = p->get_arrival_times ().begin (); ati != p->get_arrival_times ().end (); ++ati)
+            {
+                fout << "," << *ati;
+            }
+            fout << "\n";
             fout.close ();
 #endif
         }
@@ -114,6 +127,13 @@ namespace Gtfs {
         //     std::cout << "[" << p->get_distance () << ", " << p->get_speed () << "] ; ";
     }
 
+    void Vehicle::predict_etas (RNG& rng)
+    {
+        if (!valid ()) return;
+
+        for (auto p = _state.begin (); p != _state.end (); ++p) p->predict_etas (rng);
+    }
+
     double Vehicle::distance ()
     {
         double distance = 0.0;
@@ -165,18 +185,20 @@ namespace Gtfs {
         
         // get SEGMENTS
         
+        // add noise to speed
+        double speed_prop = -1;
+        while (speed_prop < 0 || speed_prop > 30)
+        {
+            speed_prop = speed + rng.rnorm () * 5;
+        }
+        speed = speed_prop;
 
         while (distance < Dmax && delta > 0)
         {
-            double speed_prop = -1;
-            while (speed_prop < 0 || speed_prop > 30)
-            {
-                speed_prop = speed + rng.rnorm () * 0.5;
-            }
-            speed = speed_prop;
             if (distance + speed >= next_stop_d)
             {
                 // about to reach a stop ... slow? stop? just drive past?
+                at.at (m) = vehicle->timestamp () - delta - 1;
                 if (rng.runif () < 0.5)
                 {
                     // stop dwell time ~ Exp(tau = 10)
@@ -193,6 +215,34 @@ namespace Gtfs {
             }
             distance += speed;
             delta--;
+        }
+    }
+
+    void Particle::predict_etas (RNG& rng)
+    {
+        if (complete) return;
+
+        // get STOPS
+        std::vector<StopTime>* stops;
+        if (!vehicle || !vehicle->trip ()) return;
+        stops = &(vehicle->trip ()->stops ());
+        int M (stops->size ());
+        unsigned int m (find_stop_index (distance, stops));
+        if (m == M-1) 
+        {
+            return;
+        }
+
+        double dcur = distance;
+        uint64_t t0 = vehicle->timestamp ();
+        while (m < M)
+        {
+            double dnext = stops->at (m).distance;
+            at.at (m) = t0 + (dnext - dcur) / speed;
+            dcur = dnext;
+            // and add some dwell time
+            t0 = at.at (m);
+            m++;
         }
     }
 

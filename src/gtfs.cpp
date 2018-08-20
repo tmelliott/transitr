@@ -1635,6 +1635,7 @@ namespace Gtfs
         vehicle = v;
         distance = d;
         speed = s;
+        at.resize (vehicle->trip ()->stops ().size (), 0);
     }
 
     Particle::Particle (const Particle &p)
@@ -1643,6 +1644,7 @@ namespace Gtfs
         distance = p.distance;
         speed = p.speed;
         tt = p.tt;
+        at = p.at;
         complete = p.complete;
         log_likelihood = p.log_likelihood;
     }
@@ -1668,6 +1670,10 @@ namespace Gtfs
         return log_likelihood;
     }
 
+    std::vector<uint64_t>& Particle::get_arrival_times ()
+    {
+        return at;
+    }
 
 
 

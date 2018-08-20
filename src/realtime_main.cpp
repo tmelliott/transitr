@@ -123,6 +123,16 @@ void run_realtime_model (
         // Now update the network state, using `numcore - 1` threads
         // std::this_thread::sleep_for (std::chrono::milliseconds (1 * 1000));
         // timer.report ("updating network state");
+        
+        // Predict ETAs
+        #pragma omp parallel for num_threads(numcore)
+        for (unsigned i=0; i<vehicles.bucket_count (); ++i)
+        {
+            for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
+            {
+                v->second.predict_etas (rngs.at (omp_get_thread_num ()));
+            }
+        }
 
         // Wait for vehicle writing to complete ...
         writev.join ();
