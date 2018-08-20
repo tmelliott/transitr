@@ -351,10 +351,6 @@ namespace Gtfs
 
     void Gtfs::write_vehicles (vehicle_map* vehicles)
     {
-        sqlite3* db;
-        sqlite3_stmt* stmt_s;
-        sqlite3_stmt* stmt_i;
-        sqlite3_stmt* stmt_u;
         sqlite3* db = get_connection ();
         if (db == nullptr)
         {
@@ -363,6 +359,9 @@ namespace Gtfs
             close_connection ();
             return;
         }
+        sqlite3_stmt* stmt_s;
+        sqlite3_stmt* stmt_i;
+        sqlite3_stmt* stmt_u;
 
         // we need three queries: 
         if (sqlite3_prepare_v2 (db, "SELECT count(vehicle_id) FROM vehicles WHERE vehicle_id=?",
