@@ -11,6 +11,7 @@
 #include "rng.h"
 
 #include "vendor/protobuf/gtfs-realtime.pb.h"
+#include "vendor/sqlite3/sqlite3.h"
 #include <Rcpp.h>
 
 namespace Gtfs 
@@ -290,6 +291,7 @@ namespace Gtfs
     private:
         std::string _dbname;
         time_t _startdate;
+        sqlite3* _connection = nullptr;
 
         std::unordered_map<std::string, Agency> _agencies;
         std::unordered_map<std::string, Route> _routes;
@@ -302,6 +304,8 @@ namespace Gtfs
         Gtfs (std::string& name);
 
         std::string& dbname ();
+        sqlite3* get_connection ();
+        void close_connection ();
         std::unordered_map<std::string, Agency>& agencies ();
         std::unordered_map<std::string, Route>& routes ();
         std::unordered_map<std::string, Trip>& trips ();
