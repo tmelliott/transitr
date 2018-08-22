@@ -240,6 +240,11 @@ namespace Gtfs
 
     sqlite3* Gtfs::get_connection ()
     {
+        if (_connection != nullptr)
+        {
+            return _connection;
+        }
+        
         int maxTries = 100;
         while (maxTries > 0)
         {
@@ -260,8 +265,8 @@ namespace Gtfs
 
     void Gtfs::close_connection ()
     {
-        sqlite3_close (_connection);
-        _connection = nullptr;
+        // sqlite3_close (_connection);
+        // _connection = nullptr;
     }
 
     std::unordered_map<std::string, Agency>& Gtfs::agencies ()
