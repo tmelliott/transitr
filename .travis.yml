@@ -16,6 +16,7 @@ addons:
       - libprotobuf-dev 
       - libprotoc-dev 
       - protobuf-compiler 
+      - libgoogle-perftools-dev
 
 after_success:
   - Rscript -e 'covr::codecov()'

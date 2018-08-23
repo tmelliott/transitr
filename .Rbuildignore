@@ -7,3 +7,5 @@
 ^scripts$
 ^codecov\.yml$
 ^fulldata.db$
+^NEWS.md$
+^.+\.csv$
