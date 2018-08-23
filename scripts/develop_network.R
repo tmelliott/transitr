@@ -54,3 +54,13 @@ ggplot(NULL, aes(seq_along(ds), ds, color = ds < 5)) + geom_point()
 ggplot(path1, aes(shape_pt_lon, shape_pt_lat)) +
     geom_path() +
     geom_point(aes(colour = d < 5), data = path2 %>% mutate(d = ds) %>% arrange(d))
+
+di <- ds < 5
+d1 <- d2 <- integer(nrow(path2))
+for (i in 2:length(d1)) if (di[i] == di[i-1]) d1[i] <- d1[i-1] + 1
+for (i in (length(d2)-1):1) if (di[i] == di[i+1]) d2[i] <- d2[i+1] + 1
+
+d1+1
+d2+1
+
+rowSums(cbind(d1+1, d2+1))
