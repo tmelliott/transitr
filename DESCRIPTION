@@ -29,7 +29,8 @@ Imports:
     glue,
     ggplot2,
     shiny,
-    leaflet
+    leaflet,
+    geosphere
 Suggests: 
     testthat (>= 2.0.0),
     covr
