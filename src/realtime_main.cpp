@@ -137,6 +137,7 @@ void run_realtime_model (
         // Wait for vehicle writing to complete ...
         writev.join ();
 
+        gtfs.close_connection (true);
         timer.end ();
 
         std::this_thread::sleep_for (std::chrono::milliseconds (10 * 1000));

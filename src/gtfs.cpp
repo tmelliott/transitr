@@ -264,10 +264,14 @@ namespace Gtfs
         return nullptr;
     }
 
-    void Gtfs::close_connection ()
+    void Gtfs::close_connection () { close_connection (false); }
+    void Gtfs::close_connection (bool sure)
     {
-        // sqlite3_close (_connection);
-        // _connection = nullptr;
+        if (sure)
+        {
+            sqlite3_close (_connection);
+            _connection = nullptr;
+        }
     }
 
     std::unordered_map<std::string, Agency>& Gtfs::agencies ()
