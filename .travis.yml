@@ -1,0 +1,28 @@
+language: R
+sudo: false
+cache: packages
+
+r:
+  - release
+  - devel
+
+addons:
+  apt:
+    update: true
+    sources:
+      - sourceline: 'ppa:edd/misc'
+    packages:
+      - libcurl4-openssl-dev
+      - libprotobuf-dev 
+      - libprotoc-dev 
+      - protobuf-compiler 
+      - libgoogle-perftools-dev
+
+after_success:
+  - Rscript -e 'covr::codecov()'
+
+notifications:
+  email:
+    on_success: change
+    on_failure: change
+    

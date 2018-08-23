@@ -1,0 +1,19 @@
+
+## Make this C++11 so that we get better int64 support and much more
+CXX_STD=CXX11
+
+PKG_CPPFLAGS=@PKG_CPPFLAGS@
+PKG_LIBS=@PKG_LIBS@ -lprofiler
+
+PROTODIR = vendor/protobuf
+
+$(SHLIB): $(OBJECTS)
+
+OBJ = $(patsubst %.cpp,%.o,$(wildcard *.cpp))
+OBJECTS = vendor/sqlite3/sqlite3.o $(PROTODIR)/gtfs-realtime.pb.o $(OBJ)
+
+PROTOFILES = $(PROTODIR)/gtfs-realtime.pb.cpp $(PROTODIR)/gtfs-realtime.pb.h
+$(PROTODIR)/gtfs-realtime.pb.o: $(PROTOFILES)
+$(PROTOFILES): $(PROTODIR)/gtfs-realtime.proto
+	protoc -I=$(PROTODIR) --cpp_out=$(PROTODIR) $^
+	mv $(PROTODIR)/gtfs-realtime.pb.cc $(PROTODIR)/gtfs-realtime.pb.cpp

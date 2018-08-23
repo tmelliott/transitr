@@ -1,0 +1,11 @@
+^\.travis\.yml$
+.env
+^appveyor\.yml$
+^data-raw$
+^tmp$
+^Makefile$
+^scripts$
+^codecov\.yml$
+^fulldata.db$
+^NEWS.md$
+^.+\.csv$
