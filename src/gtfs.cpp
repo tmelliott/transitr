@@ -1532,11 +1532,13 @@ namespace Gtfs
             _newtrip = _trip != nullptr;
         }
 
-        if (_trip != nullptr)
+        if (_trip == nullptr)
         {
-            _trip->route ()->load ();
-            _trip->shape ()->load ();
+            throw std::runtime_error ("Trip not found");
         }
+        _trip->route ()->load ();
+        _trip->shape ()->load ();
+
 
         _position = latlng (vp.position ().latitude (),
                             vp.position ().longitude ());

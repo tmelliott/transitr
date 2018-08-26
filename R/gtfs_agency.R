@@ -21,7 +21,7 @@ create_agency <- function(db) {
 update_agency <- function(object, file) {
     con <- db_connect(object$database)
     on.exit(db_close(con))
-    existing <- RSQLite::dbGetQuery(con, "SELECT agency_id FROM agency")
+    existing <- RSQLite::dbGetQuery(con, "SELECT agency_id FROM agency")[[1]]
     tbl <- utils::read.csv(file, header = TRUE)    
     agency <- data.frame(agency_id = as.character(tbl$agency_id),
                          agency_name = tbl$agency_name,
@@ -31,6 +31,7 @@ update_agency <- function(object, file) {
                          agency_timezone = as.character(tbl$agency_timezone),
                          stringsAsFactors = FALSE)
     agency <- agency[!agency$agency_id %in% existing, ]
+
     RSQLite::dbWriteTable(con, "agency", agency, append = TRUE)
 }
 

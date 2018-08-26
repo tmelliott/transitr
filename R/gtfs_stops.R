@@ -26,7 +26,7 @@ create_stops <- function(db) {
 update_stops <- function(object, file) {
     con <- db_connect(object$database)
     on.exit(db_close(con))
-    existing <- RSQLite::dbGetQuery(con, "SELECT stop_id FROM stops")
+    existing <- RSQLite::dbGetQuery(con, "SELECT stop_id FROM stops")[[1]]
     tbl <- utils::read.csv(file, header = TRUE)
     stops <- data.frame(stop_id = as.character(tbl$stop_id),
                         stop_lat = as.numeric(tbl$stop_lat),
