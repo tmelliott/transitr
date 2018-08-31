@@ -30,13 +30,41 @@ tmp_construct_network <- function(nw) {
 
 
 merge_paths <- function(new, existing, n.thres = 3) {
-    new.seg <- generate_segments(new, existing, n.thres)
-    existing.seg <- generate_segments(existing, new, n.thres)
+    # new.seg <- generate_segments(new, existing, n.thres)
+    # existing.seg <- generate_segments(existing, new, n.thres)
 
-    NETWORK <- list(segments = tibble(id = integer(), from = integer(), 
-                                      to = integer(), path = sf::st_sfc()),
-                    intersections = tibble(id = integer(), position = sf::st_sfc(), 
-                                           type = factor(character(), levels = c("int", "stop"))))
+    # NETWORK <- list(segments = tibble(id = integer(), from = integer(), 
+    #                                   to = integer(), path = sf::st_sfc()),
+    #                 intersections = tibble(id = integer(), position = sf::st_sfc(), 
+    #                                        type = factor(character(), levels = c("int", "stop"))))
+
+    # new.seg.geom <- do.call(st_sfc, tapply(seq_along(1:nrow(new.seg)), new.seg[, 5],
+    #                                        function(i) new.seg[i, 2:3] %>% st_linestring))
+    # existing.seg.geom <- do.call(st_sfc, tapply(seq_along(1:nrow(existing.seg)), existing.seg[, 5],
+    #                                             function(i) existing.seg[i, 2:3] %>% st_linestring))
+
+    # plot(new, type = "l")
+    # lines(new.seg[, 2:3])
+    # plot(new.seg.geom[[2]])
+    # plot(existing.seg.geom)
+
+    # NZ: 5759
+    CEN <- c(36.8485, 174.7633)
+
+    nl <- st_linestring(new %>% as.matrix)
+    el <- st_linestring(existing %>% as.matrix)
+    bl <- st_sfc(nl, el, crs = 4326)
+    blt <- st_transform(bl, sprintf("+proj=eqc +lat_0=%s +lon_0=%s", CEN[1], CEN[2]))
+    plot(blt)
+
+    blb <- st_buffer(blt, 20)
+
+    plot(blb)
+    plot(st_difference(blb[[1]], blb[[2]]), col=  'red', add=TRUE)
+    plot(st_difference(blb[[2]], blb[[1]]), col= 'blue', add=TRUE)
+    plot(st_intersection(blb[[1]], blb[[2]]), col = "yellow", add = TRUE)
+
+    int <- st_intersection(blb[[1]], blb[[2]])
 
     ## take EXISTING and split it up
     p <- ggplot(existing, aes(shape_pt_lon, shape_pt_lat)) + geom_path(color = "gray") +
@@ -214,6 +242,7 @@ generate_segments <- function(target, ref, n.thres, unique.only = FALSE) {
 
     segs <- lapply(segments, as.tibble) %>% bind_rows
     attr(segs, "index") <- tapply(segi, segii, function(x) if (any(is.na(x))) NA else x[1])
+    segs
 }
 
 delete_stops <- function(path, stops) {

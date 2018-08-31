@@ -86,3 +86,90 @@ ggplot(path1 %>% mutate(d = existing.seg) %>% filter(!is.na(d)),
 
 ggplot(segs, aes(shape_pt_lon, shape_pt_lat, colour = as.factor(i))) +
     geom_path()
+
+
+
+
+con <- dbConnect(SQLite(), db)
+vmax <- con %>% tbl("routes") %>% 
+    summarize(v = max(version, na.rm = TRUE)) %>%
+    collect %>% pluck("v")
+
+shapes <- con %>% tbl("trips") %>% 
+  inner_join(con %>% tbl("routes"), by = "route_id") %>% 
+  inner_join(con %>% tbl("shapes"), by = "shape_id") %>%
+  filter(route_type == 3 & version == vmax) %>%
+  select(shape_id, shape_pt_lon, shape_pt_lat, shape_pt_sequence) %>%
+  collect
+
+stops <- con %>% tbl("stops") %>%
+  filter(version == vmax) %>%
+  select(stop_id, stop_lon, stop_lat) %>%
+  collect
+
+dbDisconnect(con)
+
+shapessf <- do.call(st_sfc, tapply(1:nrow(shapes), shapes$shape_id, function(i) {
+    shapes[i,] %>% arrange(shape_pt_sequence) %>% 
+      select("shape_pt_lon", "shape_pt_lat") %>% 
+      as.matrix %>% st_linestring
+}))
+
+plot(shapessf)
+st_crs(shapessf) <- 4326
+
+CEN <- shapes %>% select(shape_pt_lat, shape_pt_lon) %>% as.matrix %>% colMeans %>% as.numeric
+
+shapest <- st_transform(shapessf, sprintf("+proj=eqc +lat_0=%s +lon_0=%s", CEN[1], CEN[2]))
+
+plot(shapest)
+
+buf <- st_buffer(shapest, 20)
+
+cen <- c(0, 0)
+wd <- 5000
+plot(buf, xlim = cen[1] + wd * c(-1, 1), ylim = cen[2] + wd * c(-1, 1))
+
+segs <- st_sfc(crs = st_crs(buf))
+for (i in 1:(length(buf)-1)) {
+  for (j in (i+1):length(buf)) {
+    cat(sprintf(" - %i - %i       \r", i, j))
+    segij <- st_intersection(buf[[i]], buf[[j]])
+    if (length(segij)) {
+      for (k in 1:length(segij)) {
+        area <- segij[[1]] %>% st_polygon %>% st_area
+        area / 40
+      }
+      break()
+      #segs <- c(segs, list(segij))
+    }
+  }
+}
+
+segs <- do.call(st_sfc, segs)
+
+
+plot(do.call(st_sfc, segs), xlim = cen[1] + wd * c(-1, 1), ylim = cen[2] + wd * c(-1, 1))
+
+
+### 
+sht <- st_transform(shapessf, sprintf("+proj=eqc +lat_0=%s +lon_0=%s", CEN[1], CEN[2]))
+stps <- stops[,2:3] %>% as.matrix %>% st_multipoint %>%
+  st_sfc(crs = 4326) %>%
+  st_transform(crs = st_crs(sht))
+
+
+s1 <- st_sfc(sht[[1]], crs = st_crs(sht))
+plot(s1)
+plot(stps, add= T)
+
+
+
+s2 <- st_buffer(st_sfc(sht[[6]], crs = st_crs(sht)), 20)
+
+xx <- st_intersection(s1, s2)
+
+apply(as.matrix(s1), 1, function(x) st_distance(st_sfc(st_point(x), crs = 4326), s2))
+
+
+
