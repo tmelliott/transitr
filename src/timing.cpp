@@ -53,3 +53,19 @@ void Timer::end ()
             wt / 1000, ct);
     reset ();
 }
+
+double Timer::cpu_seconds ()
+{
+    auto cend = std::clock ();
+    auto ct = (cend - clock) / (double)(CLOCKS_PER_SEC / 1000);
+
+    return ct;
+}
+
+double Timer::wall_seconds ()
+{
+    auto wend = std::chrono::high_resolution_clock::now ();
+    auto wt = std::chrono::duration<double, std::milli> (wend - wall).count ();
+
+    return wt;
+}

@@ -4,6 +4,8 @@
 #include <chrono>
 #include <thread>
 
+#include "timing.h"
+
 namespace Gtfs 
 {
 
@@ -526,6 +528,7 @@ namespace Gtfs
 
     void Agency::load ()
     {
+        if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
         {
@@ -624,6 +627,7 @@ namespace Gtfs
 
     void Route::load ()
     {
+        if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
         {
@@ -721,6 +725,7 @@ namespace Gtfs
 
     void Trip::load ()
     {
+        if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
         {
@@ -967,6 +972,7 @@ namespace Gtfs
 
     void Shape::load ()
     {
+        if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
         {
@@ -1164,6 +1170,7 @@ namespace Gtfs
 
     void Stop::load ()
     {
+        if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
         {
@@ -1323,6 +1330,7 @@ namespace Gtfs
 
     void Calendar::load ()
     {
+        if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
         {
@@ -1540,8 +1548,13 @@ namespace Gtfs
         {
             throw std::runtime_error ("Trip not found");
         }
+
+        Timer timer;
         _trip->route ()->load ();
+        std::cout << " - load route (" << timer.cpu_seconds () << "ms)";
+        timer.reset ();
         _trip->shape ()->load ();
+        std::cout << " - load shape (" << timer.cpu_seconds () << "ms)";
 
 
         _position = latlng (vp.position ().latitude (),
