@@ -133,6 +133,7 @@ void run_realtime_model (
                 v->second.predict_etas (rngs.at (omp_get_thread_num ()));
             }
         }
+        timer.report ("predicting ETAs");
 
         // Wait for vehicle writing to complete ...
         writev.join ();
