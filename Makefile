@@ -23,7 +23,7 @@ clean:
 	./cleanup
 
 run:
-	R -f scripts/run_model.R
+	R --slave -f scripts/run_model.R
 
 coverage:
 	R -e "covr::report()"

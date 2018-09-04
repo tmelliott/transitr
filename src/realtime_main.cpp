@@ -32,10 +32,10 @@ void write_vehicles_in_parallel (Gtfs::Gtfs& gtfs, Gtfs::vehicle_map& vehicles)
 {
     gtfs.write_vehicles (&vehicles);
     // push sqlite -> remote postgresql
-    {
-        // write to postgres in the first place (issue #5)
-        int rq = system ("R --slave -f scripts/copy_to_postgres.R > copy.out 2>&1 &");
-    }
+    // {
+    //     // write to postgres in the first place (issue #5)
+    //     int rq = system ("R --slave -f scripts/copy_to_postgres.R > copy.out 2>&1 &");
+    // }
 }
 
 // [[Rcpp::export]]
@@ -117,9 +117,6 @@ void run_realtime_model (
         }
         timer.report ("updating vehicle states");
 
-        // Write vehicles to database on a separate thread while the network update occurs
-        std::thread writev (write_vehicles_in_parallel, std::ref (gtfs), std::ref (vehicles));
-
         // Now update the network state, using `numcore - 1` threads
         // std::this_thread::sleep_for (std::chrono::milliseconds (1 * 1000));
         // timer.report ("updating network state");
@@ -136,7 +133,8 @@ void run_realtime_model (
         timer.report ("predicting ETAs");
 
         // Wait for vehicle writing to complete ...
-        writev.join ();
+        write_vehicles_in_parallel (gtfs, vehicles);
+        timer.report ("writing ETAs to trip_updates feed");
 
         gtfs.close_connection (true);
         timer.end ();
