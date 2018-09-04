@@ -1,0 +1,6 @@
+syntax = "proto2";
+import "gtfs-realtime.proto";
+
+extend transit_realtime.VehiclePosition {
+    optional transit_realtime.Position position_estimate = 1000;
+}
