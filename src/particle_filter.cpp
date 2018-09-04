@@ -2,6 +2,7 @@
  * Define the particle filter functions.
  */
 #include "particle_filter.h"
+#include "timing.h"
 
 namespace Gtfs {
 
@@ -131,7 +132,14 @@ namespace Gtfs {
     {
         if (!valid ()) return;
 
+#if VERBOSE == 2
+        Timer timer;
+        std::cout << "- vehicle " << _vehicle_id << " - predicting etas";
+#endif
         for (auto p = _state.begin (); p != _state.end (); ++p) p->predict_etas (rng);
+#if VERBOSE == 2
+        std::cout << " (" << timer.cpu_seconds () << "ms)\n";
+#endif
     }
 
     double Vehicle::distance ()

@@ -1,5 +1,7 @@
 #include "realtime_feed.h"
 
+#include "timing.h"
+
 static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp)
 {
     ((std::string*)userp)->append((char*)contents, size * nmemb);
@@ -76,6 +78,9 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
                     transit_realtime::FeedMessage* feed,
                     Gtfs::Gtfs* gtfs, int n, double err)
 {
+#if VERBOSE == 2
+    Timer timer;
+#endif
     for (int i=0; i<feed->entity_size (); ++i)
     {
         auto ent = feed->entity (i);
@@ -83,12 +88,26 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
         if (!ent.vehicle ().has_vehicle ()) continue;
         
         std::string id (ent.vehicle ().vehicle ().id ());
+#if VERBOSE == 2
+        std::cout << " + loading vehicle " << id;
+#endif
         auto vs = vehicles->find (id);
+#if VERBOSE == 2
+        std::cout << " (" << timer.cpu_seconds () << "ms)";
+        timer.reset ();
+#endif
         if (vs == vehicles->end ())
         {
+#if VERBOSE == 2
+            std::cout << " - insert";
+#endif
             auto r = vehicles->emplace (std::piecewise_construct,
                                         std::forward_as_tuple (id), 
                                         std::forward_as_tuple (id, n, err));
+#if VERBOSE == 2
+            std::cout << " (" << timer.cpu_seconds () << "ms)";
+            timer.reset ();
+#endif
             if (r.second)
             {
                 r.first->second.update (ent.vehicle (), gtfs);
@@ -98,6 +117,10 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
         {
             vs->second.update (ent.vehicle (), &(*gtfs));
         }
+#if VERBOSE == 2
+        std::cout << " => TOTAL UPDATE (" << timer.cpu_seconds () << "ms)\n";
+        timer.reset ();
+#endif
 
         // if (i >= 10) break;
     }

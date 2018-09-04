@@ -21,6 +21,9 @@ public:
     void report (const char* str);
     void end ();
 
+    double cpu_seconds ();
+    double wall_seconds ();
+
 };
 
 #endif

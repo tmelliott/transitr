@@ -14,6 +14,10 @@
 #include "vendor/sqlite3/sqlite3.h"
 #include <Rcpp.h>
 
+#ifndef VERBOSE
+#define VERBOSE 1
+#endif
+
 namespace Gtfs 
 {
 
