@@ -104,4 +104,9 @@ setwd(curd)
 f <- "at_predictions.pb"
 feed <- read(transit_realtime.FeedMessage, f)
 
-feed$entity[[1]]$vehicle$getExtension(transit_network.position_estimate)
+
+
+p <- feed$entity[[1]]$vehicle$getExtension(transit_network.position_estimate)
+feed$entity[[1]]$vehicle$position$as.list()
+
+p$as.list()
