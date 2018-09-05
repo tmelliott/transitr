@@ -85,3 +85,22 @@ doaplot(vs[vn], 1, nrow = 4)
 doaplot(vs[vn], 2)
 doaplot(vs[vn], 3)
 doaplot(vs[vn], 4)
+
+
+
+
+
+
+############ New appraoch
+library(tidyverse)
+library(RProtoBuf)
+library(RSQLite)
+library(dbplyr)
+library(pbapply)
+curd <- setwd("src/vendor/protobuf")
+readProtoFiles("gtfs-realtime-ext.proto")
+setwd(curd)
+
+f <- "at_predictions.pb"
+feed <- read(transit_realtime.FeedMessage, f)
+

@@ -125,3 +125,32 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
         // if (i >= 10) break;
     }
 }
+
+void write_vehicles (Gtfs::vehicle_map* vehicles)
+{
+    // create a new feed
+    transit_realtime::FeedMessage feed;
+
+    // set the header information
+    transit_realtime::FeedHeader* header;
+    header = feed.mutable_header ();
+    header->set_gtfs_realtime_version ("2.0");
+    std::time_t curtime = std::time (nullptr);
+    header->set_timestamp (curtime);
+
+    // write vehicles
+    for (auto v = vehicles->begin (); v != vehicles->end (); ++v)
+    {
+        if (!v->valid ()) continue;
+        transit_realtime::FeedEntity* entity = feed.add_entities ();
+        
+    }
+
+    // write the feed to a file
+    std::fstream output ("at_predictions.pb", 
+                         std::ios::out | std::ios::trunc | std::ios::binary);
+    if (!feed.SerializeToOstream (&output)) {
+        std::cerr << "\n x Failed to write feed.\n";
+    }
+
+}

@@ -3,6 +3,7 @@
 
 #include <string>
 #include <sstream>
+#include <fstream>
 
 #include <curl/curl.h>
 #include <curl/easy.h>
@@ -33,6 +34,8 @@ public:
 void load_vehicles (Gtfs::vehicle_map* vehicles,
                     transit_realtime::FeedMessage* feed,
                     Gtfs::Gtfs* gtfs, int n, double err);
+
+void write_vehicles (Gtfs::vehicle_map* vehicles);
 
 
 #endif
