@@ -56,6 +56,7 @@ void run_realtime_model (
     // Process nw components into c++ things
     String dbname_raw = nw["database"];
     std::string dbname (dbname_raw);
+    std::string outputname (output);
     // std::string dbname (get_database_name (nw));
     
     // Construct the realtime feed object
@@ -133,7 +134,7 @@ void run_realtime_model (
         timer.report ("predicting ETAs");
 
         // Write vehicles to (new) feed
-        write_vehicles (&vehicles);
+        write_vehicles (&vehicles, outputname);
         timer.report ("writing ETAs to trip_updates feed");
 
         gtfs.close_connection (true);

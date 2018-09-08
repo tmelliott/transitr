@@ -126,7 +126,7 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
     }
 }
 
-void write_vehicles (Gtfs::vehicle_map* vehicles)
+void write_vehicles (Gtfs::vehicle_map* vehicles, std::string& file)
 {
     // create a new feed
     transit_realtime::FeedMessage feed;
@@ -179,9 +179,9 @@ void write_vehicles (Gtfs::vehicle_map* vehicles)
     }
 
     // write the feed to a file
-    std::fstream output ("at_predictions.pb", 
-                         std::ios::out | std::ios::trunc | std::ios::binary);
-    if (!feed.SerializeToOstream (&output)) {
+    std::fstream output (file.c_str (), std::ios::out | std::ios::trunc | std::ios::binary);
+    if (!feed.SerializeToOstream (&output)) 
+    {
         std::cerr << "\n x Failed to write feed.\n";
     }
 
