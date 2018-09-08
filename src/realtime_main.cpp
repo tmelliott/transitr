@@ -55,8 +55,9 @@ void run_realtime_model (
 
     // Process nw components into c++ things
     String dbname_raw = nw["database"];
+    String outputname_raw = nw["output"];
     std::string dbname (dbname_raw);
-    std::string outputname (output);
+    std::string outputname (outputname_raw);
     // std::string dbname (get_database_name (nw));
     
     // Construct the realtime feed object

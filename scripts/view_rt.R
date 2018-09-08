@@ -104,7 +104,7 @@ setwd(curd)
 
 f <- "at_predictions.pb"
 
-go <- function() {
+go <- function(error = 20) {
     feed <- read(transit_realtime.FeedMessage, f)
 
     p <- lapply(feed$entity, function(entity) {
@@ -120,13 +120,23 @@ go <- function() {
         tibble(dist = geosphere::distGeo(px[1,], px[2,]))
         })
 
-    ggplot(d, aes(x = dist+1)) +
-        geom_histogram() +
+    p1 <- ggplot(d, aes(x = dist+1)) +
+        geom_vline(xintercept = error, color = 'red') +
+        geom_histogram(aes(y = cumsum(..count..) / sum(..count..) * 100)) +
         scale_x_continuous(trans = "log10") +
         xlab("Distance between observed and modeled position (m)") +
-        ylab("Frequency")
-}
+        ylab("% buses")
 
+    e <- rexp(nrow(d), 0.5)
+    dstar <- sqrt(e) * error
+    p2 <- ggplot() +
+        geom_histogram(aes(x = dstar, y = cumsum(..count..) / sum(..count..) * 100)) +
+        scale_x_continuous(trans = "log10") +
+        xlab("Distribution of distance between observed and modeled position under hypothesis (m)") +
+        ylab("% buses")
+
+    gridExtra::grid.arrange(p1, p2, nrow = 2)
+}
 go()
 
 ggplot(p, aes(longitude, latitude)) +
@@ -134,6 +144,10 @@ ggplot(p, aes(longitude, latitude)) +
     coord_fixed(1.6) +
     theme(legend.position = "none")
 
-## what's the distance?
 
+## under the null hypothesis...
+d^2 / error ~ exp(0.5)
+e <- rexp(nrow(d), 0.5)
+dstar <- sqrt(e * error)
 
+ggplot() + geom_histogram(aes(x = dstar))
