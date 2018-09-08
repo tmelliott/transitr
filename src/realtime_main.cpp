@@ -136,7 +136,7 @@ void run_realtime_model (
 
         // Write vehicles to (new) feed
         write_vehicles (&vehicles, outputname);
-        timer.report ("writing ETAs to trip_updates feed");
+        timer.report ("writing ETAs to protobuf feed");
 
         gtfs.close_connection (true);
         timer.end ();

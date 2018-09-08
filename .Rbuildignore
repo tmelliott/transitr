@@ -10,4 +10,4 @@
 ^NEWS.md$
 ^.+\.csv$
 ^.gtfs_date$
-^.at_predictions.pb$
+^.+\.pb$

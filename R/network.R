@@ -6,11 +6,10 @@
 ##' @return A \code{trgtfs} object, with additional network tables.
 ##' @author Tom Elliott
 ##' @export
-construct <- function(nw, output = "predictions.pb") {
+construct <- function(nw) {
     create_network_tables(nw)
     tmp_construct_network(nw)
     
-    nw$output <- output
     invisible(nw)
 }
 
