@@ -120,12 +120,14 @@ go <- function() {
         tibble(dist = geosphere::distGeo(px[1,], px[2,]))
         })
 
-    ggplot(d, aes(x = dist)) +
+    ggplot(d, aes(x = dist+1)) +
         geom_histogram() +
         scale_x_continuous(trans = "log10") +
         xlab("Distance between observed and modeled position (m)") +
         ylab("Frequency")
 }
+
+go()
 
 ggplot(p, aes(longitude, latitude)) +
     geom_path(aes(group = vehicle_id)) +
