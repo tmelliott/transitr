@@ -93,6 +93,7 @@ doaplot(vs[vn], 4)
 
 ############ New appraoch
 library(tidyverse)
+library(ggmap)
 library(RProtoBuf)
 library(RSQLite)
 library(dbplyr)
@@ -102,11 +103,35 @@ readProtoFiles("gtfs-realtime-ext.proto")
 setwd(curd)
 
 f <- "at_predictions.pb"
-feed <- read(transit_realtime.FeedMessage, f)
+
+go <- function() {
+    feed <- read(transit_realtime.FeedMessage, f)
+
+    p <- lapply(feed$entity, function(entity) {
+        preal <- entity$vehicle$position$as.list()
+        pmodel <- entity$vehicle$getExtension(transit_network.position_estimate)$as.list()
+        bind_rows(as.tibble(preal) %>% mutate(which = 'obs'), 
+                  as.tibble(pmodel) %>% mutate(which = 'model')) %>% 
+            mutate(vehicle_id = rep(entity$vehicle$vehicle$id, 2))
+    }) %>% bind_rows
+
+    d <- p %>% group_by(vehicle_id) %>% do({
+        px = (.) %>% select(longitude, latitude) %>% as.matrix
+        tibble(dist = geosphere::distGeo(px[1,], px[2,]))
+        })
+
+    ggplot(d, aes(x = dist)) +
+        geom_histogram() +
+        scale_x_continuous(trans = "log10") +
+        xlab("Distance between observed and modeled position (m)") +
+        ylab("Frequency")
+}
+
+ggplot(p, aes(longitude, latitude)) +
+    geom_path(aes(group = vehicle_id)) +
+    coord_fixed(1.6) +
+    theme(legend.position = "none")
+
+## what's the distance?
 
 
-
-p <- feed$entity[[1]]$vehicle$getExtension(transit_network.position_estimate)
-feed$entity[[1]]$vehicle$position$as.list()
-
-p$as.list()
