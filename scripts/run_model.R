@@ -39,7 +39,7 @@ if (Sys.info()["nodename"] == "certellprd01") {
         model(nw, 5000, 6)
     else {
         nw$output <- sprintf("at_predictions_%s.pb", Sys.getenv("GPSERROR"))
-        model(nw, 5000, 6)
+        model(nw, 5000, 6, as.numeric(Sys.getenv("GPSERROR")))
     }
 
 } else {
