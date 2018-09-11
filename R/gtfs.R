@@ -6,6 +6,7 @@
 ##' @param source where the GTFS data comes from
 ##' @param db where the GTFS data is going to be stored
 ##' @param quiet logical, if \code{TRUE} progress output will be suppressed
+##' @param output filename to output ETA predictions
 ##' @return a \code{trgtfs} object
 ##' @author Tom Elliott
 ##' @importFrom stats update
