@@ -1433,10 +1433,37 @@ namespace Gtfs
             _thursday && _friday;
     }
 
-    /***************************************************** Vehicle */
-    Vehicle::Vehicle (std::string& id, int n, double err) : 
-    _vehicle_id (id), _N (n), _gpserror (err)
+
+    /***************************************************** Parameters */
+    par::par (Rcpp::List parameters)
     {
+        // fetch the parameters
+        Rcpp::IntegerVector np = parameters["n_particles"];
+        Rcpp::IntegerVector nc = parameters["n_core"];
+        Rcpp::NumericVector sigx = parameters["gps_error"];
+
+        // set the parameters
+        n_particles = (int) np[0];
+        n_core = (int) nc[0];
+        gps_error = (float) sigx[0];
+    }
+
+    void par::print ()
+    {
+        std::cout << "\n >>> Using the following parameters:"
+            << "\n - n_particles = " << n_particles
+            << "\n - n_core = " << n_core
+            << "\n - gps_error = " << gps_error
+            << "\n";
+    }
+
+    /***************************************************** Vehicle */
+    Vehicle::Vehicle (std::string& id, par* params) : 
+    _vehicle_id (id)
+    {
+        // set the parameters here
+        _gpserror = params->gps_error;
+        _N = params->n_particles;
     }
 
     std::string& Vehicle::vehicle_id ()

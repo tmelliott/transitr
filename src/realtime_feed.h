@@ -33,7 +33,7 @@ public:
 
 void load_vehicles (Gtfs::vehicle_map* vehicles,
                     transit_realtime::FeedMessage* feed,
-                    Gtfs::Gtfs* gtfs, int n, double err);
+                    Gtfs::Gtfs* gtfs, Gtfs::par* params);
 
 void write_vehicles (Gtfs::vehicle_map* vehicles, std::string& file);
 

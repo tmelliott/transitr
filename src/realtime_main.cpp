@@ -39,11 +39,7 @@ using namespace Rcpp;
 // }
 
 // [[Rcpp::export]]
-void run_realtime_model (
-    List nw, 
-    int nparticles,
-    int numcore,
-    double gpserror)
+void run_realtime_model (List nw)
 {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
@@ -74,12 +70,15 @@ void run_realtime_model (
     // Create vehicle container
     Gtfs::vehicle_map vehicles;
 
+    // Create parameter object
+    List pars = nw["parameters"];
+    Gtfs::par params (pars);
+    params.print ();
+
     // Initialize an RNG
-    Rcout << "\n * Running on " << numcore << " cores.";
-    Rcout << "\n * Initializing " << numcore << " independent RNGs. ";
-    std::vector<RNG> rngs (numcore);
+    std::vector<RNG> rngs (params.n_core);
     unsigned int _seed = (unsigned int) time (0);
-    for (int i=0; i<numcore; ++i) rngs.at (i).set_seed (_seed++);
+    for (int i=0; i<params.n_core; ++i) rngs.at (i).set_seed (_seed++);
 
     // Allow the program to be stopped gracefully    
     signal (SIGINT, intHandler);
@@ -105,11 +104,11 @@ void run_realtime_model (
         timer.report ("loading vehicle positions");
 
         // Loading vehicle positions, assigning trips
-        load_vehicles (&vehicles, rtfeed.feed (), &gtfs, nparticles, gpserror);
+        load_vehicles (&vehicles, rtfeed.feed (), &gtfs, &params);
         timer.report ("updating vehicle information");
 
         // Update vehicle states
-        #pragma omp parallel for num_threads(numcore)
+        #pragma omp parallel for num_threads(params.n_core)
         for (unsigned i=0; i<vehicles.bucket_count (); ++i)
         {       
             for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
@@ -119,12 +118,12 @@ void run_realtime_model (
         }
         timer.report ("updating vehicle states");
 
-        // Now update the network state, using `numcore - 1` threads
+        // Now update the network state, using `params.n_core - 1` threads
         // std::this_thread::sleep_for (std::chrono::milliseconds (1 * 1000));
         // timer.report ("updating network state");
         
         // Predict ETAs
-        #pragma omp parallel for num_threads(numcore)
+        #pragma omp parallel for num_threads(params.n_core)
         for (unsigned i=0; i<vehicles.bucket_count (); ++i)
         {
             for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)

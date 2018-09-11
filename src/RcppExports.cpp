@@ -40,15 +40,12 @@ BEGIN_RCPP
 END_RCPP
 }
 // run_realtime_model
-void run_realtime_model(List nw, int nparticles, int numcore, double gpserror);
-RcppExport SEXP _transitr_run_realtime_model(SEXP nwSEXP, SEXP nparticlesSEXP, SEXP numcoreSEXP, SEXP gpserrorSEXP) {
+void run_realtime_model(List nw);
+RcppExport SEXP _transitr_run_realtime_model(SEXP nwSEXP) {
 BEGIN_RCPP
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< List >::type nw(nwSEXP);
-    Rcpp::traits::input_parameter< int >::type nparticles(nparticlesSEXP);
-    Rcpp::traits::input_parameter< int >::type numcore(numcoreSEXP);
-    Rcpp::traits::input_parameter< double >::type gpserror(gpserrorSEXP);
-    run_realtime_model(nw, nparticles, numcore, gpserror);
+    run_realtime_model(nw);
     return R_NilValue;
 END_RCPP
 }
@@ -59,7 +56,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_transitr_construct_network", (DL_FUNC) &_transitr_construct_network, 2},
     {"_transitr_shapes_df_to_list", (DL_FUNC) &_transitr_shapes_df_to_list, 1},
     {"_transitr_calculate_shape_distance", (DL_FUNC) &_transitr_calculate_shape_distance, 1},
-    {"_transitr_run_realtime_model", (DL_FUNC) &_transitr_run_realtime_model, 4},
+    {"_transitr_run_realtime_model", (DL_FUNC) &_transitr_run_realtime_model, 1},
     {"run_testthat_tests",                 (DL_FUNC) &run_testthat_tests,                 0},
     {NULL, NULL, 0}
 };

@@ -53,7 +53,10 @@ load_gtfs <- function(db, output = "predictions.pb") {
     if (!check_tables(db)) {
         stop("Oops, some of the tables aren't right...")
     }
-    structure(list(database = db, apis = apis(), output = output),
+    structure(list(database = db, apis = apis(), output = output,
+                   parameters = list(n_core = 1L, 
+                                     n_particles = 1000L, 
+                                     gps_error = 5.0)),
               class = "trgtfs")
 }
 

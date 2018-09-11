@@ -76,7 +76,7 @@ transit_realtime::FeedMessage* RealtimeFeed::feed ()
 
 void load_vehicles (Gtfs::vehicle_map* vehicles,
                     transit_realtime::FeedMessage* feed,
-                    Gtfs::Gtfs* gtfs, int n, double err)
+                    Gtfs::Gtfs* gtfs, Gtfs::par* params)
 {
 #if VERBOSE == 2
     Timer timer;
@@ -103,7 +103,7 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
 #endif
             auto r = vehicles->emplace (std::piecewise_construct,
                                         std::forward_as_tuple (id), 
-                                        std::forward_as_tuple (id, n, err));
+                                        std::forward_as_tuple (id, params));
 #if VERBOSE == 2
             std::cout << " (" << timer.cpu_seconds () << "ms)";
             timer.reset ();
