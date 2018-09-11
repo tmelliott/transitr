@@ -4,7 +4,8 @@
 \alias{create_gtfs}
 \title{Create GTFS database}
 \usage{
-create_gtfs(source, db = tempfile(), quiet = FALSE)
+create_gtfs(source, db = tempfile(), quiet = FALSE,
+  output = "predictions.pb")
 }
 \arguments{
 \item{source}{where the GTFS data comes from}
@@ -12,6 +13,8 @@ create_gtfs(source, db = tempfile(), quiet = FALSE)
 \item{db}{where the GTFS data is going to be stored}
 
 \item{quiet}{logical, if \code{TRUE} progress output will be suppressed}
+
+\item{output}{filename to output ETA predictions}
 }
 \value{
 a \code{trgtfs} object

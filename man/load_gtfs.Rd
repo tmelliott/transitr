@@ -4,7 +4,7 @@
 \alias{load_gtfs}
 \title{Load GTFS database}
 \usage{
-load_gtfs(db)
+load_gtfs(db, output = "predictions.pb")
 }
 \arguments{
 \item{db}{a database connection from \code{dbConnect}}

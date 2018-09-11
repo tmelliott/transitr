@@ -43,6 +43,17 @@ namespace Gtfs
 
     typedef std::unordered_map<std::string, Vehicle> vehicle_map;
 
+    struct par
+    {
+        int n_particles = 1000;
+        int n_core = 1;
+        float gps_error = 5;     // std. dev.
+        par () {}
+        par (Rcpp::List parameters);
+
+        void print ();
+    };
+
     struct ShapePt
     {
         latlng pt;
@@ -345,7 +356,7 @@ namespace Gtfs
             std::vector<Particle> _state;
 
         public:
-            Vehicle (std::string& id, int n, double err);
+            Vehicle (std::string& id, par* params);
 
             std::string& vehicle_id ();
             Trip* trip ();

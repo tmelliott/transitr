@@ -11,3 +11,4 @@
 ^.+\.csv$
 ^.gtfs_date$
 ^.+\.pb$
+^simulations$

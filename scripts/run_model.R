@@ -29,19 +29,21 @@ if (!file.exists("fulldata.db")) {
     }
 }
 
-
 nw <- nw %>%
     realtime_feed("https://dl.dropboxusercontent.com/s/1fvto9ex649mkri/vehicle_locations.pb?dl=1", 
                   response = "protobuf")
 
 if (Sys.info()["nodename"] == "certellprd01") {
+    nw <- nw %>% set_parameters(n_particles = 5000, n_core = 6)
     if (Sys.getenv("GPSERROR") == "")
-        model(nw, 5000, 6)
+        nw %>% model
     else {
         nw$output <- sprintf("at_predictions_%s.pb", Sys.getenv("GPSERROR"))
-        model(nw, 5000, 6, as.numeric(Sys.getenv("GPSERROR")))
+        nw %>% set_parameters(gps_error = as.numeric(Sys.getenv("GPSERROR"))) %>% model
     }
 
 } else {
-    model(nw, 500, 2)
+    nw %>% set_parameters(n_particles = 1000, n_core = 1, gps_error = 20) %>% model
 }
+
+
