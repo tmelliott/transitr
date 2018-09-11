@@ -21,9 +21,9 @@ outdated <- function(url) {
 }
 
 if (!file.exists("fulldata.db")) {
-    nw <- create_gtfs(url, db = "fulldata.db") %>% construct()
+    nw <- create_gtfs(url, db = "fulldata.db", output = "at_predictions.pb") %>% construct()
 } else {
-    nw <- load_gtfs("fulldata.db")
+    nw <- load_gtfs("fulldata.db", output = "at_predictions.pb")
     if (outdated(url)) {
         nw %>% update(url)
     }
@@ -35,7 +35,13 @@ nw <- nw %>%
                   response = "protobuf")
 
 if (Sys.info()["nodename"] == "certellprd01") {
-    model(nw, 5000, 6)
+    if (Sys.getenv("GPSERROR") == "")
+        model(nw, 5000, 6)
+    else {
+        nw$output <- sprintf("at_predictions_%s.pb", Sys.getenv("GPSERROR"))
+        model(nw, 5000, 6, as.numeric(Sys.getenv("GPSERROR")))
+    }
+
 } else {
     model(nw, 1000, 1)
 }

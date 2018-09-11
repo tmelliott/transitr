@@ -7,6 +7,7 @@ fulldata.db
 *.out
 *.csv
 .gtfs_date
+*.pb
 
 ### Emacs ###
 # -*- mode: gitignore; -*-

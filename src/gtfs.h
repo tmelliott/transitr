@@ -10,7 +10,7 @@
 #include "time.h"
 #include "rng.h"
 
-#include "vendor/protobuf/gtfs-realtime.pb.h"
+#include "vendor/protobuf/gtfs-realtime-ext.pb.h"
 #include "vendor/sqlite3/sqlite3.h"
 #include <Rcpp.h>
 

@@ -28,15 +28,15 @@ void intHandler (int dummy) {
 
 using namespace Rcpp;
 
-void write_vehicles_in_parallel (Gtfs::Gtfs& gtfs, Gtfs::vehicle_map& vehicles)
-{
-    gtfs.write_vehicles (&vehicles);
-    // push sqlite -> remote postgresql
-    // {
-    //     // write to postgres in the first place (issue #5)
-    //     int rq = system ("R --slave -f scripts/copy_to_postgres.R > copy.out 2>&1 &");
-    // }
-}
+// void write_vehicles_in_parallel (Gtfs::Gtfs& gtfs, Gtfs::vehicle_map& vehicles)
+// {
+//     gtfs.write_vehicles (&vehicles);
+//     // push sqlite -> remote postgresql
+//     // {
+//     //     // write to postgres in the first place (issue #5)
+//     //     int rq = system ("R --slave -f scripts/copy_to_postgres.R > copy.out 2>&1 &");
+//     // }
+// }
 
 // [[Rcpp::export]]
 void run_realtime_model (
@@ -55,7 +55,9 @@ void run_realtime_model (
 
     // Process nw components into c++ things
     String dbname_raw = nw["database"];
+    String outputname_raw = nw["output"];
     std::string dbname (dbname_raw);
+    std::string outputname (outputname_raw);
     // std::string dbname (get_database_name (nw));
     
     // Construct the realtime feed object
@@ -132,9 +134,9 @@ void run_realtime_model (
         }
         timer.report ("predicting ETAs");
 
-        // Wait for vehicle writing to complete ...
-        write_vehicles_in_parallel (gtfs, vehicles);
-        timer.report ("writing ETAs to trip_updates feed");
+        // Write vehicles to (new) feed
+        write_vehicles (&vehicles, outputname);
+        timer.report ("writing ETAs to protobuf feed");
 
         gtfs.close_connection (true);
         timer.end ();
