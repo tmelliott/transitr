@@ -6,3 +6,20 @@ package transit_network;
 extend transit_realtime.VehiclePosition {
     optional transit_realtime.Position position_estimate = 1000;
 }
+
+// This allows us to use adjust the quantiles specified
+message Quantile {
+    // this will have the interpretability of 
+    // "Pr(true arrival time <= `value`) = `quantile`"
+    required float quantile = 1;
+    required int64 value = 2;
+}
+
+message TimePrediction {
+    optional int64 estimate = 1;
+    repeated Quantile quantiles = 2;
+}
+
+extend transit_realtime.TripUpdate.StopTimeUpdate {
+    optional TimePrediction eta = 1000;
+}
