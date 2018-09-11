@@ -37,5 +37,7 @@ nw <- nw %>%
 if (Sys.info()["nodename"] == "certellprd01") {
     model(nw, 5000, 6)
 } else {
-    model(nw, 500, 2)
+    model(nw, 1000, 1)
 }
+
+

@@ -193,16 +193,16 @@ namespace Gtfs {
         
         // get SEGMENTS
         
-        // add noise to speed
-        double speed_prop = -1;
-        while (speed_prop < 0 || speed_prop > 30)
-        {
-            speed_prop = speed + rng.rnorm () * 5;
-        }
-        speed = speed_prop;
 
         while (distance < Dmax && delta > 0)
         {
+            // add noise to speed
+            double speed_prop = -1;
+            while (speed_prop < 0 || speed_prop > 30)
+            {
+                speed_prop = speed + rng.rnorm () * (5 / 30);
+            }
+            speed = speed_prop;
             if (distance + speed >= next_stop_d)
             {
                 // about to reach a stop ... slow? stop? just drive past?

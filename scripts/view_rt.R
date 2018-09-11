@@ -30,6 +30,9 @@ dev.flush()
 
 ## something else
 library(tidyverse)
+library(RSQLite)
+library(dbplyr)
+library(ggmap)
 
 doaplot <- function(id, which = 1, nrow = NULL, ncol = NULL) {
     v <- read.csv(sprintf("history/vehicle_%s.csv", vs[vn]), header = FALSE)
@@ -47,9 +50,6 @@ doaplot <- function(id, which = 1, nrow = NULL, ncol = NULL) {
                timestamp = as.POSIXct(timestamp, origin = "1970-01-01"),
                arrival_time = pmin(Sys.time() + 3600, as.POSIXct(arrival_time, origin = "1970-01-01")))
 
-    library(RSQLite)
-    library(dbplyr)
-    library(ggmap)
     con <- dbConnect(SQLite(), "fulldata.db")
     tid <- v$trip_id[1]
     shape <- con %>% tbl("trips") %>% 
@@ -80,7 +80,7 @@ doaplot <- function(id, which = 1, nrow = NULL, ncol = NULL) {
 
 ps <- list.files("history", pattern = "*_particles.csv")
 vs <- gsub("vehicle_|_particles.csv", "", ps)
-vn <- 15
+vn <- 25
 doaplot(vs[vn], 1, nrow = 4)
 doaplot(vs[vn], 2)
 doaplot(vs[vn], 3)
