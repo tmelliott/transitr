@@ -83,7 +83,11 @@ void run_realtime_model (List nw)
     // Allow the program to be stopped gracefully    
     signal (SIGINT, intHandler);
     Timer timer;
+    if (params.save_timings) {
+        timer.save_to ("timings.csv", "iteration,timestamp,nvehicles");
+    }
     int tries = 0;
+    int iteration = 0;
     while (ongoing)
     {
         timer.reset ();
@@ -105,6 +109,18 @@ void run_realtime_model (List nw)
         Rcout << "\n + loaded " 
             << rtfeed.feed ()->entity_size () 
             << " vehicle positions.\n";
+
+        {
+            std::ostringstream tinfo;
+            tinfo << iteration << ",";
+            if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ()) 
+            {
+                tinfo << rtfeed.feed()->header ().timestamp ();
+            }
+            tinfo << "," << rtfeed.feed ()->entity_size ();
+            
+            timer.set_info (tinfo.str ());
+        }
         timer.report ("loading vehicle positions");
 
         // Loading vehicle positions, assigning trips
@@ -146,6 +162,7 @@ void run_realtime_model (List nw)
 
         // std::this_thread::sleep_for (std::chrono::milliseconds (10 * 1000));
 
+        iteration++;
     }
 
     Rcout << "\n\n --- Finished ---\n\n";

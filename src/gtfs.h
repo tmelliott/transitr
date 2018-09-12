@@ -48,6 +48,7 @@ namespace Gtfs
         int n_particles = 1000;
         int n_core = 1;
         float gps_error = 5;     // std. dev.
+        bool save_timings = false;
         par () {}
         par (Rcpp::List parameters);
 

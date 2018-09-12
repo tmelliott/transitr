@@ -1441,11 +1441,13 @@ namespace Gtfs
         Rcpp::IntegerVector np = parameters["n_particles"];
         Rcpp::IntegerVector nc = parameters["n_core"];
         Rcpp::NumericVector sigx = parameters["gps_error"];
+        Rcpp::LogicalVector tim = parameters["save_timings"];
 
         // set the parameters
         n_particles = (int) np[0];
         n_core = (int) nc[0];
         gps_error = (float) sigx[0];
+        save_timings = (bool) tim[0];
     }
 
     void par::print ()
@@ -1454,6 +1456,7 @@ namespace Gtfs
             << "\n - n_particles = " << n_particles
             << "\n - n_core = " << n_core
             << "\n - gps_error = " << gps_error
+            << "\n - save_timings = " << (save_timings ? "true" : "false")
             << "\n";
     }
 

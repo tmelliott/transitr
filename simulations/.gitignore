@@ -1,3 +1,4 @@
 *.pb
 node_modules
 *.zip
+*.csv
