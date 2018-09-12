@@ -1,4 +1,5 @@
 #include "realtime_feed.h"
+#include <regex>
 
 #include "timing.h"
 
@@ -59,6 +60,10 @@ int RealtimeFeed::update ()
         curl_slist_free_all (chunk);
     }
     curl_global_cleanup ();
+
+    if (std::regex_match (readBuffer, std::regex ("(simulation complete)"))) {
+        return 5;
+    }
 
     std::istringstream buf (readBuffer);
     if (!_feed.ParseFromIstream (&buf)) {

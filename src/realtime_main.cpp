@@ -86,11 +86,15 @@ void run_realtime_model (List nw)
     int tries = 0;
     while (ongoing)
     {
-        Rcout << "\n --- Commence iteration ---\n";
         timer.reset ();
         
         // call the feed once and check the result is reasonable
-        if (rtfeed.update () != 0 && tries < 10)
+        int ures = rtfeed.update ();
+        // 5 => "simulations completed"
+        if (ures == 5) break;
+        
+        Rcout << "\n --- Commence iteration ---\n";
+        if (ures != 0 && tries < 10)
         {
             Rcout << "\n x Unable to fetch URL. Trying again ...\n";
             tries++;
@@ -140,7 +144,7 @@ void run_realtime_model (List nw)
         gtfs.close_connection (true);
         timer.end ();
 
-        std::this_thread::sleep_for (std::chrono::milliseconds (10 * 1000));
+        // std::this_thread::sleep_for (std::chrono::milliseconds (10 * 1000));
 
     }
 
