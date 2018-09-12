@@ -6,7 +6,7 @@ build:
 FLAGS:=
 CPPFLAGS:=
 CXXFLAGS:=
-install: src/RcppExports.cpp
+install: exports
 	R CMD INSTALL --configure-args='CPPFLAGS=$(FLAGS) $(CPPFLAGS) CXXFLAGS=$(FLAGS) $(CXXFLAGS)' .
 
 check:
@@ -29,5 +29,5 @@ coverage:
 	R -e "covr::report()"
 
 
-src/RcppExports.cpp:
+exports:
 	R -e "Rcpp::compileAttributes()"

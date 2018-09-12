@@ -46,6 +46,7 @@ check_tables <- function(db) {
 ##'
 ##' @title Load GTFS database
 ##' @param db a database connection from \code{dbConnect}
+##' @param output filename to output ETA predictions
 ##' @return a \code{trgtfs} object
 ##' @author Tom Elliott
 ##' @export
