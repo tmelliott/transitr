@@ -1,5 +1,7 @@
 library(tidyverse)
 library(RProtoBuf)
+library(RSQLite)
+library(dbplyr)
 
 curd <- setwd("src/vendor/protobuf")
 readProtoFiles("gtfs-realtime-ext.proto")
@@ -33,31 +35,33 @@ if (file.exists("simulations/arrivaldata.rda")) {
         summarize(time = tmax(timestamp, time))
     save(arrivaldata, file = "simulations/arrivaldata.rda")
 }
-loadsim <- function(sim) {
-    if (file.exists(file.path("simulations", sim, "etadata.rda"))) {
-        load(file.path("simulations", sim, "etadata.rda"))
+loadsim <- function(sim, time) {
+    pb <- file.path("simulations", sim, "etas", sprintf("etas_%s.pb", time))
+    rda <- file.path("simulations", sim, "etas", sprintf("etas_%s.rda", time))
+    if (!file.exists(pb)) {
+        stop("That file doesn't exist.")
+    }
+    if (file.exists(rda)) {
+        load(rda)
     } else {
+        ent <- read(transit_realtime.FeedMessage, pb)$entity
         etas <- do.call(bind_rows, 
-            pbapply::pblapply(list.files(file.path("simulations", sim, "etas"), full.names = TRUE),
-                function(f) {
-                    ent <- read(transit_realtime.FeedMessage, f)$entity
-                    do.call(bind_rows, 
-                        lapply(ent, function(e) {
-                            lapply(e$trip_update$stop_time_update, function(stu) {
-                                eta <- stu$getExtension(transit_network.eta)
-                                tibble(vehicle_id = e$trip_update$vehicle$id,
-                                       trip_id = e$trip_update$trip$trip_id,
-                                       route_id = e$trip_update$trip$route_id,
-                                       timestamp = as.POSIXct(as.numeric(gsub("^.+_|\\.pb$", "", f)), origin = "1970-01-01"),
-                                       stop_sequence = stu$stop_sequence,
-                                       time = as.POSIXct(ifelse(eta$estimate == 0, NA, eta$estimate), origin = "1970-01-01")
-                                )
-                            })
-                        })
+            pbapply::pblapply(ent, function(e) {
+                lapply(e$trip_update$stop_time_update, function(stu) {
+                    eta <- stu$getExtension(transit_network.eta)
+                    tibble(vehicle_id = e$trip_update$vehicle$id,
+                           trip_id = e$trip_update$trip$trip_id,
+                           route_id = e$trip_update$trip$route_id,
+                           timestamp = as.POSIXct(as.integer(time), origin = "1970-01-01"),
+                           stop_sequence = if (stu$has('stop_sequence')) stu$stop_sequence else NA,
+                           time = if (eta$has('estimate') && eta$estimate > 0) eta$estimate else NA
                     )
                 })
-        )
-        save(etas, file = file.path("simulations", sim, "etadata.rda"))
+            })
+        ) %>%
+            mutate(time = as.POSIXct(time, origin = "1970-01-01")) %>%
+            group_by(trip_id)
+        save(etas, file = rda)
     }
     etas
 }
@@ -65,6 +69,23 @@ loadsim <- function(sim) {
 ids <- tapply(arrivaldata$trip_id, arrivaldata$route_id, function(x) sort(unique(x)))
 arrivaldata <- arrivaldata %>% group_by(trip_id)
 
+## get some info from the database
+con <- dbConnect(SQLite(), "fulldata.db")
+routes <- con %>% tbl("routes") %>% select(route_id, route_short_name, route_long_name) %>% collect
+trips <- con %>% tbl("stop_times") %>% filter(stop_sequence == 1) %>% select(trip_id, departure_time) %>% collect
+dbDisconnect(con)
+
+routes <- routes[routes$route_id %in% names(ids), ] %>%
+    arrange(route_short_name, route_long_name)
+trips <- trips[trips$trip_id %in% arrivaldata$trip_id, ] %>% 
+    arrange(departure_time)
+rl <- as.list(routes$route_id)
+names(rl) <- paste(routes$route_short_name, routes$route_long_name)
+
+## Clean them at the start of the vis
+# system("rm -f simulations/*/etas/*.rda")
+
+## Load simulations
 whatOrder <- c("number of vehicles", "loading vehicle positions", 
                "updating vehicle information", "updating vehicle states", 
                "predicting ETAs", "writing ETAs to protobuf feed")
@@ -83,14 +104,17 @@ view <- function(sim) {
         geom_line() +
         facet_grid(what~., scales = "free_y")
 }
-eta <- function(sim, ta, eta) {
+eta <- function(sim, ta, ts) {
     config <- jsonlite::read_json(file.path("simulations", sim, "config.json"))
     
-    print(ta)
-    print(eta)
-    ggplot(ta, aes(time, stop_sequence, colour = type)) +
-        geom_point() +
-        geom_point(data = eta, color = "red")
+    etatime <- as.POSIXct(as.numeric(ts), origin = "1970-01-01")
+    etadata <- loadsim(sim, as.integer(ts)) %>%
+        filter(trip_id == ta$trip_id[1])
+    ggplot(ta, aes(time, stop_sequence)) +
+        geom_point(aes(colour = type)) +
+        geom_vline(aes(xintercept = etatime), data = NULL, col = "red", lty = 3) + 
+        ggtitle(sprintf("ETAs at %s", format(etatime, "%H:%M:%S"))) +
+        geom_point(data = etadata, color = "black", pch = 3)
 }
 
 library(shiny)
@@ -100,9 +124,9 @@ ui <- fluidPage(
             selectInput("simnum", label="Simulation", choices = simnames),
             selectInput("plottype", label="Graph", choices = c("Timings", "ETAs")),
             conditionalPanel(condition = "input.plottype == 'ETAs'",
-                selectInput("routeid", label="Route ID", choices = names(ids)),
+                selectInput("routeid", label="Route ID", choices = rl),
                 selectInput("tripid", label="Trip ID", ""),
-                sliderInput("predtime", label="Prediction Time", min = 0, max = 1, step=1, value = 0)
+                sliderInput("predtime", label="Prediction Time", min = 1, max = 1, step=1, value = 1)
             )
         ),
         mainPanel(
@@ -114,30 +138,46 @@ server <- function(input, output, session) {
     # refresh <- reactiveTimer(2000)
     rv <- reactiveValues()
     rv$ta <- NULL
-    rv$etat <- NULL
-    rv$etas <- NULL
+    rv$etatimes <- NULL
+    rv$tatimes <- NULL
     observeEvent(input$simnum, {
-        rv$etas <- loadsim(input$simnum)
-        print(rv$etas)
+        fts <- list.files(file.path("simulations", input$simnum, "etas"), pattern = "*.pb")
+        if (length(fts) == 0) {
+            rv$etatimes <- NULL
+            rv$tatimes <- NULL
+        } else {
+            rv$etatimes <- as.POSIXct(as.numeric(gsub("etas_|\\.pb", "", fts)), origin = "1970-01-01")
+            rv$tatimes <- rv$etatimes[rv$etatimes >= min(rv$ta$time) &
+                                      rv$etatimes <= max(rv$ta$time)]
+        }
     })
-    
     observeEvent(input$routeid, {
-        updateSelectInput(session, "tripid", 
-            choices = ids[[input$routeid]])
+        ti <- trips[trips$trip_id %in% ids[[input$routeid]], ]
+        tl <- as.list(ti$trip_id)
+        names(tl) <- ti$departure_time
+        updateSelectInput(session, "tripid", choices = tl)
     })
     observeEvent(input$tripid, {
-        rv$ta <- arrivaldata %>% filter(trip_id == input$tripid)
-        print(rv$ta)
-        rv$etat <- rv$etas %>% filter(trip_id == input$tripid)
-        print(rv$etat)
-        updateSliderInput(session, "predtime",
-            max = length(unique(rv$etat$timestamp)))
+        if (input$tripid != "") {
+            rv$ta <- arrivaldata %>% filter(trip_id == input$tripid)
+            day <- format(rv$ta$time[1], "%Y-%m-%d")
+            
+            tstart <- as.POSIXct(paste(day, trips[trips$trip_id == rv$ta$trip_id[1], "departure_time"]))
+            rv$ta <- rv$ta %>% filter(stop_sequence > 1 | time < tstart + 60*30)
+            if (!is.null(rv$etatimes)) {
+                rv$tatimes <- rv$etatimes[rv$etatimes >= min(rv$ta$time) &
+                                          rv$etatimes <= max(rv$ta$time)]
+            } else {
+                rv$tatimes <- NULL
+            }
+            updateSliderInput(session, "predtime", max = length(rv$tatimes))
+        }
     })
     output$graph <- renderPlot({
         # refresh()
         switch(input$plottype, 
             "Timings" = view(input$simnum),
-            "ETAs" = eta(input$simnum, rv$ta, rv$etat)
+            "ETAs" = eta(input$simnum, rv$ta, rv$tatimes[input$predtime])
         )
     })
 }

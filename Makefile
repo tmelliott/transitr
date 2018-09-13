@@ -32,6 +32,9 @@ SIM ?= sim000
 simulation:
 	R --slave -f scripts/run_simulation.R --args $(SIM)
 
+view:
+	R --slave -f scripts/track_simulations.R
+
 coverage:
 	R -e "covr::report()"
 
