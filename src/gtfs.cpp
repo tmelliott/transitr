@@ -1614,6 +1614,10 @@ namespace Gtfs
         return at;
     }
 
+    uint64_t Particle::get_arrival_time (int i)
+    {
+        return at.at (i);
+    }
 
 
     unsigned int 

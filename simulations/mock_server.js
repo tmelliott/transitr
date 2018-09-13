@@ -26,7 +26,7 @@ app.use('/:pid/vehicle_positions', (req, res) => {
     res.download(path.join(__dirname, 'archive/' + files[pids[pid]]));
     pids[pid]++
 
-    console.log(pids)
+    // console.log(pids)
 })
 app.use('/:pid/reset', (req, res) => {
     const pid = req.params.pid

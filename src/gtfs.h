@@ -36,7 +36,23 @@ namespace Gtfs
 
     class Vehicle;
     class Particle;
-    class ETA;
+
+    struct eta;
+    struct etaQ;
+    typedef std::vector<eta> etavector;
+
+    struct eta
+    {
+        std::string stop_id;
+        uint64_t estimate;
+        std::vector<etaQ> quantiles;
+    };
+
+    struct etaQ
+    {
+        float quantile;
+        uint64_t time;
+    };
 
     unsigned int 
     find_stop_index (double distance, std::vector<StopTime>* stops);
@@ -375,6 +391,7 @@ namespace Gtfs
             void mutate (RNG& rng); // mutate state
             void select (RNG& rng); // select state (given data)
             void predict_etas (RNG& rng);
+            etavector get_etas ();
             void reset ();
 
             double distance ();
@@ -403,6 +420,7 @@ namespace Gtfs
         double get_speed ();
         double get_ll ();
         std::vector<uint64_t>& get_arrival_times ();
+        uint64_t get_arrival_time (int i);
 
         void travel (unsigned delta, RNG& rng);
         void predict_etas (RNG& rng);

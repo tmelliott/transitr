@@ -25,6 +25,13 @@ clean:
 run:
 	R --slave -f scripts/run_model.R
 
+startserver:
+	cd simulations && yarn start &
+
+SIM ?= sim000
+simulation:
+	R --slave -f scripts/run_simulation.R --args $(SIM)
+
 coverage:
 	R -e "covr::report()"
 

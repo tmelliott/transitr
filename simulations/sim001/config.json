@@ -1,6 +1,7 @@
 {
     "n_core": 1,
-    "n_particles": 5000,
-    "gps_error": 3,
-    "save_timings": true
+    "n_particles": 500,
+    "gps_error": 6,
+    "save_timings": true,
+    "simulation_history": "/media/emperor/linuxbackup/DATA/sim001/history"
 }
