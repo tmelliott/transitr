@@ -225,9 +225,9 @@ namespace Gtfs {
         {
             // add noise to speed
             double speed_prop = -1;
-            while (speed_prop < 0 || speed_prop > 30)
+            while (speed_prop < 0.0 || speed_prop > 30.0)
             {
-                speed_prop = speed + rng.rnorm () * (5 / 30);
+                speed_prop = speed + rng.rnorm () * (5.0 / 30.0);
             }
             speed = speed_prop;
             if (distance + speed >= next_stop_d)

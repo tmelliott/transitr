@@ -1,11 +1,7 @@
-library(tidyverse)
-library(RProtoBuf)
+source("scripts/common.R")
+
 library(RSQLite)
 library(dbplyr)
-
-curd <- setwd("src/vendor/protobuf")
-readProtoFiles("gtfs-realtime-ext.proto")
-setwd(curd)
 
 simnames <- list.files("simulations", pattern = "sim*", include.dirs = TRUE)
 if (file.exists("simulations/arrivaldata.rda")) {
@@ -35,36 +31,7 @@ if (file.exists("simulations/arrivaldata.rda")) {
         summarize(time = tmax(timestamp, time))
     save(arrivaldata, file = "simulations/arrivaldata.rda")
 }
-loadsim <- function(sim, time) {
-    pb <- file.path("simulations", sim, "etas", sprintf("etas_%s.pb", time))
-    rda <- file.path("simulations", sim, "etas", sprintf("etas_%s.rda", time))
-    if (!file.exists(pb)) {
-        stop("That file doesn't exist.")
-    }
-    if (file.exists(rda)) {
-        load(rda)
-    } else {
-        ent <- read(transit_realtime.FeedMessage, pb)$entity
-        etas <- do.call(bind_rows, 
-            pbapply::pblapply(ent, function(e) {
-                lapply(e$trip_update$stop_time_update, function(stu) {
-                    eta <- stu$getExtension(transit_network.eta)
-                    tibble(vehicle_id = e$trip_update$vehicle$id,
-                           trip_id = e$trip_update$trip$trip_id,
-                           route_id = e$trip_update$trip$route_id,
-                           timestamp = as.POSIXct(as.integer(time), origin = "1970-01-01"),
-                           stop_sequence = if (stu$has('stop_sequence')) stu$stop_sequence else NA,
-                           time = if (eta$has('estimate') && eta$estimate > 0) eta$estimate else NA
-                    )
-                })
-            })
-        ) %>%
-            mutate(time = as.POSIXct(time, origin = "1970-01-01")) %>%
-            group_by(trip_id)
-        save(etas, file = rda)
-    }
-    etas
-}
+
 
 ids <- tapply(arrivaldata$trip_id, arrivaldata$route_id, function(x) sort(unique(x)))
 arrivaldata <- arrivaldata %>% group_by(trip_id)
@@ -136,6 +103,7 @@ ui <- fluidPage(
 )
 server <- function(input, output, session) {
     # refresh <- reactiveTimer(2000)
+    pbapply::pboptions(type = "timer")
     rv <- reactiveValues()
     rv$ta <- NULL
     rv$etatimes <- NULL
