@@ -57,7 +57,8 @@ load_gtfs <- function(db, output = "predictions.pb") {
     structure(list(database = db, apis = apis(), output = output,
                    parameters = list(n_core = 1L, 
                                      n_particles = 1000L, 
-                                     gps_error = 5.0)),
+                                     gps_error = 5.0,
+                                     save_timings = FALSE)),
               class = "trgtfs")
 }
 

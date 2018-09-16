@@ -1,4 +1,5 @@
 #include "realtime_feed.h"
+#include <regex>
 
 #include "timing.h"
 
@@ -59,6 +60,10 @@ int RealtimeFeed::update ()
         curl_slist_free_all (chunk);
     }
     curl_global_cleanup ();
+
+    if (std::regex_match (readBuffer, std::regex ("(simulation complete)"))) {
+        return 5;
+    }
 
     std::istringstream buf (readBuffer);
     if (!_feed.ParseFromIstream (&buf)) {
@@ -145,6 +150,7 @@ void write_vehicles (Gtfs::vehicle_map* vehicles, std::string& file)
         transit_realtime::FeedEntity* entity = feed.add_entity ();
         entity->set_id (v->second.vehicle_id ());
 
+        // --- Vehicle Position
         transit_realtime::VehiclePosition* vp = entity->mutable_vehicle ();
         if (v->second.trip () != nullptr) 
         {
@@ -175,6 +181,31 @@ void write_vehicles (Gtfs::vehicle_map* vehicles, std::string& file)
         }
         position_estimate->set_odometer (dbar);
         position_estimate->set_speed (v->second.speed ());
+
+        // --- Trip Update (ETAs)
+        transit_realtime::TripUpdate* tu = entity->mutable_trip_update ();
+        if (v->second.trip () != nullptr)
+        {
+            transit_realtime::TripDescriptor* trip = tu->mutable_trip ();
+            trip->set_trip_id (v->second.trip ()->trip_id ());
+            if (v->second.trip ()->route () != nullptr) 
+            {
+                trip->set_route_id (v->second.trip ()->route ()->route_id ());
+            }
+        }
+        vehicle = tu->mutable_vehicle ();
+        vehicle->set_id (v->second.vehicle_id ());
+
+        // Stop Time Events
+        Gtfs::etavector etas (v->second.get_etas ());
+        std::cout.flush ();
+        for (int si=0; si<etas.size (); ++si)
+        {
+            transit_realtime::TripUpdate::StopTimeUpdate* stu = tu->add_stop_time_update ();
+            stu->set_stop_sequence (si+1);
+            transit_network::TimePrediction* tpi = stu->MutableExtension(transit_network::eta);
+            tpi->set_estimate (etas.at (si).estimate);
+        }
 
     }
 

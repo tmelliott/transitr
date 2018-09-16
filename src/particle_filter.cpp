@@ -142,6 +142,33 @@ namespace Gtfs {
 #endif
     }
 
+    etavector Vehicle::get_etas ()
+    {
+        auto stops = _trip->stops ();
+        int M (stops.size ());
+        etavector etas;
+        etas.resize (M);
+        for (int i=0; i<M; ++i)
+        {
+            // need to center each particle's arrival time
+            int tarr = 0;
+            int ni = 0;
+            for (auto p = _state.begin (); p != _state.end (); ++p)
+            {
+                if (p->get_arrival_time (i) > 0)
+                {
+                    tarr += (p->get_arrival_time (i) - _timestamp);
+                    ni++;
+                }
+            }
+            etas.at (i).stop_id = stops.at (i).stop->stop_id ();
+            if (ni == 0) continue;
+            tarr /= ni;
+            etas.at (i).estimate = _timestamp + tarr;
+        }
+        return etas;
+    }
+
     double Vehicle::distance ()
     {
         double distance = 0.0;
@@ -198,9 +225,9 @@ namespace Gtfs {
         {
             // add noise to speed
             double speed_prop = -1;
-            while (speed_prop < 0 || speed_prop > 30)
+            while (speed_prop < 0.0 || speed_prop > 30.0)
             {
-                speed_prop = speed + rng.rnorm () * (5 / 30);
+                speed_prop = speed + rng.rnorm () * (5.0 / 30.0);
             }
             speed = speed_prop;
             if (distance + speed >= next_stop_d)
