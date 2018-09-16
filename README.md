@@ -49,3 +49,53 @@ Once running, you can launch a new R session and view the shiny app:
 ```r
 transitr::view_realtime("realtime.db")
 ```
+
+
+# mock data server
+
+In order to facilitate model development and checking, there's also a mock data server
+in the `simulations` directory.
+
+To install:
+```bash
+cd simulations
+yarn 
+
+## or if you don't use yarn
+npm install
+```
+
+To start the server, you need first an archive of vehicle position feeds,
+```bash
+ls archive | grep vehicle | head -n 5
+# vehicle_locations_20180911050001.pb
+# vehicle_locations_20180911050031.pb
+# vehicle_locations_20180911050102.pb
+# vehicle_locations_20180911050132.pb
+# vehicle_locations_20180911050201.pb
+
+yarn start
+# yarn run v1.9.4
+# $ node mock_server.js
+# Mock GTFS server running on port 3000!
+```
+
+Now you can run the model with the local server, which will automatically serve 
+the next file with each request.
+```r
+## assumeing you've constructed with simulation flag:
+## $ make FLAGS="-DSIMULATION"
+## simulation history will be saved in a `history` directory
+dir.create("history")
+
+## set some process ID for the server to recognise (allows running multiple simulations simultaneously)
+pid <- "test1"
+nw <- load_gtfs("fulldata.db") %>%
+    realtime_feed(sprintf("http://localhost:3000/%s/vehicle_positions", pid),
+                  response = "protobuf") %>%
+    set_parameters(n_core = 1,
+                   n_particles = 2000,
+                   gps_error = 10)
+
+nw %>% model()
+```
