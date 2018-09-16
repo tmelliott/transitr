@@ -37,10 +37,12 @@ nw <- create_gtfs("https://cdn01.at.govt.nz/data/gtfs.zip", db = dbname) %>%
                   with_headers("Ocp-Apim-Subscription-Key" = "mykey"),
                   response = "protobuf")
 
-## Set the model running in realtime
-## note: n.particles should be bigger than 500,
-##       and cores should be as many as you have spare
-nw %>% model(cores = 2, n.particles = 500)
+## Set the parameters and then run the model
+nw %>% 
+    set_parameters(n_core = 2, 
+                   n_particles = 500, 
+                   gps_error = 5) %>%
+    model()
 ```
 
 Once running, you can launch a new R session and view the shiny app:
