@@ -39,4 +39,4 @@ app.get('*', (req, res) => {
     res.status(404).send('Not found')
 })
 
-app.listen(3000, () => console.log('Example app running on port 3000!'))
+app.listen(3000, () => console.log('Mock GTFS server running on port 3000!'))
