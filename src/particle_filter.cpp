@@ -17,12 +17,14 @@ namespace Gtfs {
             // initialize each particle with a state X(i) - distance, speed
             _state.emplace_back (rng.runif () * dmax,
                                  rng.runif () * 30, 
+                                 rng.rnorm () * _systemnoise,
                                  this);
             // std::cout << " [" << _state.back ().get_distance () << ", " 
             //     << _state.back ().get_speed () << "]";
         }
 
         _newtrip = false;
+        _complete = false;
     }
 
     void Vehicle::mutate (RNG& rng)
@@ -33,15 +35,35 @@ namespace Gtfs {
             return;
         }
 
-        if (!valid () || _delta == 0) return;
+        if (_complete || !valid () || _delta == 0) return;
 
         // There probably need to be a bunch of checks here ...
         
         // do the transition ("mutation")
+        int ncomplete = 0;
         for (auto p = _state.begin (); p != _state.end (); ++p)
         {
-            p->travel (_delta, rng);
+            if (p->is_complete ())
+            {
+                ncomplete++;
+            }
+            else
+            {
+                p->travel (_delta, rng);
+            }
+        }
+        if (ncomplete == _state.size ())
+        {
+            _complete = true;
+            return;
+        }
+
+        // update
+        select (rng);
+
 #if WRITE_PARTICLES
+        for (auto p = _state.begin (); p != _state.end (); ++p)
+        {
             std::ostringstream fname;
             fname << "history/vehicle_" << _vehicle_id << ".csv";
             std::ofstream fout;
@@ -50,7 +72,9 @@ namespace Gtfs {
             latlng ppos (_trip->shape ()->coordinates_of (d));
             fout << _timestamp << ","
                 << _trip->trip_id () << ","
+                << std::setprecision(15)
                 << _position.latitude << "," << _position.longitude << ","
+                << std::setprecision(6)
                 << p->get_distance () << ","
                 << p->get_speed () << ","
                 << std::setprecision(15)
@@ -67,11 +91,9 @@ namespace Gtfs {
             }
             fout << "\n";
             fout.close ();
-#endif
         }
+#endif
 
-        // update
-        select (rng);
     }
 
     void Vehicle::select (RNG& rng)
@@ -223,13 +245,30 @@ namespace Gtfs {
 
         while (distance < Dmax && delta > 0)
         {
-            // add noise to speed
-            double speed_prop = -1;
-            while (speed_prop < 0.0 || speed_prop > 30.0)
+            // add system noise to acceleration to ensure speed remains in [0, 30]
+            // 
+            // faster speeds have less volatility
+            double accel_prop (-100.0);
+            double nmax = 10;
+            while ((speed + accel_prop < 0 || speed + accel_prop > 30) && nmax > 0)
             {
-                speed_prop = speed + rng.rnorm () * (5.0 / 30.0);
+                accel_prop = acceleration + rng.rnorm () * vehicle->system_noise ();
+                nmax--;
             }
-            speed = speed_prop;
+
+            acceleration = accel_prop;
+            speed += acceleration;
+            if (speed <= 0)
+            {
+                acceleration = 0.0;
+                speed = 0.0;
+            }
+            else if (speed > 30)
+            {
+                speed = 30.0;
+                acceleration = 0.0;
+            }
+
             if (distance + speed >= next_stop_d)
             {
                 // about to reach a stop ... slow? stop? just drive past?
@@ -242,6 +281,8 @@ namespace Gtfs {
                     double dwell = gamma - tau * log (rng.runif ());
                     delta = fmax(0, delta - dwell);
                     distance = next_stop_d;
+                    speed = 0;
+                    acceleration = 0;
                     if (m == M-1) break;
                     m++;
                     next_stop_d = stops->at (m).distance;

@@ -63,7 +63,8 @@ namespace Gtfs
     {
         int n_particles = 1000;
         int n_core = 1;
-        float gps_error = 5;     // std. dev.
+        float gps_error = 5;     // std. dev. of observation error
+        float system_noise = 5;  // std. dev. of speed variance/second
         bool save_timings = false;
         par () {}
         par (Rcpp::List parameters);
@@ -366,9 +367,11 @@ namespace Gtfs
             latlng _position;
             uint64_t _timestamp = 0;
             unsigned _delta;
-            double _gpserror;
+            float _gpserror;
+            float _systemnoise;
 
             bool _newtrip = true;
+            bool _complete = false;
             int _N;
             std::vector<Particle> _state;
 
@@ -385,6 +388,7 @@ namespace Gtfs
             void update (const transit_realtime::VehiclePosition& vp,
                          Gtfs* gtfs);
             bool valid ();
+            bool complete ();
 
             // statistics things
             void initialize (RNG& rng);
@@ -397,13 +401,16 @@ namespace Gtfs
             double distance ();
             double speed ();
             int progress ();
+            float gps_error ();
+            float system_noise ();
     };
 
     class Particle {
     private:
         Vehicle* vehicle;
-        double distance = 0;
-        double speed = 0;
+        double distance = 0.0;
+        double speed = 0.0;
+        double acceleration = 0.0;
         std::vector<unsigned int> tt; // segment travel times
         std::vector<uint64_t> at; // stop arrival times
 
@@ -412,12 +419,14 @@ namespace Gtfs
         double log_likelihood;
 
     public:
-        Particle (double d, double s, Vehicle* v);
+        Particle (double d, double s, double a, Vehicle* v);
         Particle (const Particle &p);
         ~Particle ();
         
+        bool is_complete ();
         double get_distance ();
         double get_speed ();
+        double get_acceleration ();
         double get_ll ();
         std::vector<uint64_t>& get_arrival_times ();
         uint64_t get_arrival_time (int i);

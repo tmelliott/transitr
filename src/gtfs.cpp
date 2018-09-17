@@ -1440,13 +1440,15 @@ namespace Gtfs
         // fetch the parameters
         Rcpp::IntegerVector np = parameters["n_particles"];
         Rcpp::IntegerVector nc = parameters["n_core"];
-        Rcpp::NumericVector sigx = parameters["gps_error"];
+        Rcpp::NumericVector sigy = parameters["gps_error"];
+        Rcpp::NumericVector sigx = parameters["system_noise"];
         Rcpp::LogicalVector tim = parameters["save_timings"];
 
         // set the parameters
         n_particles = (int) np[0];
         n_core = (int) nc[0];
-        gps_error = (float) sigx[0];
+        gps_error = (float) sigy[0];
+        system_noise = (float) sigx[0];
         save_timings = (bool) tim[0];
     }
 
@@ -1456,6 +1458,7 @@ namespace Gtfs
             << "\n - n_particles = " << n_particles
             << "\n - n_core = " << n_core
             << "\n - gps_error = " << gps_error
+            << "\n - system_noise = " << system_noise
             << "\n - save_timings = " << (save_timings ? "true" : "false")
             << "\n";
     }
@@ -1466,6 +1469,7 @@ namespace Gtfs
     {
         // set the parameters here
         _gpserror = params->gps_error;
+        _systemnoise = params->system_noise;
         _N = params->n_particles;
     }
 
@@ -1567,13 +1571,29 @@ namespace Gtfs
             _trip != nullptr && _timestamp != 0;
     }
 
+    bool Vehicle::complete ()
+    {
+        return _complete;
+    }
+
+    float Vehicle::gps_error ()
+    {
+        return _gpserror;
+    }
+
+    float Vehicle::system_noise ()
+    {
+        return _systemnoise;
+    }
 
 
-    Particle::Particle (double d, double s, Vehicle* v)
+
+    Particle::Particle (double d, double s, double a, Vehicle* v)
     {
         vehicle = v;
         distance = d;
         speed = s;
+        acceleration = a;
         at.resize (vehicle->trip ()->stops ().size (), 0);
     }
 
@@ -1582,6 +1602,7 @@ namespace Gtfs
         vehicle = p.vehicle;
         distance = p.distance;
         speed = p.speed;
+        acceleration = p.acceleration;
         tt = p.tt;
         at = p.at;
         complete = p.complete;
@@ -1594,6 +1615,11 @@ namespace Gtfs
         tt.clear ();
     }
 
+    bool Particle::is_complete ()
+    {
+        return complete;
+    }
+
     double Particle::get_distance ()
     {
         return distance;
@@ -1602,6 +1628,11 @@ namespace Gtfs
     double Particle::get_speed ()
     {
         return speed;
+    }
+
+    double Particle::get_acceleration ()
+    {
+        return acceleration;
     }
 
     double Particle::get_ll ()
