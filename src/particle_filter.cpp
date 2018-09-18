@@ -249,24 +249,26 @@ namespace Gtfs {
             // 
             // faster speeds have less volatility
             double accel_prop (-100.0);
-            double nmax = 10;
-            while ((speed + accel_prop < 0 || speed + accel_prop > 30) && nmax > 0)
+            double n = 0;
+            while (speed + accel_prop < 0 || speed + accel_prop > 30)
             {
-                accel_prop = acceleration + rng.rnorm () * vehicle->system_noise ();
-                nmax--;
+                accel_prop = acceleration + 
+                    rng.rnorm () * vehicle->system_noise () * (1 + n / 100);
+                n++;
             }
 
-            acceleration = accel_prop;
-            speed += acceleration;
-            if (speed <= 0)
+            double v = fmax (0.0, fmax (30.0, speed + acceleration));
+            double vstar = fmax (0.0, fmax (30.0, speed + accel_prop));
+            double alpha = (pow (v - 15, 2) - pow(vstar - 15, 2)) / (2 * pow (5, 2));
+            alpha = fmin (0, alpha);
+            if (rng.runif () < exp (alpha))
             {
-                acceleration = 0.0;
-                speed = 0.0;
+                acceleration = accel_prop;
+                speed = vstar;
             }
-            else if (speed > 30)
+            else
             {
-                speed = 30.0;
-                acceleration = 0.0;
+                speed = v;
             }
 
             if (distance + speed >= next_stop_d)
@@ -280,14 +282,12 @@ namespace Gtfs {
                     double tau = 10;
                     double dwell = gamma - tau * log (rng.runif ());
                     delta = fmax(0, delta - dwell);
-                    distance = next_stop_d;
-                    speed = 0;
-                    acceleration = 0;
-                    if (m == M-1) break;
                     m++;
-                    next_stop_d = stops->at (m).distance;
-                    continue;
+                    if (m == M-1) break;
                 }
+                distance = next_stop_d;
+                next_stop_d = stops->at (m).distance;
+                continue;
             }
             distance += speed;
             delta--;
