@@ -8,6 +8,7 @@ if (file.exists("simulations/arrivaldata.rda")) {
     load("simulations/arrivaldata.rda")
 } else {
     tmax <- function(x, t) x[which.max(t)]
+    pbapply::pboptions(type = "timer")
     arrivaldata <- pbapply::pblapply(list.files("simulations/archive", pattern = "trip_*", full.names = TRUE),
         function(f) {
             ent <- read(transit_realtime.FeedMessage, f)$entity
@@ -83,14 +84,23 @@ eta <- function(sim, ta, ts) {
         ggtitle(sprintf("ETAs at %s", format(etatime, "%H:%M:%S"))) +
         geom_point(data = etadata, color = "black", pch = 3)
 }
-vehicle <- function(vps, ts) {
+vehicle <- function(vps, ts, prop) {
     obstime <- as.POSIXct(as.numeric(ts), origin = "1970-01-01")
     vps <- vps %>% 
         mutate(dist_between = geosphere::distGeo(cbind(obs_lon, obs_lat), cbind(model_lon, model_lat)))
+    con <- dbConnect(SQLite(), "fulldata.db")
+    sid <- con %>% tbl("trips") %>% filter(trip_id == vps$trip_id[1]) %>% select(shape_id) %>% collect
+    shape <- con %>% tbl("shapes") %>% filter(shape_id == sid$shape_id[1]) %>%
+        select(shape_pt_lon, shape_pt_lat) %>% arrange(shape_pt_sequence) %>% collect
+    dbDisconnect(con)
     p <- vps %>% filter(timestamp == as.integer(obstime))
     vpx <- vps %>% group_by(timestamp) %>%
         summarize(obs_lon = first(obs_lon), obs_lat = first(obs_lat), trip_id = first(trip_id))
     p1 <- ggplot(p, aes(obs_lon, obs_lat)) +
+        geom_path(aes(shape_pt_lon, shape_pt_lat), data = shape, colour = "cyan") +
+        ## proposals
+        geom_point(aes(model_lon, model_lat), pch = 19, col = 'gray', 
+            data = prop %>% filter(timestamp == as.integer(obstime))) +
         ## particles
         geom_point(aes(model_lon, model_lat), pch = 4) +
         ## observation
@@ -105,7 +115,8 @@ vehicle <- function(vps, ts) {
     p4 <- ggplot(vps %>% filter(trip_id == p$trip_id) %>% group_by(timestamp) %>%
                 summarize(x = mean(distance), xdot = mean(speed)) %>%
                 ungroup() %>% mutate(avg_speed = c(0, diff(x) / diff(timestamp)))) +
-        geom_point(aes(x, avg_speed, colour = timestamp == as.integer(obstime)))
+        geom_point(aes(x, avg_speed, colour = timestamp == as.integer(obstime))) +
+        ylim(0, 30)
     p5 <- ggplot(vps %>% filter(trip_id == p$trip_id), aes(timestamp, dist_between)) +
         geom_point(aes(colour = timestamp == as.integer(obstime)))
     gridExtra::grid.arrange(p1, p2, p4, p5, ncol = 1)
@@ -143,16 +154,19 @@ server <- function(input, output, session) {
     rv$tatimes <- NULL
     rv$config <- NULL
     rv$vehicledata <- NULL
+    rv$hdir <- NULL
     observeEvent(input$simnum, {
         ## config info
         conf <- readLines(file.path("simulations", input$simnum, "config.json"))
         output$simconfig <- renderPrint(jsonlite::prettify(conf))
 
+        rv$hdir <- file.path("simulations", input$simnum, "history")
         rv$config <- jsonlite::fromJSON(conf)
-        hdir <- rv$config$simulation_history
-        if (dir.exists(hdir)) {
-            vids <- gsub("vehicle_|\\.csv", "", list.files(hdir))
-            vids <- vids[!grepl("_particles", vids)]
+        if (!is.null(rv$config$simulation_history)) 
+            rv$hdir <- rv$config$simulation_history
+        if (dir.exists(rv$hdir)) {
+            vids <- gsub("vehicle_|\\.csv", "", list.files(rv$hdir))
+            vids <- vids[!grepl("_", vids)]
             updateSelectInput(session, "vehicleid", choices = vids)
         }
 
@@ -191,8 +205,10 @@ server <- function(input, output, session) {
     })
     observeEvent(input$vehicleid, {
         if (input$vehicleid != "") {
-            rv$vehicledata <- read_csv(sprintf("%s/vehicle_%s.csv", rv$config$simulation_history, input$vehicleid),
-                col_names = c('timestamp', 'trip_id', 'obs_lat', 'obs_lon', 'distance', 'speed', 'model_lat', 'model_lon'))
+            rv$vehicledata <- read_csv(sprintf("%s/vehicle_%s.csv", rv$hdir, input$vehicleid),
+                col_names = c('timestamp', 'trip_id', 'obs_lat', 'obs_lon', 'distance', 'speed', 'acceleration', 'model_lat', 'model_lon'))
+            rv$vehicleprop <- read_csv(sprintf("%s/vehicle_%s_proposals.csv", rv$hdir, input$vehicleid),
+                col_names = c('timestamp', 'trip_id', 'distance', 'speed', 'acceleration', 'model_lat', 'model_lon'))
             rv$vehicletimes <- unique(rv$vehicledata$timestamp)
             updateSliderInput(session, "obstime", max = length(rv$vehicletimes))
         }
@@ -202,7 +218,7 @@ server <- function(input, output, session) {
         switch(input$plottype, 
             "Timings" = view(input$simnum),
             "ETAs" = eta(input$simnum, rv$ta, rv$tatimes[input$predtime]),
-            "Vehicles" = vehicle(rv$vehicledata, rv$vehicletimes[input$obstime])
+            "Vehicles" = vehicle(rv$vehicledata, rv$vehicletimes[input$obstime], rv$vehicleprop)
         )
     })
 }

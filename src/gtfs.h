@@ -374,6 +374,7 @@ namespace Gtfs
             bool _complete = false;
             int _N;
             std::vector<Particle> _state;
+            bool bad_sample;
 
         public:
             Vehicle (std::string& id, par* params);

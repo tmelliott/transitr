@@ -15,7 +15,7 @@ namespace Gtfs {
         for (int i=0; i<_N; ++i)
         {
             // initialize each particle with a state X(i) - distance, speed
-            _state.emplace_back (rng.runif () * dmax,
+            _state.emplace_back ((double)i / (double)(_N - 1) * dmax, //rng.runif () * dmax,
                                  rng.runif () * 30, 
                                  rng.rnorm () * _systemnoise,
                                  this);
@@ -25,6 +25,7 @@ namespace Gtfs {
 
         _newtrip = false;
         _complete = false;
+        bad_sample = false;
     }
 
     void Vehicle::mutate (RNG& rng)
@@ -39,6 +40,7 @@ namespace Gtfs {
 
         // There probably need to be a bunch of checks here ...
         
+
         // do the transition ("mutation")
         int ncomplete = 0;
         for (auto p = _state.begin (); p != _state.end (); ++p)
@@ -58,8 +60,34 @@ namespace Gtfs {
             return;
         }
 
+#if WRITE_PARTICLES
+        for (auto p = _state.begin (); p != _state.end (); ++p)
+        {
+            std::ostringstream fname;
+            fname << "history/vehicle_" << _vehicle_id << "_proposals.csv";
+            std::ofstream fout;
+            fout.open (fname.str ().c_str (), std::ofstream::app);
+            double d (p->get_distance ());
+            latlng ppos (_trip->shape ()->coordinates_of (d));
+            fout << _timestamp << ","
+                << _trip->trip_id () << ","
+                << p->get_distance () << ","
+                << p->get_speed () << ","
+                << p->get_acceleration () << ","
+                << std::setprecision(15)
+                << ppos.latitude << "," << ppos.longitude << "\n";
+            fout.close ();
+        }
+#endif
+
         // update
         select (rng);
+
+        // (re)initialize if the particle sample is bad
+        if (bad_sample)
+        {
+            initialize (rng);
+        }
 
 #if WRITE_PARTICLES
         for (auto p = _state.begin (); p != _state.end (); ++p)
@@ -77,6 +105,7 @@ namespace Gtfs {
                 << std::setprecision(6)
                 << p->get_distance () << ","
                 << p->get_speed () << ","
+                << p->get_acceleration () << ","
                 << std::setprecision(15)
                 << ppos.latitude << "," << ppos.longitude << "\n";
             fout.close ();
@@ -94,17 +123,28 @@ namespace Gtfs {
         }
 #endif
 
+
     }
 
     void Vehicle::select (RNG& rng)
     {
+        bad_sample = true;
+
         // calculate loglikelihood of particles
         double sumlh = 0.0;
+        // threshold of 100m
+        double threshold = log (0.5) - 0.5 * exp (2.0 * (log (100.0) - log (_gpserror)));
+        double maxlh = 10 * threshold;
         std::vector<ShapePt>* path = &(_trip->shape ()->path ());
+        double plh;
         for (auto p = _state.begin (); p != _state.end (); ++p)
         {
-            sumlh += p->calculate_likelihood (_position, path, _gpserror);
+            plh = p->calculate_likelihood (_position, path, _gpserror);
+            sumlh += plh;
+            if (plh > maxlh) maxlh = plh;
         }
+
+        if (maxlh < threshold) return;
 
         // compute particle (cumulative) weights ll - log(sum(likelihood)))
         std::vector<double> wt;
@@ -117,15 +157,7 @@ namespace Gtfs {
         }
 
         // some condition for resampling (1/wt^2 < N? or something ...)
-
-
-        if (wt.back () < 0.99)
-        {
-            // bad bad bad
-            _state.clear ();
-            _newtrip = true;
-            return;
-        }
+        if (wt.back () < 0.99) return;
 
         // resample u \in [0, 1)
         double u;
@@ -148,6 +180,8 @@ namespace Gtfs {
         // std::cout << "\n";
         // for (auto p = _state.begin (); p != _state.end (); ++p)
         //     std::cout << "[" << p->get_distance () << ", " << p->get_speed () << "] ; ";
+        
+        bad_sample = false;
     }
 
     void Vehicle::predict_etas (RNG& rng)
@@ -242,6 +276,11 @@ namespace Gtfs {
         
         // get SEGMENTS
         
+        // allow vehicle to remain stationary ... convert to an Exponential ??
+        if (speed == 0.0)
+        {
+            while (delta > 0 && rng.runif () < 0.8) delta--;
+        }
 
         while (distance < Dmax && delta > 0)
         {
@@ -257,19 +296,21 @@ namespace Gtfs {
                 n++;
             }
 
-            double v = fmax (0.0, fmax (30.0, speed + acceleration));
-            double vstar = fmax (0.0, fmax (30.0, speed + accel_prop));
-            double alpha = (pow (v - 15, 2) - pow(vstar - 15, 2)) / (2 * pow (5, 2));
-            alpha = fmin (0, alpha);
-            if (rng.runif () < exp (alpha))
-            {
-                acceleration = accel_prop;
-                speed = vstar;
-            }
-            else
-            {
-                speed = v;
-            }
+            // double v = fmax (0.0, fmin (30.0, speed + acceleration));
+            // double vstar = fmax (0.0, fmin (30.0, speed + accel_prop));
+            // double alpha = (pow (v - 15, 2) - pow(vstar - 15, 2)) / (2 * pow (15, 2));
+            // alpha = fmin (0, alpha);
+            // if (rng.runif () < exp (alpha))
+            // {
+            //     acceleration = accel_prop;
+            //     speed = vstar;
+            // }
+            // else
+            // {
+            //     speed = v;
+            // }
+            acceleration = accel_prop;
+            speed += acceleration;
 
             if (distance + speed >= next_stop_d)
             {

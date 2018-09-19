@@ -16,6 +16,7 @@ if (!is.null(config$simulation_history)) {
     system(sprintf("rm -rf %s/*", config$simulation_history))
     system(sprintf("ln -sf %s history", config$simulation_history))
 } else {
+    if (dir.exists("history")) unlink("history", recursive = TRUE, force = TRUE)
     dir.create("history")
 }
 
