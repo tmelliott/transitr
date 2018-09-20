@@ -16,8 +16,12 @@ transition <- function(state, delta, Sd = c(0, 1e5), config, id) {
     next_stop_d <- Sd[m+1]
 
     State <- matrix(NA, nrow = delta+1, ncol = 4)
+    if (any(state[1] == Sd) && runif(1) < 0.5) {
+        delta <- max(0, delta - rexp(1, 1/30))
+    }
+    State[delta:nrow(State), 1] <- 0
     while (state[1] < Dmax && delta > 0) {
-        State[delta+1,] <- state
+        State[delta+1, ] <- state
 
         n <- 0
         accel <- -100
@@ -27,16 +31,8 @@ transition <- function(state, delta, Sd = c(0, 1e5), config, id) {
             n <- n + 1
         }
         
-        # abar <- config$accel_rate * state[4]
-        # alpha <- min(0, dnorm(accel, abar, 0.5, log = TRUE) -
-        #     dnorm(state[3], abar, 0.5, log = TRUE))
-        # if (runif(1) > exp(alpha)) {
-        #     ## reject acceleration
-        #     accel <- state[3]
-        # }
-
         v <- max(0, min(30, state[2] + state[3]))
-        vstar <- max(0, min(30, state[2] + accel))
+        vstar <- state[2] + accel
         alpha <- min(0, dnorm(vstar, config$speed_mean, config$speed_sd, log = TRUE) - 
             dnorm(v, config$speed_mean, config$speed_sd, log = TRUE))
         if (runif(1) < exp(alpha)) {
@@ -47,20 +43,20 @@ transition <- function(state, delta, Sd = c(0, 1e5), config, id) {
             state[2] <- v
         }
 
+        state[1] <- state[1] + state[2]
+        delta <- delta - 1
         if (state[1] + state[2] >= next_stop_d) {
+            m <- m+1
             if (runif(1) < 0.5) {
                 dwell <- 6 + rexp(1, 1/10)
                 delta <- max(0, delta - dwell)
                 state[1] <- next_stop_d
                 state[3] <- 0
             }
-            m <- m+1
             if (m == M) break
             next_stop_d <- Sd[m+1]
             next
         }
-        state[1] <- state[1] + state[2]
-        delta <- delta - 1
     }
     State[1,] <- state
     colnames(State) <- c("distance", "speed", "acceleration", "state")
@@ -81,9 +77,9 @@ plot.state.history <- function(x, config, ...) {
         ungroup () %>% filter(!is.na(distance))
     p <- ggplot(x, aes(t/ifelse(max(x$t) < 60, 1, 60), group = id)) +
         xlab(ifelse(max(x$t) < 60, "Time (sec)", "Time (min)")) +
-        theme(legend.position = "none")
+        theme(legend.position = "none") #+ xlim(2, 2.5)
     p1 <- p + geom_step(aes(y = distance))
-    p2 <- p + geom_step(aes(y = speed))
+    p2 <- p + geom_step(aes(y = speed))  + ylim(0, 30)
     if (!missing(config)) {
         p2 <- p2 + 
             geom_hline(yintercept = c(config$speed_mean - 2 * config$speed_sd,
@@ -100,9 +96,10 @@ plot.state.history <- function(x, config, ...) {
 Stops <- c(0, 3000, 6000, 10000)
 config$system_noise <- 0.5
 config$accel_rate <- 1.5
-config$speed_mean <- 13
-config$speed_sd <- 2
-x <- pbapply::pblapply(1:100, function(i) 
-    attr(transition(c(0, 10, 0, 0), 600, Sd = Stops, config = config, id = i), "history")) %>%
+config$speed_mean <- 100 * 1000 / 60 / 60
+config$speed_sd <- 5
+x <- pbapply::pblapply(1:10, function(i) 
+    attr(transition(c(ifelse(runif(1) < 0.5, 0, runif(1, 0, 1000)), runif(1, 0, 30), 0, 0), 
+                    300, Sd = Stops, config = config, id = i), "history")) %>%
     do.call(bind_rows, .)
 plot(x, config)

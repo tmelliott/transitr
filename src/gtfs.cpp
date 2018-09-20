@@ -901,6 +901,10 @@ namespace Gtfs
 
 
     /***************************************************** Stoptime */
+    StopTime::StopTime ()
+    {
+
+    }
     StopTime::StopTime (std::string& stop_id, std::string& trip_id,
                         std::string& at, std::string& dt, 
                         std::string& headsign, 
@@ -1654,10 +1658,14 @@ namespace Gtfs
     unsigned int 
     find_stop_index (double distance, std::vector<StopTime>* stops)
     {
+        /*
+         * Return the index of the stop at which the particle LAST VISITED
+         * (or is currently at).
+         */
         if (distance <= 0) return 0;
         if (distance >= stops->back ().distance) return stops->size () - 1;
         unsigned int j = 0;
-        while (stops->at (j).distance < distance) j++;
+        while (stops->at (j+1).distance <= distance) j++;
         return j;
     }
 

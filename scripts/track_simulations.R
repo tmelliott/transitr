@@ -97,6 +97,8 @@ vehicle <- function(vps, ts, prop) {
     vpx <- vps %>% group_by(timestamp) %>%
         summarize(obs_lon = first(obs_lon), obs_lat = first(obs_lat), trip_id = first(trip_id))
     p1 <- ggplot(p, aes(obs_lon, obs_lat)) +
+        coord_fixed(1.6) +
+        theme(legend.position = 'none') +
         geom_path(aes(shape_pt_lon, shape_pt_lat), data = shape, colour = "cyan") +
         ## proposals
         geom_point(aes(model_lon, model_lat), pch = 19, col = 'gray', 
@@ -107,19 +109,34 @@ vehicle <- function(vps, ts, prop) {
         geom_point(aes(colour = trip_id, alpha = timestamp == as.integer(obstime)), 
             data = vpx)
     p2 <- ggplot(vps %>% filter(trip_id == p$trip_id), aes(distance, speed)) +
-        geom_point(aes(colour = trip_id), alpha = 0.1, pch = 4) +
-        geom_point(data = p, alpha = 1)
-    # p3 <- ggplot(vps %>% filter(trip_id == p$trip_id), aes(timestamp, speed)) +
-    #     geom_point(aes(colour = trip_id), alpha = 0.1, pch = 4) +
-    #     geom_point(data = p, alpha = 1)
+        geom_point(pch = 19, col = 'orangered', 
+            data = prop %>% filter(timestamp == as.integer(obstime))) +
+        geom_point(col = 'gray', alpha = 0.1, pch = 4) +
+        geom_point(data = p, alpha = 1) +
+        theme(legend.position = 'none') + ylim(0, 30)
+    p3 <- ggplot(vps %>% filter(trip_id == p$trip_id), aes(timestamp, distance)) +
+        geom_point(pch = 19, col = 'orangered', 
+            data = prop %>% filter(timestamp == as.integer(obstime))) +
+        geom_point(col = 'gray', alpha = 0.1, pch = 4) +
+        geom_point(data = p, alpha = 1) +
+        theme(legend.position = 'none')
     p4 <- ggplot(vps %>% filter(trip_id == p$trip_id) %>% group_by(timestamp) %>%
                 summarize(x = mean(distance), xdot = mean(speed)) %>%
                 ungroup() %>% mutate(avg_speed = c(0, diff(x) / diff(timestamp)))) +
         geom_point(aes(x, avg_speed, colour = timestamp == as.integer(obstime))) +
-        ylim(0, 30)
+        ylim(0, 30) +
+        theme(legend.position = 'none')
     p5 <- ggplot(vps %>% filter(trip_id == p$trip_id), aes(timestamp, dist_between)) +
-        geom_point(aes(colour = timestamp == as.integer(obstime)))
-    gridExtra::grid.arrange(p1, p2, p4, p5, ncol = 1)
+        geom_point(aes(colour = timestamp == as.integer(obstime))) +
+        theme(legend.position = 'none')
+    p6 <- ggplot(p, aes(distance, ll)) + 
+        geom_point(col = 'orangered', data = prop %>% filter(timestamp == as.integer(obstime))) +
+        geom_point() +
+        theme(legend.position = 'none')
+
+    gridExtra::grid.arrange(p1, p3, p2, p4, p5, p6, 
+        layout_matrix = cbind(c(1, 2, 4, 6), c(1, 3, 5, 6)),
+        heights = c(2, 1, 1, 1))
 }
 
 library(shiny)
@@ -206,9 +223,9 @@ server <- function(input, output, session) {
     observeEvent(input$vehicleid, {
         if (input$vehicleid != "") {
             rv$vehicledata <- read_csv(sprintf("%s/vehicle_%s.csv", rv$hdir, input$vehicleid),
-                col_names = c('timestamp', 'trip_id', 'obs_lat', 'obs_lon', 'distance', 'speed', 'acceleration', 'model_lat', 'model_lon'))
+                col_names = c('timestamp', 'trip_id', 'obs_lat', 'obs_lon', 'distance', 'speed', 'acceleration', 'll', 'model_lat', 'model_lon'))
             rv$vehicleprop <- read_csv(sprintf("%s/vehicle_%s_proposals.csv", rv$hdir, input$vehicleid),
-                col_names = c('timestamp', 'trip_id', 'distance', 'speed', 'acceleration', 'model_lat', 'model_lon'))
+                col_names = c('timestamp', 'trip_id', 'distance', 'speed', 'acceleration', 'll', 'model_lat', 'model_lon'))
             rv$vehicletimes <- unique(rv$vehicledata$timestamp)
             updateSliderInput(session, "obstime", max = length(rv$vehicletimes))
         }

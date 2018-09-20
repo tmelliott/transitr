@@ -94,6 +94,7 @@ namespace Gtfs
         int dropoff_type;
         double distance;
 
+        StopTime ();
         StopTime (std::string& stop_id, std::string& trip_id,
                   std::string& at, std::string& dt, 
                   std::string& headsign, 
@@ -417,7 +418,7 @@ namespace Gtfs
 
         bool complete = false;
 
-        double log_likelihood;
+        double log_likelihood = -1e6;
 
     public:
         Particle (double d, double s, double a, Vehicle* v);
@@ -435,7 +436,7 @@ namespace Gtfs
         void travel (unsigned delta, RNG& rng);
         void predict_etas (RNG& rng);
         
-        double calculate_likelihood (latlng& y, std::vector<ShapePt>* path, double sigma);
+        void calculate_likelihood (latlng& y, std::vector<ShapePt>* path, double sigma);
     };
 
 }; // namespace Gtfs
