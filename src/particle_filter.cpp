@@ -293,33 +293,44 @@ namespace Gtfs {
         {
             double w = - log (rng.runif ()) * delta;
             delta = fmax (0, delta - round (w));
+            // we don't want this to affect the speed
         }
         else if (rng.runif () < 0.05)
         {
             // a very small chance for particles to remain stationary
-            // when /not/ at a bus stop
+            speed = 0.0;
+            // when /not/ at a bus stop, set speed to 0 and wait
             double w = - log (rng.runif ()) * delta;
-            delta = fmax (0, delta - round (w));   
+            delta = fmax (0, delta - round (w));
         }
 
 
         while (distance < Dmax && delta > 0)
         {
             // add system noise to acceleration to ensure speed remains in [0, 30]
-            // 
-            // faster speeds have less volatility
+            double speed_mean = 15.0;
+            double speed_sd = 8.0;
             double accel_prop (-100.0);
             double n = 0;
             while (speed + accel_prop < 0 || speed + accel_prop > 30)
             {
-                accel_prop = rng.rnorm () * vehicle->system_noise () * 
-                    (1.0 + (double)n / 100.0);
-                n++;
+                if (speed == 0)
+                {
+                    // speed + accel_prop ~ segment speed distribution
+                    // --> this will be updated at some point to take segment values
+                    accel_prop = rng.rnorm () * speed_sd + speed_mean;
+                }
+                else
+                {
+                    accel_prop = rng.rnorm () * vehicle->system_noise () * 
+                        (1.0 + (double)n / 100.0);
+                    n++;
+                }
             }
 
             double v = fmax (0, fmin (30, speed + acceleration));
             double vstar = speed + accel_prop;
-            double alpha = (pow (v - 15, 2) - pow(vstar - 15, 2)) / (2 * pow (8, 2));
+            double alpha = (pow (v - speed_mean, 2) - pow(vstar - speed_mean, 2)) / (2 * pow (speed_sd, 2));
             alpha = fmin (0, alpha);
             if (rng.runif () < exp (alpha))
             {
