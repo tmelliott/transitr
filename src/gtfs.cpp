@@ -1607,6 +1607,7 @@ namespace Gtfs
         distance = p.distance;
         speed = p.speed;
         acceleration = p.acceleration;
+        accelerating = p.accelerating;
         tt = p.tt;
         at = p.at;
         complete = p.complete;

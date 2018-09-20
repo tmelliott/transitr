@@ -110,12 +110,12 @@ vehicle <- function(vps, ts, prop) {
         ## observation
         geom_point(aes(colour = trip_id, alpha = timestamp == as.integer(obstime)), 
             data = vpx)
-    p2 <- ggplot(vps %>% filter(trip_id == p$trip_id), aes(distance, speed)) +
+    p2 <- ggplot(vps %>% filter(trip_id == p$trip_id), aes(distance, speed/1000*60*60)) +
         geom_point(pch = 19, col = 'orangered', 
             data = prop %>% filter(timestamp == as.integer(obstime))) +
         geom_point(col = 'gray', alpha = 0.1, pch = 4) +
         geom_point(data = p, alpha = 1) +
-        theme(legend.position = 'none') + ylim(0, 30)
+        theme(legend.position = 'none') + ylim(0, 100) + ylab("Speed (km/h)")
     p3 <- ggplot(vps %>% filter(trip_id == p$trip_id), aes(ts, distance)) +
         geom_point(pch = 19, col = 'orangered', 
             data = prop %>% filter(timestamp == as.integer(obstime))) +
@@ -125,8 +125,8 @@ vehicle <- function(vps, ts, prop) {
     p4 <- ggplot(vps %>% filter(trip_id == p$trip_id) %>% group_by(timestamp) %>%
                 summarize(x = mean(distance), xdot = mean(speed)) %>%
                 ungroup() %>% mutate(avg_speed = c(0, diff(x) / diff(timestamp)))) +
-        geom_point(aes(x, avg_speed, colour = timestamp == as.integer(obstime))) +
-        ylim(0, 30) +
+        geom_point(aes(x, avg_speed/1000*60*60, colour = timestamp == as.integer(obstime))) +
+        ylim(0, 100) + ylab("Speed (km/h)") +
         theme(legend.position = 'none')
     p5 <- ggplot(vps %>% filter(trip_id == p$trip_id), aes(ts, dist_between)) +
         geom_point(aes(colour = timestamp == as.integer(obstime))) +

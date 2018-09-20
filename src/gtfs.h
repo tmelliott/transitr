@@ -413,6 +413,7 @@ namespace Gtfs
         double distance = 0.0;
         double speed = 0.0;
         double acceleration = 0.0;
+        int accelerating = 0.0;
         std::vector<unsigned int> tt; // segment travel times
         std::vector<uint64_t> at; // stop arrival times
 

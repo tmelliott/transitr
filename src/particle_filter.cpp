@@ -301,30 +301,29 @@ namespace Gtfs {
             speed = 0.0;
             // when /not/ at a bus stop, set speed to 0 and wait
             double w = - log (rng.runif ()) * delta;
-            delta = fmax (0, delta - round (w));
+            delta = fmax (0.0, delta - round (w));
+            // then the bus needs to accelerate back up to speed ... for how many seconds?
+            accelerating = 5.0 + rng.runif () * 10.0;
+            acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
         }
 
 
-        while (distance < Dmax && delta > 0)
+        while (distance < Dmax && delta > 0.0)
         {
             // add system noise to acceleration to ensure speed remains in [0, 30]
             double speed_mean = 15.0;
             double speed_sd = 8.0;
             double accel_prop (-100.0);
             double n = 0;
-            while (speed + accel_prop < 0 || speed + accel_prop > 30)
+            while (speed + accel_prop < 0.0 || speed + accel_prop > 30.0)
             {
-                if (speed == 0)
+                accel_prop = rng.rnorm () * vehicle->system_noise () * 
+                    (1.0 + (double)n / 100.0);
+                n++;
+                if (accelerating > 0.0)
                 {
-                    // speed + accel_prop ~ segment speed distribution
-                    // --> this will be updated at some point to take segment values
-                    accel_prop = rng.rnorm () * speed_sd + speed_mean;
-                }
-                else
-                {
-                    accel_prop = rng.rnorm () * vehicle->system_noise () * 
-                        (1.0 + (double)n / 100.0);
-                    n++;
+                    accel_prop += acceleration;
+                    accelerating--;
                 }
             }
 
@@ -362,6 +361,7 @@ namespace Gtfs {
                     double dwell = gamma - tau * log (rng.runif ());
                     delta = fmax(0, delta - dwell);
                     distance = next_stop_d;
+                    speed = 0.0;
                 }
                 next_stop_d = stops->at (m+1).distance;
                 continue;
