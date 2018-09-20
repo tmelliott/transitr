@@ -362,6 +362,8 @@ namespace Gtfs {
                     delta = fmax(0, delta - dwell);
                     distance = next_stop_d;
                     speed = 0.0;
+                    accelerating = 5.0 + rng.runif () * 10.0;
+                    acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
                 }
                 next_stop_d = stops->at (m+1).distance;
                 continue;
