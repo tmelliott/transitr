@@ -2,6 +2,6 @@
     "n_core": 2,
     "n_particles": 1000,
     "gps_error": 5,
-    "system_noise": 0.05,
+    "system_noise": 0.5,
     "save_timings": true
 }
