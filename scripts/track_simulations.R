@@ -87,7 +87,8 @@ eta <- function(sim, ta, ts) {
 vehicle <- function(vps, ts, prop) {
     obstime <- as.POSIXct(as.numeric(ts), origin = "1970-01-01")
     vps <- vps %>% 
-        mutate(dist_between = geosphere::distGeo(cbind(obs_lon, obs_lat), cbind(model_lon, model_lat)))
+        mutate(dist_between = geosphere::distGeo(cbind(obs_lon, obs_lat), cbind(model_lon, model_lat)),
+               ts = as.POSIXct(timestamp, origin = "1970-01-01"))
     con <- dbConnect(SQLite(), "fulldata.db")
     sid <- con %>% tbl("trips") %>% filter(trip_id == vps$trip_id[1]) %>% select(shape_id) %>% collect
     shape <- con %>% tbl("shapes") %>% filter(shape_id == sid$shape_id[1]) %>%
@@ -96,6 +97,7 @@ vehicle <- function(vps, ts, prop) {
     p <- vps %>% filter(timestamp == as.integer(obstime))
     vpx <- vps %>% group_by(timestamp) %>%
         summarize(obs_lon = first(obs_lon), obs_lat = first(obs_lat), trip_id = first(trip_id))
+    prop <- prop %>% mutate(ts = as.POSIXct(timestamp, origin = "1970-01-01"))
     p1 <- ggplot(p, aes(obs_lon, obs_lat)) +
         coord_fixed(1.6) +
         theme(legend.position = 'none') +
@@ -114,7 +116,7 @@ vehicle <- function(vps, ts, prop) {
         geom_point(col = 'gray', alpha = 0.1, pch = 4) +
         geom_point(data = p, alpha = 1) +
         theme(legend.position = 'none') + ylim(0, 30)
-    p3 <- ggplot(vps %>% filter(trip_id == p$trip_id), aes(timestamp, distance)) +
+    p3 <- ggplot(vps %>% filter(trip_id == p$trip_id), aes(ts, distance)) +
         geom_point(pch = 19, col = 'orangered', 
             data = prop %>% filter(timestamp == as.integer(obstime))) +
         geom_point(col = 'gray', alpha = 0.1, pch = 4) +
@@ -126,7 +128,7 @@ vehicle <- function(vps, ts, prop) {
         geom_point(aes(x, avg_speed, colour = timestamp == as.integer(obstime))) +
         ylim(0, 30) +
         theme(legend.position = 'none')
-    p5 <- ggplot(vps %>% filter(trip_id == p$trip_id), aes(timestamp, dist_between)) +
+    p5 <- ggplot(vps %>% filter(trip_id == p$trip_id), aes(ts, dist_between)) +
         geom_point(aes(colour = timestamp == as.integer(obstime))) +
         theme(legend.position = 'none')
     p6 <- ggplot(p, aes(distance, ll)) + 
