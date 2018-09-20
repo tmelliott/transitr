@@ -34,7 +34,7 @@ nw <- nw %>%
                   response = "protobuf")
 
 if (Sys.info()["nodename"] == "certellprd01") {
-    nw <- nw %>% set_parameters(n_particles = 5000, n_core = 6)
+    nw <- nw %>% set_parameters(n_particles = 5000, n_core = 6, gps_error = 5, system_noise = 0.5)
     if (Sys.getenv("GPSERROR") == "")
         nw %>% model
     else {
@@ -43,7 +43,7 @@ if (Sys.info()["nodename"] == "certellprd01") {
     }
 
 } else {
-    nw %>% set_parameters(n_particles = 1000, n_core = 1, gps_error = 20) %>% model
+    nw %>% set_parameters(n_particles = 1000, n_core = 1, gps_error = 5, system_noise = 0.5) %>% model
 }
 
 
