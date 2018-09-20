@@ -291,8 +291,15 @@ namespace Gtfs {
         if (distance == stops->at (m).distance &&
             rng.runif () < 0.5)
         {
-            double w = - log (rng.runif ()) * 30;
+            double w = - log (rng.runif ()) * delta;
             delta = fmax (0, delta - round (w));
+        }
+        else if (rng.runif () < 0.05)
+        {
+            // a very small chance for particles to remain stationary
+            // when /not/ at a bus stop
+            double w = - log (rng.runif ()) * delta;
+            delta = fmax (0, delta - round (w));   
         }
 
 
@@ -336,7 +343,6 @@ namespace Gtfs {
                     distance = next_stop_d;
                     break;
                 }
-                next_stop_d = stops->at (m+1).distance;
                 if (rng.runif () < 0.5)
                 {
                     // stop dwell time ~ Exp(tau = 10)
@@ -346,6 +352,7 @@ namespace Gtfs {
                     delta = fmax(0, delta - dwell);
                     distance = next_stop_d;
                 }
+                next_stop_d = stops->at (m+1).distance;
                 continue;
             }
         }
