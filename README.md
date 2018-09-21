@@ -20,8 +20,6 @@ devtools::install_github('tmelliott/transitr')
 # usage
 
 __Still under development!__
-Please wait until the `master` branch gets pushed with the first
-usable release before trying to use this package.
 This here is just for demonstration of what it could be like at some point
 in the future.
 
