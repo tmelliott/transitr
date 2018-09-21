@@ -164,6 +164,40 @@ namespace Gtfs
             sqlite3_finalize (stmt);
             Rcpp::Rcout << " + Created " << _shapes.size () << " shapes\n";
         }
+        // load SEGMENTS
+        {
+            // qry = "SELECT count(segment_id) FROM segments";
+            // if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            // {
+            //     Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+            //         << sqlite3_errmsg (db) << "\n";
+            //     sqlite3_finalize (stmt);
+            //     close_connection ();
+            //     return;
+            // }
+            // _segments.reserve (sqlite3_column_int (stmt, 0));
+            // sqlite3_finalize (stmt);
+
+            // qry ="SELECT segment_id FROM segments";
+            // if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            // {
+            //     Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+            //         << sqlite3_errmsg (db) << "\n";
+            //     sqlite3_finalize (stmt);
+            //     close_connection ();
+            //     return;
+            // }
+            // std::string sid;
+            // while (sqlite3_step (stmt) == SQLITE_ROW)
+            // {
+            //     sid = (char*)sqlite3_column_text (stmt, 0);
+            //     _segmentss.emplace (std::piecewise_construct,
+            //                         std::forward_as_tuple (sid),
+            //                         std::forward_as_tuple (sid, this));
+            // }
+            // sqlite3_finalize (stmt);
+            // Rcpp::Rcout << " + Created " << _segments.size () << " segmentss\n";
+        }
         // load STOPS
         {
             qry = "SELECT count(distinct stop_id) FROM stops";
@@ -292,6 +326,14 @@ namespace Gtfs
     {
         return _shapes;
     }
+    std::unordered_map<std::string, Segment>& Gtfs::segments ()
+    {
+        return _segments;
+    }
+    std::unordered_map<std::string, Intersection>& Gtfs::intersections ()
+    {
+        return _intersections;
+    }
     std::unordered_map<std::string, Stop>& Gtfs::stops ()
     {
         return _stops;
@@ -335,6 +377,26 @@ namespace Gtfs
     {
         auto search = _shapes.find (id);
         if (search != _shapes.end ())
+        {
+            return &(search->second);
+        }
+        return nullptr;
+    }
+
+    Segment* Gtfs::find_segment (std::string& id)
+    {
+        auto search = _segments.find (id);
+        if (search != _segments.end ())
+        {
+            return &(search->second);
+        }
+        return nullptr;
+    }
+
+    Intersection* Gtfs::find_intersection (std::string& id)
+    {
+        auto search = _intersections.find (id);
+        if (search != _intersections.end ())
         {
             return &(search->second);
         }
@@ -1126,6 +1188,142 @@ namespace Gtfs
         double b = bearing (_path[i].pt, _path[i+1].pt);
 
         return destinationPoint (_path[i].pt, b, dd);       
+    }
+
+
+    /***************************************************** Segment */
+    Segment::Segment (std::string& id, Gtfs* gtfs) : 
+        gtfs (gtfs), _segment_id (id) {}
+
+    void Segment::load ()
+    {
+        if (loaded) return;
+        sqlite3* db = gtfs->get_connection ();
+        if (db == nullptr)
+        {
+            Rcpp::Rcerr << " x Unable to connect to database\n  "
+                << sqlite3_errmsg (db) << "\n";
+            gtfs->close_connection ();
+            return;
+        }
+
+        sqlite3_stmt* stmt;
+        std::string qry = "SELECT from, to, length FROM segments WHERE segment_id=?";
+        if (sqlite3_prepare_v2(db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+        if (sqlite3_bind_text (stmt, 1, _segment_id.c_str (),
+                               -1, SQLITE_STATIC) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't bind segment id to query\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return; 
+        }
+        if (sqlite3_step (stmt) != SQLITE_ROW)
+        {
+            Rcpp::Rcerr << " x Couldn't get segment from db\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+
+        std::string fromid = (char*)sqlite3_column_text (stmt, 0);
+        // _from = gtfs->find_intersection (fromid);
+        std::string toid = (char*)sqlite3_column_text (stmt, 1);
+        // _to = gtfs->find_intersection (toid);
+        _length = sqlite3_column_double (stmt, 2);
+
+        sqlite3_finalize (stmt);
+        gtfs->close_connection ();
+
+        loaded = true;
+    }
+
+    void Segment::unload ()
+    {
+        _from = nullptr;
+        _to = nullptr;
+        loaded = false;
+    }
+
+    std::string& Segment::segment_id () {
+        return _segment_id; 
+    }
+
+
+    /***************************************************** Intersection */
+    Intersection::Intersection (std::string& id, Gtfs* gtfs) : 
+        gtfs (gtfs), _intersection_id (id) {}
+
+    void Intersection::load ()
+    {
+        if (loaded) return;
+        sqlite3* db = gtfs->get_connection ();
+        if (db == nullptr)
+        {
+            Rcpp::Rcerr << " x Unable to connect to database\n  "
+                << sqlite3_errmsg (db) << "\n";
+            gtfs->close_connection ();
+            return;
+        }
+
+        sqlite3_stmt* stmt;
+        std::string qry = "SELECT position_lat, position_lon FROM intersections WHERE intersection_id=?";
+        if (sqlite3_prepare_v2(db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+        if (sqlite3_bind_text (stmt, 1, _intersection_id.c_str (),
+                               -1, SQLITE_STATIC) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't bind intersection id to query\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return; 
+        }
+        if (sqlite3_step (stmt) != SQLITE_ROW)
+        {
+            Rcpp::Rcerr << " x Couldn't get intersection from db\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+
+        _position = latlng (sqlite3_column_double (stmt, 0),
+                                 sqlite3_column_double (stmt, 1));
+
+        sqlite3_finalize (stmt);
+        gtfs->close_connection ();
+
+        loaded = true;
+    }
+
+    void Intersection::unload ()
+    {
+        loaded = false;
+    }
+
+    std::string& Intersection::intersection_id () {
+        return _intersection_id; 
+    }
+    latlng& Intersection::position ()
+    {
+        if (!loaded) load ();
+        return _position;
     }
 
 

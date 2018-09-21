@@ -31,6 +31,8 @@ namespace Gtfs
     class Route;
     class Trip;
     class Shape;
+    class Segment;
+    class Intersection;
     class Stop;
     class Calendar;
 
@@ -80,7 +82,7 @@ namespace Gtfs
     };
     struct ShapeSegment
     {
-        // Segment* segment;
+        Segment* segment;
         double distance;
     };
     struct StopTime
@@ -235,6 +237,48 @@ namespace Gtfs
         latlng coordinates_of (double& d);
     };
 
+    class Segment
+    {
+    private:
+        Gtfs* gtfs;
+        std::string _segment_id;
+        Intersection* _from;
+        Intersection* _to;
+        double _length;
+
+        bool loaded = false;
+
+    public:
+        Segment (std::string& id, Gtfs* gtfs);
+
+        void load ();
+        void unload ();
+
+        std::string& segment_id ();
+        Intersection* from ();
+        Intersection* to ();
+        double length ();
+    };
+
+    class Intersection
+    {
+    private:
+        Gtfs* gtfs;
+        std::string _intersection_id;
+        latlng _position;
+
+        bool loaded = false;
+
+    public:
+        Intersection (std::string& id, Gtfs* gtfs);
+
+        void load ();
+        void unload ();
+
+        std::string& intersection_id ();
+        latlng& position ();
+    };
+
 
     class Stop
     {
@@ -331,6 +375,8 @@ namespace Gtfs
         std::unordered_map<std::string, Route> _routes;
         std::unordered_map<std::string, Trip> _trips;
         std::unordered_map<std::string, Shape> _shapes;
+        std::unordered_map<std::string, Segment> _segments;
+        std::unordered_map<std::string, Intersection> _intersections;
         std::unordered_map<std::string, Stop> _stops;
         std::unordered_map<std::string, Calendar> _calendar;
 
@@ -345,6 +391,8 @@ namespace Gtfs
         std::unordered_map<std::string, Route>& routes ();
         std::unordered_map<std::string, Trip>& trips ();
         std::unordered_map<std::string, Shape>& shapes ();
+        std::unordered_map<std::string, Segment>& segments ();
+        std::unordered_map<std::string, Intersection>& intersections ();
         std::unordered_map<std::string, Stop>& stops ();
         std::unordered_map<std::string, Calendar>& calendar ();
 
@@ -353,6 +401,8 @@ namespace Gtfs
         Route* find_route (std::string& id);
         Trip* find_trip (std::string& id);
         Shape* find_shape (std::string& id);
+        Segment* find_segment (std::string& id);
+        Intersection* find_intersection (std::string& id);
         Stop* find_stop (std::string& id);
         Calendar* find_calendar (std::string& id);
 
