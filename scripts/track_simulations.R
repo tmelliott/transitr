@@ -89,15 +89,16 @@ vehicle <- function(vps, ts, prop) {
     vps <- vps %>% 
         mutate(dist_between = geosphere::distGeo(cbind(obs_lon, obs_lat), cbind(model_lon, model_lat)),
                ts = as.POSIXct(timestamp, origin = "1970-01-01"))
+    p <- vps %>% filter(timestamp == as.integer(obstime))
     con <- dbConnect(SQLite(), "fulldata.db")
-    sid <- con %>% tbl("trips") %>% filter(trip_id == vps$trip_id[1]) %>% select(shape_id) %>% collect
+    sid <- con %>% tbl("trips") %>% filter(trip_id == p$trip_id[1]) %>% select(shape_id) %>% collect
     shape <- con %>% tbl("shapes") %>% filter(shape_id == sid$shape_id[1]) %>%
         select(shape_pt_lon, shape_pt_lat) %>% arrange(shape_pt_sequence) %>% collect
     dbDisconnect(con)
-    p <- vps %>% filter(timestamp == as.integer(obstime))
     vpx <- vps %>% group_by(timestamp) %>%
         summarize(obs_lon = first(obs_lon), obs_lat = first(obs_lat), trip_id = first(trip_id))
     prop <- prop %>% mutate(ts = as.POSIXct(timestamp, origin = "1970-01-01"))
+    Dmax <- prop %>% filter(trip_id == p$trip_id) %>% pluck("distance") %>% max
     p1 <- ggplot(p, aes(obs_lon, obs_lat)) +
         coord_fixed(1.6) +
         theme(legend.position = 'none') +
@@ -115,30 +116,37 @@ vehicle <- function(vps, ts, prop) {
             data = prop %>% filter(timestamp == as.integer(obstime))) +
         geom_point(col = 'gray', alpha = 0.1, pch = 4) +
         geom_point(data = p, alpha = 1) +
-        theme(legend.position = 'none') + ylim(0, 100) + ylab("Speed (km/h)")
+        theme(legend.position = 'none') + ylim(0, 100) + ylab("Speed (km/h)") +
+        xlab("Distance Traveled (m)") + xlim(0, Dmax)
     p3 <- ggplot(vps %>% filter(trip_id == p$trip_id), aes(ts, distance)) +
         geom_point(pch = 19, col = 'orangered', 
             data = prop %>% filter(timestamp == as.integer(obstime))) +
         geom_point(col = 'gray', alpha = 0.1, pch = 4) +
         geom_point(data = p, alpha = 1) +
-        theme(legend.position = 'none')
+        theme(legend.position = 'none') +
+        xlab("Time") +
+        ylab("Distance Traveled (m)") + ylim(0, Dmax)
     p4 <- ggplot(vps %>% filter(trip_id == p$trip_id) %>% group_by(timestamp) %>%
                 summarize(x = mean(distance), xdot = mean(speed)) %>%
                 ungroup() %>% mutate(avg_speed = c(0, diff(x) / diff(timestamp)))) +
         geom_point(aes(x, avg_speed/1000*60*60, colour = timestamp == as.integer(obstime))) +
-        ylim(0, 100) + ylab("Speed (km/h)") +
+        ylim(0, 100) + ylab("Mean Interpolated Speed (km/h)") +
+        xlab("Distance Traveled (m)") + xlim(0, Dmax) +
         theme(legend.position = 'none')
     p5 <- ggplot(vps %>% filter(trip_id == p$trip_id), aes(ts, dist_between)) +
         geom_point(aes(colour = timestamp == as.integer(obstime))) +
-        theme(legend.position = 'none')
+        theme(legend.position = 'none') +
+        xlab("Time") +
+        ylab("Distance between\nparticle and observation (m)")
     p6 <- ggplot(p, aes(distance, ll)) + 
         geom_point(col = 'orangered', data = prop %>% filter(timestamp == as.integer(obstime))) +
         geom_point() +
-        theme(legend.position = 'none')
+        theme(legend.position = 'none') +
+        xlab("Distance Traveled (m)") + xlim(0, Dmax) +
+        ylab("Log Likelihood")
 
-    gridExtra::grid.arrange(p1, p3, p2, p4, p5, p6, 
-        layout_matrix = cbind(c(1, 2, 4, 6), c(1, 3, 5, 6)),
-        heights = c(2, 1, 1, 1))
+    gridExtra::grid.arrange(p1, p3, p5, p2, p4, p6, 
+        layout_matrix = cbind(c(1, 1, 1, 1, 6), c(2:6)))
 }
 
 library(shiny)
