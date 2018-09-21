@@ -6,18 +6,19 @@
 ##' @param source where the GTFS data comes from
 ##' @param db where the GTFS data is going to be stored
 ##' @param quiet logical, if \code{TRUE} progress output will be suppressed
+##' @param output filename to output ETA predictions
 ##' @return a \code{trgtfs} object
 ##' @author Tom Elliott
 ##' @importFrom stats update
 ##' @export
-create_gtfs <- function(source, db = tempfile(), quiet = FALSE) {
+create_gtfs <- function(source, db = tempfile(), quiet = FALSE, output = "predictions.pb") {
     if (!requireNamespace("RSQLite", quietly = TRUE)) {
         stop("Please install the `RSQLite` package first,\n",
              "  or connect to a database manually and use `load_gtfs` instead.")
     }
     
     create_tables(db)
-    nw <- load_gtfs(db)
+    nw <- load_gtfs(db, output)
     if (!missing(source)) {
         update(nw, source, quiet = quiet)
     }
@@ -45,14 +46,20 @@ check_tables <- function(db) {
 ##'
 ##' @title Load GTFS database
 ##' @param db a database connection from \code{dbConnect}
+##' @param output filename to output ETA predictions
 ##' @return a \code{trgtfs} object
 ##' @author Tom Elliott
 ##' @export
-load_gtfs <- function(db) {
+load_gtfs <- function(db, output = "predictions.pb") {
     if (!check_tables(db)) {
         stop("Oops, some of the tables aren't right...")
     }
-    structure(list(database = db, apis = apis()),
+    structure(list(database = db, apis = apis(), output = output,
+                   parameters = list(n_core = 1L, 
+                                     n_particles = 1000L, 
+                                     gps_error = 5.0,
+                                     system_noise = 1.0,
+                                     save_timings = FALSE)),
               class = "trgtfs")
 }
 

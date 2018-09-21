@@ -1,0 +1,16 @@
+{
+  "name": "mock-data-server",
+  "version": "1.0.0",
+  "description": "Serve mock realtime GTFS data for testing and model comparison",
+  "main": "mock_server.js",
+  "scripts": {
+    "start": "node mock_server.js"
+  },
+  "repository": "https://github.com/tmelliott/transitr",
+  "author": "Tom Elliott",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.16.3",
+    "fs": "^0.0.1-security"
+  }
+}

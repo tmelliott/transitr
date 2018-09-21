@@ -28,22 +28,8 @@ void intHandler (int dummy) {
 
 using namespace Rcpp;
 
-void write_vehicles_in_parallel (Gtfs::Gtfs& gtfs, Gtfs::vehicle_map& vehicles)
-{
-    gtfs.write_vehicles (&vehicles);
-    // push sqlite -> remote postgresql
-    {
-        // write to postgres in the first place (issue #5)
-        int rq = system ("R --slave -f scripts/copy_to_postgres.R > copy.out 2>&1 &");
-    }
-}
-
 // [[Rcpp::export]]
-void run_realtime_model (
-    List nw, 
-    int nparticles,
-    int numcore,
-    double gpserror)
+void run_realtime_model (List nw)
 {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
@@ -55,8 +41,9 @@ void run_realtime_model (
 
     // Process nw components into c++ things
     String dbname_raw = nw["database"];
+    String outputname_raw = nw["output"];
     std::string dbname (dbname_raw);
-    // std::string dbname (get_database_name (nw));
+    std::string outputname (outputname_raw);
     
     // Construct the realtime feed object
     List apis = nw["apis"];
@@ -72,24 +59,35 @@ void run_realtime_model (
     // Create vehicle container
     Gtfs::vehicle_map vehicles;
 
+    // Create parameter object
+    List pars = nw["parameters"];
+    Gtfs::par params (pars);
+    params.print ();
+
     // Initialize an RNG
-    Rcout << "\n * Running on " << numcore << " cores.";
-    Rcout << "\n * Initializing " << numcore << " independent RNGs. ";
-    std::vector<RNG> rngs (numcore);
+    std::vector<RNG> rngs (params.n_core);
     unsigned int _seed = (unsigned int) time (0);
-    for (int i=0; i<numcore; ++i) rngs.at (i).set_seed (_seed++);
+    for (int i=0; i<params.n_core; ++i) rngs.at (i).set_seed (_seed++);
 
     // Allow the program to be stopped gracefully    
     signal (SIGINT, intHandler);
     Timer timer;
+    if (params.save_timings) {
+        timer.save_to ("timings.csv", "iteration,timestamp,nvehicles");
+    }
     int tries = 0;
+    int iteration = 0;
     while (ongoing)
     {
-        Rcout << "\n --- Commence iteration ---\n";
         timer.reset ();
         
         // call the feed once and check the result is reasonable
-        if (rtfeed.update () != 0 && tries < 10)
+        int ures = rtfeed.update ();
+        // 5 => "simulations completed"
+        if (ures == 5) break;
+        
+        Rcout << "\n --- Commence iteration ---\n";
+        if (ures != 0 && tries < 10)
         {
             Rcout << "\n x Unable to fetch URL. Trying again ...\n";
             tries++;
@@ -100,14 +98,26 @@ void run_realtime_model (
         Rcout << "\n + loaded " 
             << rtfeed.feed ()->entity_size () 
             << " vehicle positions.\n";
+
+        {
+            std::ostringstream tinfo;
+            tinfo << iteration << ",";
+            if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ()) 
+            {
+                tinfo << rtfeed.feed()->header ().timestamp ();
+            }
+            tinfo << "," << rtfeed.feed ()->entity_size ();
+            
+            timer.set_info (tinfo.str ());
+        }
         timer.report ("loading vehicle positions");
 
         // Loading vehicle positions, assigning trips
-        load_vehicles (&vehicles, rtfeed.feed (), &gtfs, nparticles, gpserror);
+        load_vehicles (&vehicles, rtfeed.feed (), &gtfs, &params);
         timer.report ("updating vehicle information");
 
         // Update vehicle states
-        #pragma omp parallel for num_threads(numcore)
+        #pragma omp parallel for num_threads(params.n_core)
         for (unsigned i=0; i<vehicles.bucket_count (); ++i)
         {       
             for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
@@ -117,15 +127,12 @@ void run_realtime_model (
         }
         timer.report ("updating vehicle states");
 
-        // Write vehicles to database on a separate thread while the network update occurs
-        std::thread writev (write_vehicles_in_parallel, std::ref (gtfs), std::ref (vehicles));
-
-        // Now update the network state, using `numcore - 1` threads
+        // Now update the network state, using `params.n_core - 1` threads
         // std::this_thread::sleep_for (std::chrono::milliseconds (1 * 1000));
         // timer.report ("updating network state");
         
         // Predict ETAs
-        #pragma omp parallel for num_threads(numcore)
+        #pragma omp parallel for num_threads(params.n_core)
         for (unsigned i=0; i<vehicles.bucket_count (); ++i)
         {
             for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
@@ -133,14 +140,30 @@ void run_realtime_model (
                 v->second.predict_etas (rngs.at (omp_get_thread_num ()));
             }
         }
+        timer.report ("predicting ETAs");
 
-        // Wait for vehicle writing to complete ...
-        writev.join ();
+        // Write vehicles to (new) feed
+#if SIMULATION
+        std::ostringstream outputname_t;
+        outputname_t << "etas/etas";
+        if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ()) 
+        {
+            outputname_t << "_" << rtfeed.feed ()->header ().timestamp ();
+        }
+        outputname_t << ".pb";
+        std::string oname (outputname_t.str ());
+        write_vehicles (&vehicles, oname);
+#endif
+        write_vehicles (&vehicles, outputname);
 
+        timer.report ("writing ETAs to protobuf feed");
+
+        gtfs.close_connection (true);
         timer.end ();
 
-        std::this_thread::sleep_for (std::chrono::milliseconds (10 * 1000));
+        // std::this_thread::sleep_for (std::chrono::milliseconds (10 * 1000));
 
+        iteration++;
     }
 
     Rcout << "\n\n --- Finished ---\n\n";

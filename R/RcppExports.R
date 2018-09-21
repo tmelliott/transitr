@@ -13,7 +13,7 @@ calculate_shape_distance <- function(x) {
     .Call(`_transitr_calculate_shape_distance`, x)
 }
 
-run_realtime_model <- function(nw, nparticles, numcore, gpserror) {
-    invisible(.Call(`_transitr_run_realtime_model`, nw, nparticles, numcore, gpserror))
+run_realtime_model <- function(nw) {
+    invisible(.Call(`_transitr_run_realtime_model`, nw))
 }
 

@@ -4,6 +4,8 @@
 #include <chrono>
 #include <thread>
 
+#include "timing.h"
+
 namespace Gtfs 
 {
 
@@ -264,10 +266,14 @@ namespace Gtfs
         return nullptr;
     }
 
-    void Gtfs::close_connection ()
+    void Gtfs::close_connection () { close_connection (false); }
+    void Gtfs::close_connection (bool sure)
     {
-        // sqlite3_close (_connection);
-        // _connection = nullptr;
+        if (sure)
+        {
+            sqlite3_close (_connection);
+            _connection = nullptr;
+        }
     }
 
     std::unordered_map<std::string, Agency>& Gtfs::agencies ()
@@ -355,156 +361,117 @@ namespace Gtfs
         return nullptr;
     }
 
-    void Gtfs::write_vehicles (vehicle_map* vehicles)
-    {
-        sqlite3* db = get_connection ();
-        if (db == nullptr)
-        {
-            Rcpp::Rcerr << " x Unable to connect to database\n  "
-                << sqlite3_errmsg (db) << "\n";
-            close_connection ();
-            return;
-        }
-        sqlite3_stmt* stmt_s;
-        sqlite3_stmt* stmt_i;
-        sqlite3_stmt* stmt_u;
-
-        // we need three queries: 
-        std::string qry = "SELECT count(vehicle_id) FROM vehicles WHERE vehicle_id=?";
-        if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt_s, 0) != SQLITE_OK)
-        {
-            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
-                << sqlite3_errmsg (db) << "\n";
-            sqlite3_finalize (stmt_s);
-            close_connection ();
-            return;
-        }
-        qry = "INSERT INTO vehicles VALUES (?,?,?,?,?,?,?,?)";
-        if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt_i, 0) != SQLITE_OK)
-        {
-            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
-                << sqlite3_errmsg (db) << "\n";
-            sqlite3_finalize (stmt_i);
-            close_connection ();
-            return;
-        }
-        qry = "UPDATE vehicles SET trip_id=?, timestamp=?, position_latitude=?, position_longitude=?, distance=?, speed=?, progress=? WHERE vehicle_id=?";
-        if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt_u, 0) != SQLITE_OK)
-        {
-            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
-                << sqlite3_errmsg (db) << "\n";
-            sqlite3_finalize (stmt_u);
-            close_connection ();
-            return;
-        }
-
-        // loop over vehicles and insert/update
-        for (auto v = vehicles->begin (); v != vehicles->end (); ++v)
-        {
-            if (sqlite3_bind_text (stmt_s, 1, v->second.vehicle_id ().c_str (),
-                                   -1, SQLITE_STATIC) != SQLITE_OK)
-            {
-                Rcpp::Rcerr << " x Can't bind vehicle id to query\n  "
-                    << sqlite3_errmsg (db) << "\n";
-                sqlite3_finalize (stmt_s);
-                sqlite3_finalize (stmt_i);
-                sqlite3_finalize (stmt_u);
-                close_connection ();
-                return; 
-            }
-            if (sqlite3_step (stmt_s) != SQLITE_ROW)
-            {
-                Rcpp::Rcerr << " x Couldn't get vehicle from db\n  "
-                    << sqlite3_errmsg (db) << "\n";
-                sqlite3_finalize (stmt_s);
-                sqlite3_finalize (stmt_i);
-                sqlite3_finalize (stmt_u);
-                close_connection ();
-                return;
-            }
-            // vehicle ts needs to be a string
-            std::ostringstream ts;
-            ts << v->second.timestamp ();
-            if (sqlite3_column_int (stmt_s, 0) == 0)
-            {
-                // vehicle doesn't exist - insert
-                if (sqlite3_bind_text (stmt_i, 1, v->second.vehicle_id ().c_str (),
-                                       -1, SQLITE_STATIC) != SQLITE_OK ||
-                    sqlite3_bind_text (stmt_i, 2, v->second.trip ()->trip_id ().c_str (),
-                                       -1, SQLITE_STATIC) != SQLITE_OK ||
-                    sqlite3_bind_text (stmt_i, 3, ts.str ().c_str (),
-                                       -1, SQLITE_STATIC) != SQLITE_OK ||
-                    sqlite3_bind_double (stmt_i, 4, v->second.position ().latitude) != SQLITE_OK ||
-                    sqlite3_bind_double (stmt_i, 5, v->second.position ().longitude) != SQLITE_OK ||
-                    sqlite3_bind_double (stmt_i, 6, v->second.distance ()) != SQLITE_OK ||
-                    sqlite3_bind_double (stmt_i, 7, v->second.speed ()) != SQLITE_OK ||
-                    sqlite3_bind_int (stmt_i, 8, v->second.progress ()) != SQLITE_OK)
-                {
-                    Rcpp::Rcerr << " x Couldn't bind values to query\n  "
-                        << sqlite3_errmsg (db) << "\n";
-                    sqlite3_finalize (stmt_s);
-                    sqlite3_finalize (stmt_i);
-                    sqlite3_finalize (stmt_u);
-                    close_connection ();
-                    return;
-                }
-                if (sqlite3_step (stmt_i) != SQLITE_DONE)
-                {
-                    Rcpp::Rcerr << " x Couldn't insert values into database\n  "
-                        << sqlite3_errmsg (db) << "\n";
-                    sqlite3_finalize (stmt_s);
-                    sqlite3_finalize (stmt_i);
-                    sqlite3_finalize (stmt_u);
-                    close_connection ();
-                    return;
-                }
-                // std::cout << " - inserted";
-            }
-            else
-            {
-                // vehicles exists - update
-                if (sqlite3_bind_text (stmt_u, 1, v->second.trip ()->trip_id ().c_str (),
-                                       -1, SQLITE_STATIC) != SQLITE_OK ||
-                    sqlite3_bind_text (stmt_u, 2, ts.str ().c_str (),
-                                       -1, SQLITE_STATIC) != SQLITE_OK ||
-                    sqlite3_bind_double (stmt_u, 3, v->second.position ().latitude) != SQLITE_OK ||
-                    sqlite3_bind_double (stmt_u, 4, v->second.position ().longitude) != SQLITE_OK ||
-                    sqlite3_bind_double (stmt_u, 5, v->second.distance ()) != SQLITE_OK ||
-                    sqlite3_bind_double (stmt_u, 6, v->second.speed ()) != SQLITE_OK ||
-                    sqlite3_bind_int (stmt_u, 7, v->second.progress ()) != SQLITE_OK ||
-                    sqlite3_bind_text (stmt_u, 8, v->second.vehicle_id ().c_str (),
-                                       -1, SQLITE_STATIC) != SQLITE_OK)
-                {
-                    Rcpp::Rcerr << " x Couldn't bind values to query\n  "
-                        << sqlite3_errmsg (db) << "\n";
-                    sqlite3_finalize (stmt_s);
-                    sqlite3_finalize (stmt_i);
-                    sqlite3_finalize (stmt_u);
-                    close_connection ();
-                    return;
-                }
-                if (sqlite3_step (stmt_u) != SQLITE_DONE)
-                {
-                    Rcpp::Rcerr << " x Couldn't update values in database\n  "
-                        << sqlite3_errmsg (db) << "\n";
-                    sqlite3_finalize (stmt_s);
-                    sqlite3_finalize (stmt_i);
-                    sqlite3_finalize (stmt_u);
-                    close_connection ();
-                    return;
-                }
-                // std::cout << " - updated";
-            }
-            sqlite3_reset (stmt_s);
-            sqlite3_reset (stmt_i);
-            sqlite3_reset (stmt_u);
-        }
+    // void Gtfs::write_vehicles (vehicle_map* vehicles)
+    // {
+    //     transit_realtime::Feed feed;
         
-        sqlite3_finalize (stmt_s);
-        sqlite3_finalize (stmt_i);
-        sqlite3_finalize (stmt_u);
-        close_connection ();
-    }
+    //     // // loop over vehicles and insert/update
+    //     // for (auto v = vehicles->begin (); v != vehicles->end (); ++v)
+    //     // {
+    //     //     if (sqlite3_bind_text (stmt_s, 1, v->second.vehicle_id ().c_str (),
+    //     //                            -1, SQLITE_STATIC) != SQLITE_OK)
+    //     //     {
+    //     //         Rcpp::Rcerr << " x Can't bind vehicle id to query\n  "
+    //     //             << sqlite3_errmsg (db) << "\n";
+    //     //         sqlite3_finalize (stmt_s);
+    //     //         sqlite3_finalize (stmt_i);
+    //     //         sqlite3_finalize (stmt_u);
+    //     //         close_connection ();
+    //     //         return; 
+    //     //     }
+    //     //     if (sqlite3_step (stmt_s) != SQLITE_ROW)
+    //     //     {
+    //     //         Rcpp::Rcerr << " x Couldn't get vehicle from db\n  "
+    //     //             << sqlite3_errmsg (db) << "\n";
+    //     //         sqlite3_finalize (stmt_s);
+    //     //         sqlite3_finalize (stmt_i);
+    //     //         sqlite3_finalize (stmt_u);
+    //     //         close_connection ();
+    //     //         return;
+    //     //     }
+    //     //     // vehicle ts needs to be a string
+    //     //     std::ostringstream ts;
+    //     //     ts << v->second.timestamp ();
+    //     //     if (sqlite3_column_int (stmt_s, 0) == 0)
+    //     //     {
+    //     //         // vehicle doesn't exist - insert
+    //     //         if (sqlite3_bind_text (stmt_i, 1, v->second.vehicle_id ().c_str (),
+    //     //                                -1, SQLITE_STATIC) != SQLITE_OK ||
+    //     //             sqlite3_bind_text (stmt_i, 2, v->second.trip ()->trip_id ().c_str (),
+    //     //                                -1, SQLITE_STATIC) != SQLITE_OK ||
+    //     //             sqlite3_bind_text (stmt_i, 3, ts.str ().c_str (),
+    //     //                                -1, SQLITE_STATIC) != SQLITE_OK ||
+    //     //             sqlite3_bind_double (stmt_i, 4, v->second.position ().latitude) != SQLITE_OK ||
+    //     //             sqlite3_bind_double (stmt_i, 5, v->second.position ().longitude) != SQLITE_OK ||
+    //     //             sqlite3_bind_double (stmt_i, 6, v->second.distance ()) != SQLITE_OK ||
+    //     //             sqlite3_bind_double (stmt_i, 7, v->second.speed ()) != SQLITE_OK ||
+    //     //             sqlite3_bind_int (stmt_i, 8, v->second.progress ()) != SQLITE_OK)
+    //     //         {
+    //     //             Rcpp::Rcerr << " x Couldn't bind values to query\n  "
+    //     //                 << sqlite3_errmsg (db) << "\n";
+    //     //             sqlite3_finalize (stmt_s);
+    //     //             sqlite3_finalize (stmt_i);
+    //     //             sqlite3_finalize (stmt_u);
+    //     //             close_connection ();
+    //     //             return;
+    //     //         }
+    //     //         if (sqlite3_step (stmt_i) != SQLITE_DONE)
+    //     //         {
+    //     //             Rcpp::Rcerr << " x Couldn't insert values into database\n  "
+    //     //                 << sqlite3_errmsg (db) << "\n";
+    //     //             sqlite3_finalize (stmt_s);
+    //     //             sqlite3_finalize (stmt_i);
+    //     //             sqlite3_finalize (stmt_u);
+    //     //             close_connection ();
+    //     //             return;
+    //     //         }
+    //     //         // std::cout << " - inserted";
+    //     //     }
+    //     //     else
+    //     //     {
+    //     //         // vehicles exists - update
+    //     //         if (sqlite3_bind_text (stmt_u, 1, v->second.trip ()->trip_id ().c_str (),
+    //     //                                -1, SQLITE_STATIC) != SQLITE_OK ||
+    //     //             sqlite3_bind_text (stmt_u, 2, ts.str ().c_str (),
+    //     //                                -1, SQLITE_STATIC) != SQLITE_OK ||
+    //     //             sqlite3_bind_double (stmt_u, 3, v->second.position ().latitude) != SQLITE_OK ||
+    //     //             sqlite3_bind_double (stmt_u, 4, v->second.position ().longitude) != SQLITE_OK ||
+    //     //             sqlite3_bind_double (stmt_u, 5, v->second.distance ()) != SQLITE_OK ||
+    //     //             sqlite3_bind_double (stmt_u, 6, v->second.speed ()) != SQLITE_OK ||
+    //     //             sqlite3_bind_int (stmt_u, 7, v->second.progress ()) != SQLITE_OK ||
+    //     //             sqlite3_bind_text (stmt_u, 8, v->second.vehicle_id ().c_str (),
+    //     //                                -1, SQLITE_STATIC) != SQLITE_OK)
+    //     //         {
+    //     //             Rcpp::Rcerr << " x Couldn't bind values to query\n  "
+    //     //                 << sqlite3_errmsg (db) << "\n";
+    //     //             sqlite3_finalize (stmt_s);
+    //     //             sqlite3_finalize (stmt_i);
+    //     //             sqlite3_finalize (stmt_u);
+    //     //             close_connection ();
+    //     //             return;
+    //     //         }
+    //     //         if (sqlite3_step (stmt_u) != SQLITE_DONE)
+    //     //         {
+    //     //             Rcpp::Rcerr << " x Couldn't update values in database\n  "
+    //     //                 << sqlite3_errmsg (db) << "\n";
+    //     //             sqlite3_finalize (stmt_s);
+    //     //             sqlite3_finalize (stmt_i);
+    //     //             sqlite3_finalize (stmt_u);
+    //     //             close_connection ();
+    //     //             return;
+    //     //         }
+    //     //         // std::cout << " - updated";
+    //     //     }
+    //     //     sqlite3_reset (stmt_s);
+    //     //     sqlite3_reset (stmt_i);
+    //     //     sqlite3_reset (stmt_u);
+    //     // }
+        
+    //     // sqlite3_finalize (stmt_s);
+    //     // sqlite3_finalize (stmt_i);
+    //     // sqlite3_finalize (stmt_u);
+    //     // close_connection ();
+    // }
 
     bool Gtfs::no_trips_remaining ()
     {
@@ -522,6 +489,7 @@ namespace Gtfs
 
     void Agency::load ()
     {
+        if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
         {
@@ -620,6 +588,7 @@ namespace Gtfs
 
     void Route::load ()
     {
+        if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
         {
@@ -717,6 +686,7 @@ namespace Gtfs
 
     void Trip::load ()
     {
+        if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
         {
@@ -931,6 +901,10 @@ namespace Gtfs
 
 
     /***************************************************** Stoptime */
+    StopTime::StopTime ()
+    {
+
+    }
     StopTime::StopTime (std::string& stop_id, std::string& trip_id,
                         std::string& at, std::string& dt, 
                         std::string& headsign, 
@@ -963,6 +937,7 @@ namespace Gtfs
 
     void Shape::load ()
     {
+        if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
         {
@@ -1160,6 +1135,7 @@ namespace Gtfs
 
     void Stop::load ()
     {
+        if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
         {
@@ -1319,6 +1295,7 @@ namespace Gtfs
 
     void Calendar::load ()
     {
+        if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
         {
@@ -1460,10 +1437,44 @@ namespace Gtfs
             _thursday && _friday;
     }
 
-    /***************************************************** Vehicle */
-    Vehicle::Vehicle (std::string& id, int n, double err) : 
-    _vehicle_id (id), _N (n), _gpserror (err)
+
+    /***************************************************** Parameters */
+    par::par (Rcpp::List parameters)
     {
+        // fetch the parameters
+        Rcpp::IntegerVector np = parameters["n_particles"];
+        Rcpp::IntegerVector nc = parameters["n_core"];
+        Rcpp::NumericVector sigy = parameters["gps_error"];
+        Rcpp::NumericVector sigx = parameters["system_noise"];
+        Rcpp::LogicalVector tim = parameters["save_timings"];
+
+        // set the parameters
+        n_particles = (int) np[0];
+        n_core = (int) nc[0];
+        gps_error = (float) sigy[0];
+        system_noise = (float) sigx[0];
+        save_timings = (bool) tim[0];
+    }
+
+    void par::print ()
+    {
+        std::cout << "\n >>> Using the following parameters:"
+            << "\n - n_particles = " << n_particles
+            << "\n - n_core = " << n_core
+            << "\n - gps_error = " << gps_error
+            << "\n - system_noise = " << system_noise
+            << "\n - save_timings = " << (save_timings ? "true" : "false")
+            << "\n";
+    }
+
+    /***************************************************** Vehicle */
+    Vehicle::Vehicle (std::string& id, par* params) : 
+    _vehicle_id (id)
+    {
+        // set the parameters here
+        _gpserror = params->gps_error;
+        _systemnoise = params->system_noise;
+        _N = params->n_particles;
     }
 
     std::string& Vehicle::vehicle_id ()
@@ -1532,11 +1543,23 @@ namespace Gtfs
             _newtrip = _trip != nullptr;
         }
 
-        if (_trip != nullptr)
+        if (_trip == nullptr)
         {
-            _trip->route ()->load ();
-            _trip->shape ()->load ();
+            throw std::runtime_error ("Trip not found");
         }
+
+#if VERBOSE == 2
+        Timer timer;
+#endif
+        _trip->route ()->load ();
+#if VERBOSE == 2
+        std::cout << " - load route (" << timer.cpu_seconds () << "ms)";
+        timer.reset ();
+#endif
+        _trip->shape ()->load ();
+#if VERBOSE == 2
+        std::cout << " - load shape (" << timer.cpu_seconds () << "ms)";
+#endif
 
         _position = latlng (vp.position ().latitude (),
                             vp.position ().longitude ());
@@ -1552,13 +1575,29 @@ namespace Gtfs
             _trip != nullptr && _timestamp != 0;
     }
 
+    bool Vehicle::complete ()
+    {
+        return _complete;
+    }
+
+    float Vehicle::gps_error ()
+    {
+        return _gpserror;
+    }
+
+    float Vehicle::system_noise ()
+    {
+        return _systemnoise;
+    }
 
 
-    Particle::Particle (double d, double s, Vehicle* v)
+
+    Particle::Particle (double d, double s, double a, Vehicle* v)
     {
         vehicle = v;
         distance = d;
         speed = s;
+        acceleration = a;
         at.resize (vehicle->trip ()->stops ().size (), 0);
     }
 
@@ -1567,6 +1606,8 @@ namespace Gtfs
         vehicle = p.vehicle;
         distance = p.distance;
         speed = p.speed;
+        acceleration = p.acceleration;
+        accelerating = p.accelerating;
         tt = p.tt;
         at = p.at;
         complete = p.complete;
@@ -1579,6 +1620,11 @@ namespace Gtfs
         tt.clear ();
     }
 
+    bool Particle::is_complete ()
+    {
+        return complete;
+    }
+
     double Particle::get_distance ()
     {
         return distance;
@@ -1587,6 +1633,11 @@ namespace Gtfs
     double Particle::get_speed ()
     {
         return speed;
+    }
+
+    double Particle::get_acceleration ()
+    {
+        return acceleration;
     }
 
     double Particle::get_ll ()
@@ -1599,15 +1650,23 @@ namespace Gtfs
         return at;
     }
 
+    uint64_t Particle::get_arrival_time (int i)
+    {
+        return at.at (i);
+    }
 
 
     unsigned int 
     find_stop_index (double distance, std::vector<StopTime>* stops)
     {
+        /*
+         * Return the index of the stop at which the particle LAST VISITED
+         * (or is currently at).
+         */
         if (distance <= 0) return 0;
         if (distance >= stops->back ().distance) return stops->size () - 1;
         unsigned int j = 0;
-        while (stops->at (j).distance < distance) j++;
+        while (stops->at (j+1).distance <= distance) j++;
         return j;
     }
 

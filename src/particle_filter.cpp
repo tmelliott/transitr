@@ -2,6 +2,7 @@
  * Define the particle filter functions.
  */
 #include "particle_filter.h"
+#include "timing.h"
 
 namespace Gtfs {
 
@@ -14,14 +15,17 @@ namespace Gtfs {
         for (int i=0; i<_N; ++i)
         {
             // initialize each particle with a state X(i) - distance, speed
-            _state.emplace_back (rng.runif () * dmax,
-                                 rng.runif () * 30, 
+            _state.emplace_back ((double)i / (double)(_N - 1) * dmax, //rng.runif () * dmax,
+                                 rng.runif () * 30.0, 
+                                 rng.rnorm () * _systemnoise,
                                  this);
             // std::cout << " [" << _state.back ().get_distance () << ", " 
-            //     << _state.back ().get_speed () << "]";
+            //     << _state.back ().get_speed () << "," << _state.back ().get_acceleration () << "]";
         }
 
         _newtrip = false;
+        _complete = false;
+        bad_sample = false;
     }
 
     void Vehicle::mutate (RNG& rng)
@@ -32,15 +36,66 @@ namespace Gtfs {
             return;
         }
 
-        if (!valid () || _delta == 0) return;
+        if (_complete || !valid () || _delta == 0) return;
 
         // There probably need to be a bunch of checks here ...
         
+
         // do the transition ("mutation")
+        int ncomplete = 0;
         for (auto p = _state.begin (); p != _state.end (); ++p)
         {
-            p->travel (_delta, rng);
+            if (p->is_complete ())
+            {
+                ncomplete++;
+            }
+            else
+            {
+                p->travel (_delta, rng);
+            }
+        }
+        if (ncomplete == _state.size ())
+        {
+            _complete = true;
+            return;
+        }
+
 #if WRITE_PARTICLES
+        std::vector<ShapePt>* path = &(_trip->shape ()->path ());
+        for (auto p = _state.begin (); p != _state.end (); ++p)
+        {
+            p->calculate_likelihood (_position, path, _gpserror);
+            std::ostringstream fname;
+            fname << "history/vehicle_" << _vehicle_id << "_proposals.csv";
+            std::ofstream fout;
+            fout.open (fname.str ().c_str (), std::ofstream::app);
+            double d (p->get_distance ());
+            latlng ppos (_trip->shape ()->coordinates_of (d));
+            fout << _timestamp << ","
+                << _trip->trip_id () << ","
+                << p->get_distance () << ","
+                << p->get_speed () << ","
+                << p->get_acceleration () << ","
+                << std::setprecision(15)
+                << p->get_ll () << ","
+                << ppos.latitude << "," << ppos.longitude << "\n";
+            fout.close ();
+        }
+#endif
+
+        // update
+        select (rng);
+
+        // (re)initialize if the particle sample is bad
+        if (bad_sample)
+        {
+            initialize (rng);
+        }
+
+#if WRITE_PARTICLES
+        for (auto p = _state.begin (); p != _state.end (); ++p)
+        {
+            p->calculate_likelihood (_position, path, _gpserror);
             std::ostringstream fname;
             fname << "history/vehicle_" << _vehicle_id << ".csv";
             std::ofstream fout;
@@ -49,10 +104,14 @@ namespace Gtfs {
             latlng ppos (_trip->shape ()->coordinates_of (d));
             fout << _timestamp << ","
                 << _trip->trip_id () << ","
+                << std::setprecision(15)
                 << _position.latitude << "," << _position.longitude << ","
+                << std::setprecision(6)
                 << p->get_distance () << ","
                 << p->get_speed () << ","
+                << p->get_acceleration () << ","
                 << std::setprecision(15)
+                << p->get_ll () << ","
                 << ppos.latitude << "," << ppos.longitude << "\n";
             fout.close ();
 
@@ -66,22 +125,32 @@ namespace Gtfs {
             }
             fout << "\n";
             fout.close ();
-#endif
         }
+#endif
 
-        // update
-        select (rng);
+
     }
 
     void Vehicle::select (RNG& rng)
     {
+        bad_sample = true;
+
         // calculate loglikelihood of particles
         double sumlh = 0.0;
+        // threshold of 100m
+        double threshold = log (0.5) - 0.5 * exp (2.0 * (log (100.0) - log (_gpserror)));
+        double maxlh = threshold;
         std::vector<ShapePt>* path = &(_trip->shape ()->path ());
+        double plh;
         for (auto p = _state.begin (); p != _state.end (); ++p)
         {
-            sumlh += p->calculate_likelihood (_position, path, _gpserror);
+            p->calculate_likelihood (_position, path, _gpserror);
+            plh = p->get_ll ();
+            sumlh += exp (plh);
+            if (plh > maxlh) maxlh = plh;
         }
+
+        // if (maxlh < threshold) return;
 
         // compute particle (cumulative) weights ll - log(sum(likelihood)))
         std::vector<double> wt;
@@ -94,15 +163,7 @@ namespace Gtfs {
         }
 
         // some condition for resampling (1/wt^2 < N? or something ...)
-
-
-        if (wt.back () < 0.99)
-        {
-            // bad bad bad
-            _state.clear ();
-            _newtrip = true;
-            return;
-        }
+        if (wt.back () < 0.99) return;
 
         // resample u \in [0, 1)
         double u;
@@ -111,10 +172,15 @@ namespace Gtfs {
         _newstate.reserve (_N);
         for (int i=0; i<_N; ++i)
         {
-            u = rng.runif ();
-            j = 1;
-            while (wt[j] <= u && j < _N) j++;
-            _newstate.emplace_back (_state[j-1]);
+            u = rng.runif () * wt.back ();
+            for (j=0; j<_N; ++j)
+            {
+                if (u < wt[j+1])
+                {
+                    _newstate.emplace_back (_state[j]);
+                    break;
+                }
+            }
         }
 
         // std::cout << "\n + vehicle " << _vehicle_id << ":\n";
@@ -125,13 +191,49 @@ namespace Gtfs {
         // std::cout << "\n";
         // for (auto p = _state.begin (); p != _state.end (); ++p)
         //     std::cout << "[" << p->get_distance () << ", " << p->get_speed () << "] ; ";
+        
+        bad_sample = false;
     }
 
     void Vehicle::predict_etas (RNG& rng)
     {
         if (!valid ()) return;
 
+#if VERBOSE == 2
+        Timer timer;
+        std::cout << "- vehicle " << _vehicle_id << " - predicting etas";
+#endif
         for (auto p = _state.begin (); p != _state.end (); ++p) p->predict_etas (rng);
+#if VERBOSE == 2
+        std::cout << " (" << timer.cpu_seconds () << "ms)\n";
+#endif
+    }
+
+    etavector Vehicle::get_etas ()
+    {
+        auto stops = _trip->stops ();
+        int M (stops.size ());
+        etavector etas;
+        etas.resize (M);
+        for (int i=0; i<M; ++i)
+        {
+            // need to center each particle's arrival time
+            int tarr = 0;
+            int ni = 0;
+            for (auto p = _state.begin (); p != _state.end (); ++p)
+            {
+                if (p->get_arrival_time (i) > 0)
+                {
+                    tarr += (p->get_arrival_time (i) - _timestamp);
+                    ni++;
+                }
+            }
+            etas.at (i).stop_id = stops.at (i).stop->stop_id ();
+            if (ni == 0) continue;
+            tarr /= ni;
+            etas.at (i).estimate = _timestamp + tarr;
+        }
+        return etas;
     }
 
     double Vehicle::distance ()
@@ -181,24 +283,76 @@ namespace Gtfs {
             return;
         }
 
-        double next_stop_d = stops->at (m).distance;
+        double next_stop_d = stops->at (m+1).distance;
         
         // get SEGMENTS
         
-        // add noise to speed
-        double speed_prop = -1;
-        while (speed_prop < 0 || speed_prop > 30)
+        // allow vehicle to remain stationary if at a stop:
+        if (distance == stops->at (m).distance &&
+            rng.runif () < 0.5)
         {
-            speed_prop = speed + rng.rnorm () * 5;
+            double w = - log (rng.runif ()) * delta;
+            delta = fmax (0, delta - round (w));
+            // we don't want this to affect the speed
         }
-        speed = speed_prop;
-
-        while (distance < Dmax && delta > 0)
+        else if (rng.runif () < 0.05)
         {
-            if (distance + speed >= next_stop_d)
+            // a very small chance for particles to remain stationary
+            speed = 0.0;
+            // when /not/ at a bus stop, set speed to 0 and wait
+            double w = - log (rng.runif ()) * delta;
+            delta = fmax (0.0, delta - round (w));
+            // then the bus needs to accelerate back up to speed ... for how many seconds?
+            accelerating = 5.0 + rng.runif () * 10.0;
+            acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
+        }
+
+
+        while (distance < Dmax && delta > 0.0)
+        {
+            // add system noise to acceleration to ensure speed remains in [0, 30]
+            double speed_mean = 15.0;
+            double speed_sd = 8.0;
+            double accel_prop (-100.0);
+            double n = 0;
+            while (speed + accel_prop < 0.0 || speed + accel_prop > 30.0)
+            {
+                accel_prop = rng.rnorm () * vehicle->system_noise () * 
+                    (1.0 + (double)n / 100.0);
+                n++;
+                if (accelerating > 0.0)
+                {
+                    accel_prop += acceleration;
+                    accelerating--;
+                }
+            }
+
+            double v = fmax (0, fmin (30, speed + acceleration));
+            double vstar = speed + accel_prop;
+            double alpha = (pow (v - speed_mean, 2) - pow(vstar - speed_mean, 2)) / (2 * pow (speed_sd, 2));
+            alpha = fmin (0, alpha);
+            if (rng.runif () < exp (alpha))
+            {
+                acceleration = accel_prop;
+                speed = vstar;
+            }
+            else
+            {
+                speed = v;
+            }
+
+            distance += speed;
+            delta--;
+            if (distance >= next_stop_d)
             {
                 // about to reach a stop ... slow? stop? just drive past?
-                at.at (m) = vehicle->timestamp () - delta - 1;
+                m++; // the stop we are about to reach
+                at.at (m) = vehicle->timestamp () - delta;
+                if (m == M-1) 
+                {
+                    distance = next_stop_d;
+                    break;
+                }
                 if (rng.runif () < 0.5)
                 {
                     // stop dwell time ~ Exp(tau = 10)
@@ -207,14 +361,13 @@ namespace Gtfs {
                     double dwell = gamma - tau * log (rng.runif ());
                     delta = fmax(0, delta - dwell);
                     distance = next_stop_d;
-                    if (m == M-1) break;
-                    m++;
-                    next_stop_d = stops->at (m).distance;
-                    continue;
+                    speed = 0.0;
+                    accelerating = 5.0 + rng.runif () * 10.0;
+                    acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
                 }
+                next_stop_d = stops->at (m+1).distance;
+                continue;
             }
-            distance += speed;
-            delta--;
         }
     }
 
@@ -235,18 +388,18 @@ namespace Gtfs {
 
         double dcur = distance;
         uint64_t t0 = vehicle->timestamp ();
-        while (m < M)
+        while (m < M-1)
         {
+            m++; // `next` stop index
             double dnext = stops->at (m).distance;
-            at.at (m) = t0 + (dnext - dcur) / speed;
+            at.at (m) = t0 + (dnext - dcur) / speed; // makes no sense because speeds are noise
             dcur = dnext;
             // and add some dwell time
             t0 = at.at (m);
-            m++;
         }
     }
 
-    double 
+    void
     Particle::calculate_likelihood (latlng& y, 
                                     std::vector<ShapePt>* path, 
                                     double sigma)
@@ -258,7 +411,6 @@ namespace Gtfs {
         double lX2 = 2 * (ld - log (sigma));
         // log pdf of lX2 ~ Exp(2)
         log_likelihood = log (0.5) - 0.5 * exp(lX2);
-        return exp (log_likelihood);
     }
 
 }; // namespace Gtfs

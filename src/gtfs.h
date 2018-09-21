@@ -10,9 +10,13 @@
 #include "time.h"
 #include "rng.h"
 
-#include "vendor/protobuf/gtfs-realtime.pb.h"
+#include "vendor/protobuf/gtfs-realtime-ext.pb.h"
 #include "vendor/sqlite3/sqlite3.h"
 #include <Rcpp.h>
+
+#ifndef VERBOSE
+#define VERBOSE 1
+#endif
 
 namespace Gtfs 
 {
@@ -32,12 +36,41 @@ namespace Gtfs
 
     class Vehicle;
     class Particle;
-    class ETA;
+
+    struct eta;
+    struct etaQ;
+    typedef std::vector<eta> etavector;
+
+    struct eta
+    {
+        std::string stop_id;
+        uint64_t estimate;
+        std::vector<etaQ> quantiles;
+    };
+
+    struct etaQ
+    {
+        float quantile;
+        uint64_t time;
+    };
 
     unsigned int 
     find_stop_index (double distance, std::vector<StopTime>* stops);
 
     typedef std::unordered_map<std::string, Vehicle> vehicle_map;
+
+    struct par
+    {
+        int n_particles = 1000;
+        int n_core = 1;
+        float gps_error = 5;     // std. dev. of observation error
+        float system_noise = 5;  // std. dev. of speed variance/second
+        bool save_timings = false;
+        par () {}
+        par (Rcpp::List parameters);
+
+        void print ();
+    };
 
     struct ShapePt
     {
@@ -61,6 +94,7 @@ namespace Gtfs
         int dropoff_type;
         double distance;
 
+        StopTime ();
         StopTime (std::string& stop_id, std::string& trip_id,
                   std::string& at, std::string& dt, 
                   std::string& headsign, 
@@ -306,6 +340,7 @@ namespace Gtfs
         std::string& dbname ();
         sqlite3* get_connection ();
         void close_connection ();
+        void close_connection (bool sure);
         std::unordered_map<std::string, Agency>& agencies ();
         std::unordered_map<std::string, Route>& routes ();
         std::unordered_map<std::string, Trip>& trips ();
@@ -333,14 +368,17 @@ namespace Gtfs
             latlng _position;
             uint64_t _timestamp = 0;
             unsigned _delta;
-            double _gpserror;
+            float _gpserror;
+            float _systemnoise;
 
             bool _newtrip = true;
+            bool _complete = false;
             int _N;
             std::vector<Particle> _state;
+            bool bad_sample;
 
         public:
-            Vehicle (std::string& id, int n, double err);
+            Vehicle (std::string& id, par* params);
 
             std::string& vehicle_id ();
             Trip* trip ();
@@ -352,45 +390,54 @@ namespace Gtfs
             void update (const transit_realtime::VehiclePosition& vp,
                          Gtfs* gtfs);
             bool valid ();
+            bool complete ();
 
             // statistics things
             void initialize (RNG& rng);
             void mutate (RNG& rng); // mutate state
             void select (RNG& rng); // select state (given data)
             void predict_etas (RNG& rng);
+            etavector get_etas ();
             void reset ();
 
             double distance ();
             double speed ();
             int progress ();
+            float gps_error ();
+            float system_noise ();
     };
 
     class Particle {
     private:
         Vehicle* vehicle;
-        double distance = 0;
-        double speed = 0;
+        double distance = 0.0;
+        double speed = 0.0;
+        double acceleration = 0.0;
+        int accelerating = 0.0;
         std::vector<unsigned int> tt; // segment travel times
         std::vector<uint64_t> at; // stop arrival times
 
         bool complete = false;
 
-        double log_likelihood;
+        double log_likelihood = -1e6;
 
     public:
-        Particle (double d, double s, Vehicle* v);
+        Particle (double d, double s, double a, Vehicle* v);
         Particle (const Particle &p);
         ~Particle ();
         
+        bool is_complete ();
         double get_distance ();
         double get_speed ();
+        double get_acceleration ();
         double get_ll ();
         std::vector<uint64_t>& get_arrival_times ();
+        uint64_t get_arrival_time (int i);
 
         void travel (unsigned delta, RNG& rng);
         void predict_etas (RNG& rng);
         
-        double calculate_likelihood (latlng& y, std::vector<ShapePt>* path, double sigma);
+        void calculate_likelihood (latlng& y, std::vector<ShapePt>* path, double sigma);
     };
 
 }; // namespace Gtfs

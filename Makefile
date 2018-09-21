@@ -6,8 +6,8 @@ build:
 FLAGS:=
 CPPFLAGS:=
 CXXFLAGS:=
-install:
-	R CMD INSTALL --configure-args='CPPFLAGS=$(FLAGS) $(CPPFLAGS) CXXFLAGS=$(FLAGS) $(CXXFLAGS)' .
+install: exports
+	R CMD INSTALL --configure-args='CPPFLAGS="$(FLAGS) $(CPPFLAGS)" CXXFLAGS="$(FLAGS) $(CXXFLAGS)"' .
 
 check:
 	R CMD build .
@@ -23,7 +23,21 @@ clean:
 	./cleanup
 
 run:
-	R -f scripts/run_model.R
+	R --slave -f scripts/run_model.R
+
+startserver:
+	cd simulations && yarn start &
+
+SIM ?= sim000
+simulation:
+	R --slave -f scripts/run_simulation.R --args $(SIM)
+
+view:
+	R --slave -f scripts/track_simulations.R
 
 coverage:
 	R -e "covr::report()"
+
+
+exports:
+	R -e "Rcpp::compileAttributes()"

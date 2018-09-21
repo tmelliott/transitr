@@ -6,6 +6,11 @@ fulldata.db
 *.log
 *.out
 *.csv
+.gtfs_date
+*.pb
+
+*.db-shm
+*.db-wal
 
 ### Emacs ###
 # -*- mode: gitignore; -*-
