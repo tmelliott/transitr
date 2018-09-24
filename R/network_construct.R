@@ -22,8 +22,8 @@ tmp_construct_network <- function(nw) {
     }
 
     con <- db_connect(nw$database)
-    RSQLite::dbWriteTable(con, "road_segments", segments, append = TRUE)
-    RSQLite::dbWriteTable(con, "intersections", intersections, append = TRUE)
-    RSQLite::dbWriteTable(con, "shape_segments", sh_segs, append = TRUE)
+    RSQLite::dbWriteTable(con, "road_segments", segments, overwrite = TRUE)
+    RSQLite::dbWriteTable(con, "intersections", intersections, overwrite = TRUE)
+    RSQLite::dbWriteTable(con, "shape_segments", sh_segs, overwrite = TRUE)
     db_close(con)
 }
