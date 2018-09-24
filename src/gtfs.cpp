@@ -230,7 +230,7 @@ namespace Gtfs
                                         std::forward_as_tuple (iid, this));
             }
             sqlite3_finalize (stmt);
-            Rcpp::Rcout << " + Created " << _intersections.size () << " segments\n";
+            Rcpp::Rcout << " + Created " << _intersections.size () << " intersections\n";
         }
         // load STOPS
         {
