@@ -1157,9 +1157,9 @@ namespace Gtfs
         }
 
         int fromid = sqlite3_column_int (stmt, 0);
-        // _from = gtfs->find_intersection (fromid);
+        _from = gtfs->find_intersection (fromid);
         int toid = sqlite3_column_int (stmt, 1);
-        // _to = gtfs->find_intersection (toid);
+        _to = gtfs->find_intersection (toid);
         _length = sqlite3_column_double (stmt, 2);
 
         sqlite3_finalize (stmt);
