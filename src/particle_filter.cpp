@@ -261,6 +261,7 @@ namespace Gtfs {
 
     void Particle::travel (unsigned delta, RNG& rng)
     {
+        if (!vehicle || !vehicle->trip () || !vehicle->trip ()->shape ()) return;
         // do the particle physics
         double Dmax = vehicle->trip ()->shape ()->path ().back ().distance;
         if (distance >= Dmax) 
@@ -272,7 +273,6 @@ namespace Gtfs {
         
         // get STOPS
         std::vector<StopTime>* stops;
-        if (!vehicle || !vehicle->trip ()) return;
         stops = &(vehicle->trip ()->stops ());
         int M (stops->size ());
         unsigned int m (find_stop_index (distance, stops));
@@ -286,6 +286,12 @@ namespace Gtfs {
         double next_stop_d = stops->at (m+1).distance;
         
         // get SEGMENTS
+        std::vector<ShapeSegment>* segments;
+        segments = &(vehicle->trip ()->shape ()->segments ());
+        int L (segments->size ());
+        unsigned int l (find_segment_index (distance, segments));
+        double next_segment_d;
+        next_segment_d = (l == L-1) ? Dmax : segments->at (l+1).distance;
         
         // allow vehicle to remain stationary if at a stop:
         if (distance == stops->at (m).distance &&
@@ -295,6 +301,13 @@ namespace Gtfs {
             delta = fmax (0, delta - round (w));
             // we don't want this to affect the speed
         }
+        else if (distance == segments->at (l).distance &&
+                 rng.runif () < 0.5)
+        {
+            double w = - log (rng.runif ()) * delta;
+            delta = fmax (0, delta - round (w));
+            tt.at (l) = tt.at (l) + 1;
+        }
         else if (rng.runif () < 0.05)
         {
             // a very small chance for particles to remain stationary
@@ -302,6 +315,7 @@ namespace Gtfs {
             // when /not/ at a bus stop, set speed to 0 and wait
             double w = - log (rng.runif ()) * delta;
             delta = fmax (0.0, delta - round (w));
+            tt.at (l) = tt.at (l) + 1;
             // then the bus needs to accelerate back up to speed ... for how many seconds?
             accelerating = 5.0 + rng.runif () * 10.0;
             acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
@@ -343,6 +357,16 @@ namespace Gtfs {
 
             distance += speed;
             delta--;
+            tt.at (l) = tt.at (l) + 1;
+            
+            if (distance >= next_segment_d)
+            {
+                // reaching intersection ... 
+                l++;
+                tt.at (l) = 0;
+                next_segment_d = (l == L-1) ? Dmax : segments->at (l+1).distance;
+            }
+
             if (distance >= next_stop_d)
             {
                 // about to reach a stop ... slow? stop? just drive past?
