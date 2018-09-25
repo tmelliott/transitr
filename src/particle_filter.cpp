@@ -26,6 +26,15 @@ namespace Gtfs {
         _newtrip = false;
         _complete = false;
         bad_sample = false;
+
+        _current_segment = 0;
+        _current_stop = 0;
+        _segment_travel_times.clear ();
+        _stop_arrival_times.clear ();
+
+        if (_trip == nullptr || _trip->shape () == nullptr) return;
+        _segment_travel_times.resize (_trip->shape ()->segments ().size (), 0);
+        _stop_arrival_times.resize (_trip->stops ().size (), 0);
     }
 
     void Vehicle::mutate (RNG& rng)
@@ -90,6 +99,49 @@ namespace Gtfs {
         if (bad_sample)
         {
             initialize (rng);
+        }
+        else
+        {
+            // NETWORK STUFF
+            double dmin = _trip->shape ()->path ().back ().distance;
+            for (auto p = _state.begin (); p != _state.end (); ++p)
+            {
+                if (p->get_distance () < dmin)
+                {
+                    dmin = p->get_distance ();
+                }
+            }
+            int m = find_stop_index (dmin, &(_trip->stops ()));
+            int l = find_segment_index (dmin, &(_trip->shape ()->segments ()));
+
+            // update segment travel times for intermediate ones ...
+            int tt, ttp, n;
+            while (_current_segment < m)
+            {
+                // get the average travel time for particles along that segment
+                tt = 0;
+                n = 0;
+                for (auto p = _state.begin (); p != _state.end (); ++p)
+                {
+                    ttp = p->get_travel_time (_current_segment);
+                    if (ttp > 0)
+                    {
+                        tt += ttp;
+                        n++;
+                    }
+                }
+                if (n > 0 && tt > 0)
+                {
+                    _segment_travel_times.at (_current_segment) = (double) tt / (double) n;
+                }
+
+                _current_segment++;
+            }
+
+            // NOTE: need to ignore segment if previous segment travel time is 0
+            // (i.e., can't be sure that the current segment travel time is complete)
+            
+            
         }
 
 #if WRITE_PARTICLES
@@ -306,7 +358,8 @@ namespace Gtfs {
         {
             double w = - log (rng.runif ()) * delta;
             delta = fmax (0, delta - round (w));
-            tt.at (l) = tt.at (l) + 1;
+            if (tt.at (l) >= 0)
+                tt.at (l) = tt.at (l) + 1;
         }
         else if (rng.runif () < 0.05)
         {
@@ -315,7 +368,8 @@ namespace Gtfs {
             // when /not/ at a bus stop, set speed to 0 and wait
             double w = - log (rng.runif ()) * delta;
             delta = fmax (0.0, delta - round (w));
-            tt.at (l) = tt.at (l) + 1;
+            if (tt.at (l) >= 0)
+                tt.at (l) = tt.at (l) + 1;
             // then the bus needs to accelerate back up to speed ... for how many seconds?
             accelerating = 5.0 + rng.runif () * 10.0;
             acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
@@ -357,7 +411,8 @@ namespace Gtfs {
 
             distance += speed;
             delta--;
-            tt.at (l) = tt.at (l) + 1;
+            if (tt.at (l) >= 0)
+                tt.at (l) = tt.at (l) + 1;
             
             if (l < L-1 && distance >= next_segment_d)
             {

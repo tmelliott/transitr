@@ -431,6 +431,11 @@ namespace Gtfs
             std::vector<Particle> _state;
             bool bad_sample;
 
+            std::vector<unsigned int> _segment_travel_times; // segment travel times
+            std::vector<uint64_t> _stop_arrival_times;     // stop arrival times
+            int _current_segment;
+            int _current_stop;
+
         public:
             Vehicle (std::string& id, par* params);
 
@@ -459,6 +464,13 @@ namespace Gtfs
             int progress ();
             float gps_error ();
             float system_noise ();
+
+            std::vector<unsigned int>& segment_travel_times ();
+            unsigned int segment_travel_time (int l);
+            int current_segment ();
+            std::vector<uint64_t>& stop_arrival_times ();
+            uint64_t stop_arrival_time (int m);
+            int current_stop ();
     };
 
     class Particle {
@@ -468,7 +480,7 @@ namespace Gtfs
         double speed = 0.0;
         double acceleration = 0.0;
         int accelerating = 0.0;
-        std::vector<unsigned int> tt; // segment travel times
+        std::vector<int> tt; // segment travel times
         std::vector<uint64_t> at; // stop arrival times
 
         bool complete = false;
@@ -487,6 +499,8 @@ namespace Gtfs
         double get_ll ();
         std::vector<uint64_t>& get_arrival_times ();
         uint64_t get_arrival_time (int i);
+        std::vector<int>& get_travel_times ();
+        int get_travel_time (int i);
 
         void travel (unsigned delta, RNG& rng);
         void predict_etas (RNG& rng);

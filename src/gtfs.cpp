@@ -1248,6 +1248,22 @@ namespace Gtfs
         return _segment_id; 
     }
 
+    Intersection* Segment::from ()
+    {
+        if (!loaded) load ();
+        return _from;
+    }
+    Intersection* Segment::to ()
+    {
+        if (!loaded) load ();
+        return _to;
+    }
+    double Segment::length ()
+    {
+        if (!loaded) load ();
+        return _length;
+    }
+
 
     /***************************************************** Intersection */
     Intersection::Intersection (int id, Gtfs* gtfs) : 
@@ -1309,6 +1325,7 @@ namespace Gtfs
     int Intersection::intersection_id () {
         return _intersection_id;
     }
+
     latlng& Intersection::position ()
     {
         if (!loaded) load ();
@@ -1777,6 +1794,31 @@ namespace Gtfs
         return _systemnoise;
     }
 
+    std::vector<unsigned int>& Vehicle::segment_travel_times ()
+    {
+        return _segment_travel_times;
+    }
+    unsigned int Vehicle::segment_travel_time (int l)
+    {
+        return _segment_travel_times.at (l);
+    }
+    int Vehicle::current_segment ()
+    {
+        return _current_segment;
+    }
+    std::vector<uint64_t>& Vehicle::stop_arrival_times ()
+    {
+        return _stop_arrival_times;
+    }
+    uint64_t Vehicle::stop_arrival_time (int m)
+    {
+        return _stop_arrival_times.at (m);
+    }
+    int Vehicle::current_stop ()
+    {
+        return _current_stop;
+    }
+
 
 
     Particle::Particle (double d, double s, double a, Vehicle* v)
@@ -1785,7 +1827,8 @@ namespace Gtfs
         distance = d;
         speed = s;
         acceleration = a;
-        tt.resize (vehicle->trip ()->shape ()->segments ().size () + 1, 0);
+        // initialize travel times to -1 and set to 0 when starting segment
+        tt.resize (vehicle->trip ()->shape ()->segments ().size () + 1, -1);
         at.resize (vehicle->trip ()->stops ().size (), 0);
     }
 
@@ -1841,6 +1884,15 @@ namespace Gtfs
     uint64_t Particle::get_arrival_time (int i)
     {
         return at.at (i);
+    }
+
+    std::vector<int>& Particle::get_travel_times ()
+    {
+        return tt;
+    }
+    int Particle::get_travel_time (int i)
+    {
+        return tt.at (i);
     }
 
 

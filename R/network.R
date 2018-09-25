@@ -8,7 +8,7 @@
 ##' @export
 construct <- function(nw) {
     create_network_tables(nw)
-    tmp_construct_network(nw)
+    construct_network(nw)
     
     invisible(nw)
 }
