@@ -291,7 +291,7 @@ namespace Gtfs {
         int L (segments->size ());
         unsigned int l (find_segment_index (distance, segments));
         double next_segment_d;
-        next_segment_d = (l == L-1) ? Dmax : segments->at (l+1).distance;
+        next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
         
         // allow vehicle to remain stationary if at a stop:
         if (distance == stops->at (m).distance &&
@@ -359,12 +359,12 @@ namespace Gtfs {
             delta--;
             tt.at (l) = tt.at (l) + 1;
             
-            if (distance >= next_segment_d)
+            if (l < L-1 && distance >= next_segment_d)
             {
                 // reaching intersection ... 
                 l++;
                 tt.at (l) = 0;
-                next_segment_d = (l == L-1) ? Dmax : segments->at (l+1).distance;
+                next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
             }
 
             if (distance >= next_stop_d)

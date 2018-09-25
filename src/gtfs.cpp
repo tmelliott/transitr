@@ -1785,6 +1785,7 @@ namespace Gtfs
         distance = d;
         speed = s;
         acceleration = a;
+        tt.resize (vehicle->trip ()->shape ()->segments ().size () + 1, 0);
         at.resize (vehicle->trip ()->stops ().size (), 0);
     }
 
