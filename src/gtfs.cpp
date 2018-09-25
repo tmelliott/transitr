@@ -914,6 +914,17 @@ namespace Gtfs
         distance = d;
     }
 
+    /***************************************************** ShapeSegment */
+    ShapeSegment::ShapeSegment ()
+    {
+        
+    }
+    ShapeSegment::ShapeSegment (Segment* s, double d) 
+    {
+        segment = s;
+        distance = d;
+    }
+
 
     /***************************************************** Shape */
     Shape::Shape (std::string& id, Gtfs* gtfs) : 
@@ -944,7 +955,7 @@ namespace Gtfs
         if (sqlite3_bind_text (stmt, 1, _shape_id.c_str (),
                                -1, SQLITE_STATIC) != SQLITE_OK)
         {
-            Rcpp::Rcerr << " x Can't bind trip id to query\n  "
+            Rcpp::Rcerr << " x Can't bind shape id to query\n  "
                 << sqlite3_errmsg (db) << "\n";
             sqlite3_finalize (stmt);
             gtfs->close_connection ();
@@ -993,7 +1004,65 @@ namespace Gtfs
             _path.emplace_back (px.latitude, px.longitude, d);
         }
         _version = (float)sqlite3_column_double (stmt, 3);
-        
+
+        // and then load the shape segments 
+        qry = "SELECT count(shape_id) FROM shape_segments WHERE shape_id=?";
+        if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+        if (sqlite3_bind_text (stmt, 1, _shape_id.c_str (),
+                               -1, SQLITE_STATIC) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't bind shape id to query\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return; 
+        }
+        if (sqlite3_step (stmt) != SQLITE_ROW)
+        {
+            Rcpp::Rcerr << " x Couldn't get row count from db\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+        _segments.reserve (sqlite3_column_int (stmt, 0));
+        sqlite3_finalize (stmt);
+
+        qry = "SELECT road_segment_id, distance_traveled FROM shape_segments WHERE shape_id=? ORDER BY shape_road_sequence";
+        if (sqlite3_prepare_v2(db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+        if (sqlite3_bind_text (stmt, 1, _shape_id.c_str (),
+                               -1, SQLITE_STATIC) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't bind shape id to query\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return; 
+        }
+
+        Segment* segi;
+        double di;
+        while (sqlite3_step (stmt) == SQLITE_ROW)
+        {
+            segi = gtfs->find_segment (sqlite3_column_int (stmt, 0));
+            di = sqlite3_column_double (stmt, 1);
+            _segments.emplace_back (segi, di);
+        }
+
         sqlite3_finalize (stmt);
         gtfs->close_connection ();
 
@@ -1781,10 +1850,23 @@ namespace Gtfs
          * Return the index of the stop at which the particle LAST VISITED
          * (or is currently at).
          */
-        if (distance <= 0) return 0;
+        if (distance <= 0.0) return 0;
         if (distance >= stops->back ().distance) return stops->size () - 1;
         unsigned int j = 0;
         while (stops->at (j+1).distance <= distance) j++;
+        return j;
+    }
+
+    unsigned int
+    find_segment_index (double distance, std::vector<ShapeSegment>* segments)
+    {
+        /**
+         * Return the index of the segment at which the particle is now in.
+         */
+        if (distance <= 0.0) return 0;
+        if (distance >= segments->back ().distance) return segments->size () - 1;
+        unsigned int j = 0;
+        while (segments->at (j+1).distance <= distance) j++;
         return j;
     }
 

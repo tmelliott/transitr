@@ -1,32 +1,35 @@
 construct_network <- function(nw) {
     con <- db_connect(nw$database)
 
-    intersections <- dbReadTable(con, "intersections")
-    segments <- dbReadTable(con, "road_segments")
-    shape_segments <- dbReadTable(con, "shape_segments")
+    intersections <- RSQLite::dbReadTable(con, "intersections")
+    segments <- RSQLite::dbReadTable(con, "road_segments")
+    shape_segments <- RSQLite::dbReadTable(con, "shape_segments")
 
     ## For each route ...
-    routes <- dbGetQuery(con, "SELECT route_id FROM routes")
-    trq <- dbSendQuery(con, "SELECT trip_id, shape_id FROM trips WHERE route_id=? LIMIT 1")
-    stq <- dbSendQuery(con, "SELECT stop_times.stop_id, stop_sequence, stop_lat, stop_lon FROM stop_times, stops WHERE trip_id=? AND stop_times.stop_id=stops.stop_id ORDER BY stop_sequence")
-    shq <- dbSendQuery(con, "SELECT shape_pt_lat, shape_pt_lon, shape_pt_sequence FROM shapes WHERE shape_id=? ORDER BY shape_pt_sequence")
+    routes <- RSQLite::dbGetQuery(con, "SELECT route_id FROM routes")
 
     pb <- txtProgressBar(0, nrow(routes), style = 3)
     for (route in routes$route_id) {
         pb$up(pb$getVal() + 1)
-        dbBind(trq, list(route))
-        res <- dbFetch(trq)
-        dbClearResult(trq)
+        
+        trq <- RSQLite::dbSendQuery(con, "SELECT trip_id, shape_id FROM trips WHERE route_id=? LIMIT 1")
+        RSQLite::dbBind(trq, list(route))
+        res <- RSQLite::dbFetch(trq)
+        RSQLite::dbClearResult(trq)
+
+        if (res$shape_id %in% shape_segments$shape_id) continue()
 
         ## ... get a trip and find stop sequence ...
-        dbBind(stq, list(res$trip_id))
-        stops <- dbFetch(stq)
-        dbClearResult(stq)
+        stq <- RSQLite::dbSendQuery(con, "SELECT stop_times.stop_id, stop_sequence, stop_lat, stop_lon FROM stop_times, stops WHERE trip_id=? AND stop_times.stop_id=stops.stop_id ORDER BY stop_sequence")
+        RSQLite::dbBind(stq, list(res$trip_id))
+        stops <- RSQLite::dbFetch(stq)
+        RSQLite::dbClearResult(stq)
 
         ## ... and get the shape ...
-        dbBind(shq, list(res$shape_id))
-        shape <- dbFetch(shq)
-        dbClearResult(shq)
+        shq <- RSQLite::dbSendQuery(con, "SELECT shape_pt_lat, shape_pt_lon, shape_pt_sequence, shape_dist_traveled FROM shapes WHERE shape_id=? ORDER BY shape_pt_sequence")
+        RSQLite::dbBind(shq, list(res$shape_id))
+        shape <- RSQLite::dbFetch(shq)
+        RSQLite::dbClearResult(shq)
 
         ## ... then create "intersections" at stops ... 
         intid = NA
@@ -38,11 +41,9 @@ construct_network <- function(nw) {
                                   intersections$intersection_lon == si$stop_lon, ]
             if (nrow(inti) == 0) {
                 ## create new intesection
-                intid <- max(1, max(intersections$intersection_id) + 1)
+                intid <- max(c(0, intersections$intersection_id)) + 1
                 intersections <- rbind(intersections, 
-                    data.frame(intersection_id = max(intersections$intersection_id)+1,
-                               intersection_lat = si$stop_lat,
-                               intersection_lon = si$stop_lon))
+                    data.frame(intersection_id = intid, intersection_lat = si$stop_lat, intersection_lon = si$stop_lon))
             } else {
                 ## use existing
                 intid <- inti$intersection_id[1]
@@ -53,7 +54,7 @@ construct_network <- function(nw) {
                 segi <- segments[segments$int_from == previd & segments$int_to == intid, ]
                 if (nrow(segi) == 0) {
                     ## create new segment
-                    segid <- max(1, max(segments$road_segment_id) + 1)
+                    segid <- max(c(0, segments$road_segment_id)) + 1
                     segments <- rbind(segments,
                         data.frame(road_segment_id = segid, int_from = previd, int_to = intid, length = 0))
                 } else {
@@ -64,9 +65,37 @@ construct_network <- function(nw) {
             }
         }
 
-        ## Finally, create shape_segments
+        ## Finally, create shape_segments - which requires distances
+        if (any(is.na(shape$shape_dist_traveled))) {
+            shape$shape_dist_traveled <- c(0, cumsum(geosphere::distGeo(shape[,2L:1L])))
+        }
 
+        siprev <- 0
+        si <- 1
+        for (i in 1:length(segs)) {
+            ## first we need to find the closest point in shape to stop ...
+            segi <- segments[segments$road_segment_id == segs[i], ]
+            iprev <- intersections[intersections$intersection_id == segi$int_from, ]
+            icur <- intersections[intersections$intersection_id == segi$int_to, ]
+
+            siprev <- si + which.min(geosphere::distGeo(iprev[, 3L:2L], shape[si:nrow(shape), 2L:1L])) - 1
+            si <- siprev + which.min(geosphere::distGeo(icur[, 3L:2L], shape[siprev:nrow(shape), 2L:1L])) - 1
+            ## ... then use shape_dist_traveled to insert segment
+            shape_segments <- rbind(shape_segments, 
+                data.frame(shape_id = res$shape_id,
+                           road_segment_id = segs[i],
+                           shape_road_sequence = i,
+                           distance_traveled = shape$shape_dist_traveled[siprev]))
+            if (segi$length == 0)
+                segments[segments$road_segment_id == segs[i], "length"] <- 
+                    shape$shape_dist_traveled[si] - shape$shape_dist_traveled[siprev]
+        }
     }
+    close(pb)
+
+    RSQLite::dbWriteTable(con, "road_segments", segments, overwrite = TRUE)
+    RSQLite::dbWriteTable(con, "intersections", intersections, overwrite = TRUE)
+    RSQLite::dbWriteTable(con, "shape_segments", shape_segments, overwrite = TRUE)
 
     db_close(con)
 }

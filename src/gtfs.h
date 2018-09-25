@@ -58,6 +58,8 @@ namespace Gtfs
 
     unsigned int 
     find_stop_index (double distance, std::vector<StopTime>* stops);
+    unsigned int
+    find_segment_index (double distance, std::vector<ShapeSegment>* segments);
 
     typedef std::unordered_map<std::string, Vehicle> vehicle_map;
 
@@ -84,6 +86,8 @@ namespace Gtfs
     {
         Segment* segment;
         double distance;
+        ShapeSegment ();
+        ShapeSegment (Segment* s, double d);
     };
     struct StopTime
     {
