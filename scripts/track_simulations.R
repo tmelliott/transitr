@@ -76,8 +76,12 @@ eta <- function(sim, ta, ts) {
     config <- jsonlite::read_json(file.path("simulations", sim, "config.json"))
     
     etatime <- as.POSIXct(as.numeric(ts), origin = "1970-01-01")
-    etadata <- loadsim(sim, as.integer(ts)) %>%
-        filter(trip_id == ta$trip_id[1])
+    etadata <- loadsim(sim, as.integer(ts))
+    print(etadata)
+    print(unique(etadata$trip_id))
+    print(ta$trip_id[1])
+        etadata <- etadata %>% filter(trip_id == ta$trip_id[1])
+    print(etadata)
     ggplot(ta, aes(time, stop_sequence)) +
         geom_point(aes(colour = type)) +
         geom_vline(aes(xintercept = etatime), data = NULL, col = "red", lty = 3) + 

@@ -2,8 +2,8 @@ library(tidyverse)
 library(RSQLite)
 library(dbplyr)
 
-get_segments <- function() {
-    read_csv("segment_states.csv", col_names = c("segment_id", "timestamp", "travel_time", "uncertainty"),
+get_segments <- function(f = "segment_states.csv") {
+    read_csv(f, col_names = c("segment_id", "timestamp", "travel_time", "uncertainty"),
         col_types = "iinn")
 }
 
@@ -20,8 +20,8 @@ get_segment_data <- function() {
     segments
 }
 
-view_segment_states <- function(segment, n = 12) {
-    data <- get_segments()
+view_segment_states <- function(f = "segment_states.csv", segment, n = 12) {
+    data <- get_segments(f)
     if (missing(segment)) {
         segment <- data %>% distinct %>% pluck("segment_id") %>% 
             table %>% sort %>% tail(n) %>% names
@@ -37,9 +37,9 @@ view_segment_states <- function(segment, n = 12) {
         facet_wrap(~segment_id)
 }
 
-map_segments <- function(t = max(data$timestamp)) {
+map_segments <- function(f = "segment_states.csv", t = max(data$timestamp)) {
     segdata <- get_segment_data()
-    data <- get_segments() %>% distinct()
+    data <- get_segments(f) %>% distinct()
     data <- data %>% filter(timestamp <= t) %>%
         group_by(segment_id) %>%
         do((.) %>% filter(timestamp == max(.$timestamp)))
@@ -56,6 +56,6 @@ map_segments <- function(t = max(data$timestamp)) {
         xlab("") + ylab("")
 }
 
-view_segment_states()
+view_segment_states("simulations/sim000/segment_states.csv")
 
 map_segments()

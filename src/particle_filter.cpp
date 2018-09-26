@@ -469,14 +469,44 @@ namespace Gtfs {
         {
             return;
         }
+        double Dmax = stops->back ().distance;
+        
+        if (!vehicle->trip ()->shape ()) return;
+        std::vector<ShapeSegment>* segments;
+        segments = &(vehicle->trip ()->shape ()->segments ());
+        int L (segments->size ());
+        unsigned int l (find_segment_index (distance, segments));
+        double next_segment_d;
+        next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
 
         double dcur = distance;
+        double dnext;
         uint64_t t0 = vehicle->timestamp ();
+        int tt;
+        double vel = speed;
+        if (segments->at (l).segment->uncertainty () > 0)
+        {
+            vel = segments->at (l).segment->length () / segments->at (l).segment->travel_time () +
+                rng.rnorm () * segments->at (l).segment->uncertainty ();
+        }
         while (m < M-1)
         {
             m++; // `next` stop index
-            double dnext = stops->at (m).distance;
-            at.at (m) = t0 + (dnext - dcur) / speed; // makes no sense because speeds are noise
+            dnext = stops->at (m).distance;
+            tt = 0;
+            while (next_segment_d < dnext && l < L-1)
+            {
+                // time to get to end of segment
+                tt += (next_segment_d - dcur) / vel;
+                dcur = next_segment_d;
+                l++;
+                next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
+                vel = segments->at (l).segment->uncertainty () > 0 ? 
+                    segments->at (l).segment->length () / segments->at (l).segment->travel_time () +
+                    rng.rnorm () * segments->at (l).segment->uncertainty () : speed;
+            }
+            tt += (dnext - dcur) / vel;
+            at.at (m) = t0 + tt; // makes no sense because speeds are noise
             dcur = dnext;
             // and add some dwell time
             t0 = at.at (m);
