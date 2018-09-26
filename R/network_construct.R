@@ -17,7 +17,7 @@ construct_network <- function(nw) {
         res <- RSQLite::dbFetch(trq)
         RSQLite::dbClearResult(trq)
 
-        if (res$shape_id %in% shape_segments$shape_id) continue()
+        if (nrow(shape_segments) > 0 && nrow(res) > 0 && res$shape_id %in% shape_segments$shape_id) continue()
 
         ## ... get a trip and find stop sequence ...
         stq <- RSQLite::dbSendQuery(con, "SELECT stop_times.stop_id, stop_sequence, stop_lat, stop_lon FROM stop_times, stops WHERE trip_id=? AND stop_times.stop_id=stops.stop_id ORDER BY stop_sequence")
@@ -33,7 +33,8 @@ construct_network <- function(nw) {
 
         ## ... then create "intersections" at stops ... 
         intid = NA
-        segs <- integer(nrow(stops) - 1)
+        if (nrow(stops) == 0) next()
+        segs <- integer(nrow(stops) - 1L)
         for (i in 1:nrow(stops)) {
             previd <- intid
             si <- stops[i, ]
