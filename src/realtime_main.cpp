@@ -128,22 +128,12 @@ void run_realtime_model (List nw)
         timer.report ("updating vehicle states");
 
         // Now update the network state
-        std::vector<Gtfs::ShapeSegment>* segs;
-        for (auto v = vehicles.begin (); v != vehicles.end (); ++v)
+        #pragma omp parallel for num_threads (1)
+        for (unsigned l=0; l<gtfs.segments ().bucket_count (); ++l)
         {
-            std::cout << "\nVehicle " << v->second.vehicle_id ()
-                << " >> travel times: ";
-            segs = &(v->second.trip ()->shape ()->segments ());
-            for (int l=0; l<v->second.segment_travel_times ().size (); ++l)
+            for (auto sl = gtfs.segments ().begin (l); sl != gtfs.segments ().end (l); ++sl)
             {
-                if (v->second.segment_travel_time (l) > 0)
-                    std::cout << "[" << l << ", "
-                        << v->second.segment_travel_time (l) 
-                        << ", " << segs->at (l).segment->length ()
-                        << ", " 
-                        << round (segs->at (l).segment->length () / 
-                                v->second.segment_travel_time (l))
-                        << "] ";
+                sl->second.update ();
             }
         }
         timer.report ("updating network state");

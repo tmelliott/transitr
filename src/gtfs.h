@@ -5,6 +5,7 @@
 #include <memory>
 #include <unordered_map>
 #include <ctime>
+#include <mutex>
 
 #include "geo.h"
 #include "time.h"
@@ -252,16 +253,31 @@ namespace Gtfs
 
         bool loaded = false;
 
+        // network state
+        std::vector<int> _data; // new observations as vehicles traverse network
+        std::mutex data_mutex;
+        uint64_t _timestamp;
+        double _travel_time;
+        double _uncertainty;
+
     public:
         Segment (int id, Gtfs* gtfs);
 
         void load ();
         void unload ();
+        bool is_loaded ();
 
         int segment_id ();
         Intersection* from ();
         Intersection* to ();
         double length ();
+
+        std::vector<int>& data ();
+        double travel_time ();
+        double uncertainty ();
+
+        void push_data (int time);
+        void update ();
     };
 
     class Intersection

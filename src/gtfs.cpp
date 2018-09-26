@@ -1234,6 +1234,9 @@ namespace Gtfs
         sqlite3_finalize (stmt);
         gtfs->close_connection ();
 
+        _travel_time = 0.0;
+        _uncertainty = 0.0;
+
         loaded = true;
     }
 
@@ -1242,6 +1245,11 @@ namespace Gtfs
         _from = nullptr;
         _to = nullptr;
         loaded = false;
+    }
+
+    bool Segment::is_loaded ()
+    {
+        return loaded;
     }
 
     int Segment::segment_id () {
@@ -1262,6 +1270,42 @@ namespace Gtfs
     {
         if (!loaded) load ();
         return _length;
+    }
+
+    std::vector<int>& Segment::data ()
+    {
+        if (!loaded) load ();
+        return _data;
+    }
+    double Segment::travel_time ()
+    {
+        if (!loaded) load ();
+        return _travel_time;
+    }
+    double Segment::uncertainty ()
+    {
+        if (!loaded) load ();
+        return _uncertainty;
+    }
+
+    void Segment::push_data (int time)
+    {
+        if (!loaded) load ();
+        std::lock_guard<std::mutex> lk (data_mutex);
+        _data.push_back (time);
+    }
+
+    void Segment::update ()
+    {
+        // first, predict the future state ...
+        double xhat, Phat;
+        
+        
+        // then update with observations
+        if (_data.size ())
+        {
+            
+        }
     }
 
 

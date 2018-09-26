@@ -111,11 +111,14 @@ namespace Gtfs {
                     dmin = p->get_distance ();
                 }
             }
+            std::vector<ShapeSegment>& segs = _trip->shape ()->segments ();
             int m = find_stop_index (dmin, &(_trip->stops ()));
-            int l = find_segment_index (dmin, &(_trip->shape ()->segments ()));
+            int l = find_segment_index (dmin, &segs);
+
 
             // update segment travel times for intermediate ones ...
-            int tt, ttp, n;
+            double tt, ttp;
+            int n;
             while (_current_segment < m)
             {
                 // get the average travel time for particles along that segment
@@ -132,12 +135,14 @@ namespace Gtfs {
                 }
                 if (n > 0 && tt > 0)
                 {
-                    _segment_travel_times.at (_current_segment) = (double) tt / (double) n;
+                    tt /= (double) n;
+                    _segment_travel_times.at (_current_segment) = round (tt);
+                    segs.at (_current_segment).segment->push_data (round (tt));
                 }
 
                 _current_segment++;
             }
-
+            
             // NOTE: need to ignore segment if previous segment travel time is 0
             // (i.e., can't be sure that the current segment travel time is complete)
             
