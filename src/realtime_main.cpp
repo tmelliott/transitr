@@ -133,10 +133,27 @@ void run_realtime_model (List nw)
         {
             for (auto sl = gtfs.segments ().begin (l); sl != gtfs.segments ().end (l); ++sl)
             {
-                sl->second.update ();
+                sl->second.update (rtfeed.feed()->header ().timestamp ());
             }
         }
         timer.report ("updating network state");
+
+        {
+            std::ofstream fout;
+            fout.open ("segment_states.csv", std::ofstream::app);
+            // fout << "segment_id,timestamp,travel_time,uncertainty\n";
+            for (auto sl = gtfs.segments ().begin (); sl != gtfs.segments ().end (); ++sl)
+            {
+                if (sl->second.uncertainty () > 0)
+                {
+                    fout << sl->second.segment_id () << ","
+                        << sl->second.timestamp () << ","
+                        << sl->second.travel_time () << "," 
+                        << sl->second.uncertainty () << "\n";
+                }
+            }
+            fout.close ();
+        }
         
         // Predict ETAs
         #pragma omp parallel for num_threads(params.n_core)

@@ -1277,6 +1277,10 @@ namespace Gtfs
         if (!loaded) load ();
         return _data;
     }
+    uint64_t Segment::timestamp ()
+    {
+        return _timestamp;
+    }
     double Segment::travel_time ()
     {
         if (!loaded) load ();
@@ -1293,19 +1297,6 @@ namespace Gtfs
         if (!loaded) load ();
         std::lock_guard<std::mutex> lk (data_mutex);
         _data.push_back (time);
-    }
-
-    void Segment::update ()
-    {
-        // first, predict the future state ...
-        double xhat, Phat;
-        
-        
-        // then update with observations
-        if (_data.size ())
-        {
-            
-        }
     }
 
 

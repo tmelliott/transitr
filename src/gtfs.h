@@ -273,11 +273,13 @@ namespace Gtfs
         double length ();
 
         std::vector<int>& data ();
+        uint64_t timestamp ();
         double travel_time ();
         double uncertainty ();
 
         void push_data (int time);
-        void update ();
+        std::pair<double,double> predict (int delta);
+        void update (uint64_t now);
     };
 
     class Intersection
