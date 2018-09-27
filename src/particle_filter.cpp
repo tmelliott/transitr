@@ -282,12 +282,15 @@ namespace Gtfs {
         etas.resize (M);
         if (!valid ()) return etas;
         // std::cout << "\n Vehicle " << _vehicle_id << " =============================";
+        std::vector<uint64_t> etam;
+        etam.reserve (_state.size ());
         for (int i=0; i<M; ++i)
         {
             // need to center each particle's arrival time
             // std::cout << "\n   [" << i << "]: ";
             int tarr = 0;
             int ni = 0;
+            etam.clear ();
             for (auto p = _state.begin (); p != _state.end (); ++p)
             {
                 // std::cout << p->get_arrival_time (i) << ", ";
@@ -295,6 +298,7 @@ namespace Gtfs {
                 {
                     tarr += (p->get_arrival_time (i) - _timestamp);
                     ni++;
+                    etam.push_back (p->get_arrival_time (i));
                 }
             }
             // std::cout << tarr << " / " << ni;
@@ -302,6 +306,14 @@ namespace Gtfs {
             if (ni == 0) continue;
             tarr /= ni;
             etas.at (i).estimate = _timestamp + tarr;
+            if (ni != _N) continue;
+            // generate quantiles [0, 5, 50, 95, 100] -> [0, 50, 500, 950, 999]
+            std::sort (etam.begin (), etam.end ());
+            etas.at (i).quantiles.emplace_back (0.0, etam.front ());
+            etas.at (i).quantiles.emplace_back (5.0, etam.at (round (_N * 0.05)));
+            etas.at (i).quantiles.emplace_back (50.0, etam.at (round (_N * 0.5)));
+            etas.at (i).quantiles.emplace_back (95.0, etam.at (round (_N * 0.95)));
+            etas.at (i).quantiles.emplace_back (100.0, etam.back ());
         }
         return etas;
     }

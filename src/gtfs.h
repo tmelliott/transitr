@@ -55,6 +55,7 @@ namespace Gtfs
     {
         float quantile;
         uint64_t time;
+        etaQ (float q, uint64_t t) : quantile (q), time (t) {};
     };
 
     unsigned int 
