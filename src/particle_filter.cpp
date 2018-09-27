@@ -260,7 +260,15 @@ namespace Gtfs {
         Timer timer;
         std::cout << "- vehicle " << _vehicle_id << " - predicting etas";
 #endif
-        for (auto p = _state.begin (); p != _state.end (); ++p) p->predict_etas (rng);
+        for (auto p = _state.begin (); p != _state.end (); ++p) 
+        {
+            p->predict_etas (rng);
+            // std::cout << "\n";
+            // for (auto eta : p->get_arrival_times ()) std::cout << eta << ", ";
+            // std::cout << "\n VERSUS ... ";
+            // for (int i=0; i<p->get_arrival_times ().size (); ++i) 
+            //     std::cout << p->get_arrival_time (i) << ",";
+        }
 #if VERBOSE == 2
         std::cout << " (" << timer.cpu_seconds () << "ms)\n";
 #endif
@@ -272,19 +280,24 @@ namespace Gtfs {
         int M (stops.size ());
         etavector etas;
         etas.resize (M);
+        if (!valid ()) return etas;
+        // std::cout << "\n Vehicle " << _vehicle_id << " =============================";
         for (int i=0; i<M; ++i)
         {
             // need to center each particle's arrival time
+            // std::cout << "\n   [" << i << "]: ";
             int tarr = 0;
             int ni = 0;
             for (auto p = _state.begin (); p != _state.end (); ++p)
             {
+                // std::cout << p->get_arrival_time (i) << ", ";
                 if (p->get_arrival_time (i) > 0)
                 {
                     tarr += (p->get_arrival_time (i) - _timestamp);
                     ni++;
                 }
             }
+            // std::cout << tarr << " / " << ni;
             etas.at (i).stop_id = stops.at (i).stop->stop_id ();
             if (ni == 0) continue;
             tarr /= ni;
@@ -457,14 +470,19 @@ namespace Gtfs {
 
     void Particle::predict_etas (RNG& rng)
     {
+        // std::cout << "\n > ";
         if (complete) return;
+        // std::cout << "| ";
 
         // get STOPS
         std::vector<StopTime>* stops;
         if (!vehicle || !vehicle->trip ()) return;
         stops = &(vehicle->trip ()->stops ());
         int M (stops->size ());
+        at.clear ();
+        at.resize (M, 0);
         unsigned int m (find_stop_index (distance, stops));
+        // std::cout << " @" << m << " > ";
         if (m == M-1) 
         {
             return;
@@ -482,34 +500,43 @@ namespace Gtfs {
         double dcur = distance;
         double dnext;
         uint64_t t0 = vehicle->timestamp ();
-        int tt;
-        double vel = speed;
-        if (segments->at (l).segment->uncertainty () > 0)
+        // std::cout << t0 << " > ";
+        int etat;
+        double vel;
+        vel = segments->at (l).segment->sample_speed (rng);
+        if (vel == 0.0 && speed >= 0.0) vel = speed;
+        while (vel <= 0 || vel > 30)
         {
-            vel = segments->at (l).segment->length () / segments->at (l).segment->travel_time () +
-                rng.rnorm () * segments->at (l).segment->uncertainty ();
+            vel = rng.rnorm () * 8.0 + 15.0;
         }
         while (m < M-1)
         {
             m++; // `next` stop index
             dnext = stops->at (m).distance;
-            tt = 0;
+            etat = 0;
+            // std::cout << " [";
             while (next_segment_d < dnext && l < L-1)
             {
                 // time to get to end of segment
-                tt += (next_segment_d - dcur) / vel;
+                etat += (next_segment_d - dcur) / vel;
                 dcur = next_segment_d;
                 l++;
                 next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
-                vel = segments->at (l).segment->uncertainty () > 0 ? 
-                    segments->at (l).segment->length () / segments->at (l).segment->travel_time () +
-                    rng.rnorm () * segments->at (l).segment->uncertainty () : speed;
+                vel = segments->at (l).segment->sample_speed (rng);
+                if (vel == 0.0 && speed >= 0.0) vel = speed;
+                while (vel <= 0.0 || vel > 30)
+                {
+                    vel = rng.rnorm () * 8.0 + 15.0;
+                }
+                // std::cout << vel << "; ";
             }
-            tt += (dnext - dcur) / vel;
-            at.at (m) = t0 + tt; // makes no sense because speeds are noise
+            // std::cout << "] ";
+            etat += (dnext - dcur) / vel;
+            at.at (m) = t0 + etat; // makes no sense because speeds are noise
             dcur = dnext;
             // and add some dwell time
             t0 = at.at (m);
+            // std::cout << "(" << m << ") " << at.at (m) << ", ";
         }
     }
 

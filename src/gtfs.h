@@ -277,6 +277,10 @@ namespace Gtfs
         double travel_time ();
         double uncertainty ();
 
+        double get_speed ();
+        int sample_travel_time (RNG& rng);
+        double sample_speed (RNG& rng);
+
         void push_data (int time);
         std::pair<double,double> predict (int delta);
         void update (uint64_t now);

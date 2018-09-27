@@ -146,7 +146,7 @@ void write_vehicles (Gtfs::vehicle_map* vehicles, std::string& file)
     // write vehicles
     for (auto v = vehicles->begin (); v != vehicles->end (); ++v)
     {
-        if (!v->second.complete () || !v->second.valid ()) continue;
+        if (v->second.complete () || !v->second.valid ()) continue;
         transit_realtime::FeedEntity* entity = feed.add_entity ();
         entity->set_id (v->second.vehicle_id ());
 

@@ -1864,7 +1864,7 @@ namespace Gtfs
         acceleration = a;
         // initialize travel times to -1 and set to 0 when starting segment
         tt.resize (vehicle->trip ()->shape ()->segments ().size () + 1, -1);
-        at.resize (vehicle->trip ()->stops ().size (), 0);
+        at.resize (vehicle->trip ()->stops ().size ());
     }
 
     Particle::Particle (const Particle &p)
@@ -1918,6 +1918,7 @@ namespace Gtfs
 
     uint64_t Particle::get_arrival_time (int i)
     {
+        if (i >= at.size ()) return 0;
         return at.at (i);
     }
 
@@ -1927,6 +1928,7 @@ namespace Gtfs
     }
     int Particle::get_travel_time (int i)
     {
+        if (i >= tt.size ()) return 0;
         return tt.at (i);
     }
 

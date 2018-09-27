@@ -50,4 +50,28 @@ namespace Gtfs {
         _data.clear ();
     }
 
+    double Segment::get_speed ()
+    {
+        if (_uncertainty > 0 && _travel_time > 0)
+        {
+            return _length / _travel_time;
+        }
+        return 0.0;
+    }
+    int Segment::sample_travel_time (RNG& rng)
+    {
+        if (_uncertainty > 0 && _travel_time > 0)
+        {
+            double x = rng.rnorm () * _uncertainty + _travel_time;
+            return round (fmax (0.0, x));
+        }
+        return 0.0;
+    }
+    double Segment::sample_speed (RNG& rng)
+    {
+        int x = sample_travel_time (rng);
+        if (x == 0) return 0.0;
+        return _length / x;
+    }
+
 } // end Gtfs 
