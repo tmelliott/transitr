@@ -20,7 +20,7 @@ get_segment_data <- function() {
     segments
 }
 
-view_segment_states <- function(f = "segment_states.csv", segment, n = 12) {
+view_segment_states <- function(f = "segment_states.csv", segment, n = 12, speed = FALSE) {
     data <- get_segments(f)
     if (missing(segment)) {
         segment <- data %>% distinct %>% pluck("segment_id") %>% 
@@ -30,11 +30,23 @@ view_segment_states <- function(f = "segment_states.csv", segment, n = 12) {
         mutate(timestamp = as.POSIXct(timestamp, origin = "1970-01-01")) %>%
         arrange(timestamp)
 
-    ggplot(data, aes(timestamp, travel_time)) + 
-        geom_linerange(aes(ymin = travel_time - uncertainty, ymax = travel_time + uncertainty)) +
-        geom_point() +
-        xlab("Time") + ylab("Travel Time (seconds)") +
+    if (speed) {
+        segdata <- get_segment_data() %>% select(road_segment_id, length)
+        data <- data %>% 
+            inner_join(segdata, by = c("segment_id" = "road_segment_id")) %>%
+            mutate(speed = length / travel_time) %>%
+            filter(speed < 35) %>%
+            mutate(speed = speed / 1000 * 60 * 60)
+    }
+    p <- ggplot(data, aes(timestamp, if (speed) speed else travel_time))
+    if (!speed)
+        p <- p + geom_linerange(aes(ymin = travel_time - uncertainty, 
+                                    ymax = travel_time + uncertainty))
+    p <- p + geom_point() +
+        xlab("Time") + 
+        ylab(ifelse(speed, "Speed (km/h)", "Travel Time (seconds)")) +
         facet_wrap(~segment_id)
+    p
 }
 
 map_segments <- function(f = "segment_states.csv", t = max(data$timestamp)) {
@@ -46,16 +58,28 @@ map_segments <- function(f = "segment_states.csv", t = max(data$timestamp)) {
     data <- segdata %>% 
         inner_join(data, by = c("road_segment_id" = "segment_id")) %>%
         mutate(speed = length / travel_time) %>%
-        filter(speed < 35)
+        filter(speed < 35) %>%
+        mutate(speed = speed / 1000 * 60 * 60,
+               speed_fct = case_when(speed < 30 ~ "< 30 kmh",
+                                     speed < 60 ~ "30-60 kmh",
+                                     speed < 80 ~ "60-80 kmh",
+                                     TRUE ~ "80+ kmh"))
     
-    ggplot(data, aes(intersection_lon, intersection_lat, colour = speed / 1000 * 60 * 60)) +
-        geom_segment(aes(xend = intersection_lon_end, yend = intersection_lat_end)) +
+    ggplot(data, aes(intersection_lon, intersection_lat, 
+                     xend = intersection_lon_end, yend = intersection_lat_end)) +
+        geom_segment(data = segdata, colour = "black", alpha = 0.05) + 
+        geom_segment(aes(color = speed)) +
         coord_fixed(1.2) +
         labs(colour = "Speed (km/h)") +
+        theme(legend.position = "bottom") +
         scale_colour_viridis_c(option = "B", limits = c(0, 100)) +
+        facet_grid(~speed_fct) +
         xlab("") + ylab("")
 }
 
 view_segment_states("simulations/sim000/segment_states.csv")
 
-map_segments()
+view_segment_states("simulations/sim100/segment_states.csv")
+view_segment_states("simulations/sim100/segment_states.csv", speed = TRUE)
+
+map_segments("simulations/sim100/segment_states.csv")

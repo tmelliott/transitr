@@ -7,7 +7,8 @@ namespace Gtfs {
         // use current estimate and (historical) prior to predict future state
         double xhat, Phat;
         xhat = _travel_time;
-        Phat = _uncertainty + delta * 2.0 / 60;
+        // Phat = _uncertainty + delta * 2.0 / 60;
+        Phat = _uncertainty + 2.0;
 
         return std::make_pair (xhat, Phat);
     }
