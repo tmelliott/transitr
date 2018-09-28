@@ -279,6 +279,7 @@ namespace Gtfs
         double uncertainty ();
 
         double get_speed ();
+        double get_speed (int delta);
         int sample_travel_time (RNG& rng);
         double sample_speed (RNG& rng);
 
