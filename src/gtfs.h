@@ -255,7 +255,7 @@ namespace Gtfs
         bool loaded = false;
 
         // network state
-        std::vector<int> _data; // new observations as vehicles traverse network
+        std::vector<std::pair<int, double> > _data; // new observations as vehicles traverse network
         std::mutex data_mutex;
         uint64_t _timestamp;
         double _travel_time;
@@ -273,7 +273,7 @@ namespace Gtfs
         Intersection* to ();
         double length ();
 
-        std::vector<int>& data ();
+        std::vector<std::pair<int, double> >& data ();
         uint64_t timestamp ();
         double travel_time ();
         double uncertainty ();
@@ -282,7 +282,7 @@ namespace Gtfs
         int sample_travel_time (RNG& rng);
         double sample_speed (RNG& rng);
 
-        void push_data (int time);
+        void push_data (int time, double err);
         std::pair<double,double> predict (int delta);
         void update (uint64_t now);
     };

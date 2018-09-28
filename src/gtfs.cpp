@@ -1244,6 +1244,7 @@ namespace Gtfs
     {
         _from = nullptr;
         _to = nullptr;
+        _data.clear ();
         loaded = false;
     }
 
@@ -1272,7 +1273,7 @@ namespace Gtfs
         return _length;
     }
 
-    std::vector<int>& Segment::data ()
+    std::vector<std::pair<int, double> >& Segment::data ()
     {
         if (!loaded) load ();
         return _data;
@@ -1292,11 +1293,11 @@ namespace Gtfs
         return _uncertainty;
     }
 
-    void Segment::push_data (int time)
+    void Segment::push_data (int time, double err)
     {
         if (!loaded) load ();
         std::lock_guard<std::mutex> lk (data_mutex);
-        _data.push_back (time);
+        _data.emplace_back (time, err);
     }
 
 

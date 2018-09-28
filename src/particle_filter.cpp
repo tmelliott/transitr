@@ -117,12 +117,12 @@ namespace Gtfs {
 
 
             // update segment travel times for intermediate ones ...
-            double tt, ttp;
+            double tt, ttp, err;
             int n;
             while (_current_segment < m)
             {
                 // get the average travel time for particles along that segment
-                tt = 0;
+                tt = 0.0;
                 n = 0;
                 for (auto p = _state.begin (); p != _state.end (); ++p)
                 {
@@ -133,11 +133,18 @@ namespace Gtfs {
                         n++;
                     }
                 }
-                if (n > 0 && tt > 0)
+
+                if (n > _N/2 && tt > 0)
                 {
                     tt /= (double) n;
+                    err = std::accumulate (_state.begin (), _state.end (), 0.0,
+                                           [=](double a, Particle& p) {
+                                               if (p.get_travel_time (_current_segment) == 0) return a;
+                                               return a + pow(p.get_travel_time (_current_segment) - tt, 2);
+                                           });
+                    err /= (double) (n - 1);
                     _segment_travel_times.at (_current_segment) = round (tt);
-                    segs.at (_current_segment).segment->push_data (round (tt));
+                    segs.at (_current_segment).segment->push_data (round (tt), fmax(2.0, err));
                 }
 
                 _current_segment++;
