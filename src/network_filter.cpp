@@ -7,8 +7,8 @@ namespace Gtfs {
         // use current estimate and (historical) prior to predict future state
         double xhat, Phat;
         xhat = _travel_time;
-        // Phat = _uncertainty + delta * 2.0 / 60;
-        Phat = _uncertainty + 2.0;
+        Phat = _uncertainty + delta * 2.0 / 60 / 30;
+        // Phat = _uncertainty + 2.0;
 
         return std::make_pair (xhat, Phat);
     }
@@ -71,6 +71,15 @@ namespace Gtfs {
         if (_uncertainty > 0 && _travel_time > 0)
         {
             return _length / _travel_time;
+        }
+        return 0.0;
+    }
+    double Segment::get_speed (int delta)
+    {
+        if (_uncertainty > 0 && _travel_time > 0)
+        {
+            auto x = predict (delta);
+            return _length / x.first;
         }
         return 0.0;
     }

@@ -413,11 +413,19 @@ namespace Gtfs {
         }
 
 
+        double speed_mean = 15.0;
+        double speed_sd = 8.0;
+        if (segments->at (l).segment->travel_time () > 0 &&
+            segments->at (l).segment->uncertainty () > 0) 
+        {
+            speed_mean = segments->at (l).segment->get_speed ();
+            speed_sd = - segments->at (l).segment->length () / pow (speed_mean, 2) *
+                segments->at (l).segment->uncertainty ();
+            speed_sd = pow(speed_sd, 0.5);
+        }
         while (distance < Dmax && delta > 0.0)
         {
             // add system noise to acceleration to ensure speed remains in [0, 30]
-            double speed_mean = 15.0;
-            double speed_sd = 8.0;
             double accel_prop (-100.0);
             double n = 0;
             while (speed + accel_prop < 0.0 || speed + accel_prop > 30.0)
@@ -457,6 +465,19 @@ namespace Gtfs {
                 l++;
                 tt.at (l) = 0;
                 next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
+                if (segments->at (l).segment->travel_time () > 0 &&
+                    segments->at (l).segment->uncertainty () > 0) 
+                {
+                    speed_mean = segments->at (l).segment->get_speed ();
+                    speed_sd = - segments->at (l).segment->length () / pow (speed_mean, 2) *
+                        segments->at (l).segment->uncertainty ();
+                    speed_sd = pow(speed_sd, 0.5);
+                }
+                else
+                {
+                    speed_mean = 15.0;
+                    speed_sd = 8.0;
+                }
             }
 
             if (distance >= next_stop_d)
