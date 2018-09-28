@@ -91,10 +91,11 @@ eta <- function(sim, ta, ts) {
     p <- ggplot(ta, aes(time, stop_sequence)) +
         geom_point(aes(colour = type)) +
         geom_vline(aes(xintercept = etatime), data = NULL, col = "red", lty = 3) + 
-        ggtitle(sprintf("ETAs at %s", format(etatime, "%H:%M:%S")))
+        ggtitle(sprintf("ETAs at %s", format(etatime, "%H:%M:%S"))) +
+        xlim(min(ta$time), max(ta$time))
     # print(etadata %>% select(stop_sequence, time, q5, q100))
     if (all(c("q5", "q95") %in% names(etadata))) {
-        p <- p + geom_segment(aes(x = astime(q5), xend = astime(q95), yend = stop_sequence), 
+        p <- p + geom_segment(aes(x = astime(q5), xend = pmin(max(ta$time), astime(q95)), yend = stop_sequence), 
             data = etadata %>% filter(q5 > 0 & q95 > 0))
     }
     if ("q50" %in% names(etadata)) {
@@ -221,13 +222,13 @@ server <- function(input, output, session) {
         fts <- list.files(file.path("simulations", input$simnum, "etas"), pattern = "*.pb")
         if (length(fts) == 0) {
             rv$etatimes <- NULL
-            # rv$tatimes <- NULL
+            rv$tatimes <- NULL
         } else {
-            rv$etatimes <- all_sims(input$simnum) %>% filter(!is.na(time))
+            # rv$etatimes <- all_sims(input$simnum) %>% filter(!is.na(time))
             # rv$tatimes <- rv$etatimes %>% filter(trip_id == )
-            # rv$etatimes <- as.POSIXct(as.numeric(gsub("etas_|\\.pb", "", fts)), origin = "1970-01-01")
-            # rv$tatimes <- rv$etatimes[rv$etatimes >= min(rv$ta$time) &
-            #                           rv$etatimes <= max(rv$ta$time)]
+            rv$etatimes <- as.POSIXct(as.numeric(gsub("etas_|\\.pb", "", fts)), origin = "1970-01-01")
+            rv$tatimes <- rv$etatimes[rv$etatimes >= min(rv$ta$time) &
+                                      rv$etatimes <= max(rv$ta$time)]
         }
     })
     observeEvent(input$routeid, {
@@ -250,10 +251,10 @@ server <- function(input, output, session) {
             tstart <- as.POSIXct(paste(day, trips[trips$trip_id == rv$ta$trip_id[1], "departure_time"]))
             rv$ta <- rv$ta %>% filter(stop_sequence > 1 | time < tstart + 60*30)
             if (!is.null(rv$etatimes)) {
-                rv$tatimes <- rv$etatimes %>% filter(trip_id == input$tripid) %>%
-                    pluck("timestamp") %>% unique() %>% sort()
-                    ##rv$etatimes[rv$etatimes >= min(rv$ta$time) - 60*30 &
-                        ##            rv$etatimes <= max(rv$ta$time) + 60*60]
+                # rv$tatimes <- rv$etatimes %>% filter(trip_id == input$tripid) %>%
+                #     pluck("timestamp") %>% unique() %>% sort()
+                rv$tatimes <- rv$etatimes[rv$etatimes >= min(rv$ta$time) - 60*30 &
+                                          rv$etatimes <= max(rv$ta$time) + 60*60]
             } else {
                 rv$tatimes <- NULL
             }
