@@ -36,16 +36,17 @@ view_segment_states <- function(f = "segment_states.csv", segment, n = 12, speed
             inner_join(segdata, by = c("segment_id" = "road_segment_id")) %>%
             mutate(speed = length / travel_time) %>%
             filter(speed < 35) %>%
-            mutate(speed = speed / 1000 * 60 * 60)
+            mutate(speed = speed * 3.6, .y = speed, .e = sqrt(uncertainty * 3.6^2))
+    } else {
+        data <- data %>% mutate(.y = travel_time, .e = sqrt(uncertainty))
     }
-    p <- ggplot(data, aes(timestamp, if (speed) speed else travel_time))
-    if (!speed)
-        p <- p + geom_linerange(aes(ymin = travel_time - uncertainty, 
-                                    ymax = travel_time + uncertainty))
-    p <- p + geom_point() +
+    p <- ggplot(data, aes(timestamp, .y)) + 
+        geom_linerange(aes(ymin = .y - .e, ymax = .y + .e)) +
+        geom_point() +
         xlab("Time") + 
         ylab(ifelse(speed, "Speed (km/h)", "Travel Time (seconds)")) +
-        facet_wrap(~segment_id)
+        facet_wrap(~segment_id, scales = ifelse(speed, "fixed", "free_y"))
+    if (speed) p <- p + ylim(0, 100)
     p
 }
 
@@ -76,6 +77,8 @@ map_segments <- function(f = "segment_states.csv", t = max(data$timestamp)) {
         facet_grid(~speed_fct) +
         xlab("") + ylab("")
 }
+
+view_segment_states()
 
 view_segment_states("simulations/sim000/segment_states.csv")
 
