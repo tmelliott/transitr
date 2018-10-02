@@ -41,7 +41,7 @@ view_segment_states <- function(f = "segment_states.csv", segment, n = 12, speed
         data <- data %>% mutate(.y = travel_time, .e = sqrt(uncertainty))
     }
     p <- ggplot(data, aes(timestamp, .y)) + 
-        geom_linerange(aes(ymin = .y - .e, ymax = .y + .e)) +
+        geom_linerange(aes(ymin = .y - .e, ymax = .y + .e),  color = 'gray') +
         geom_point() +
         xlab("Time") + 
         ylab(ifelse(speed, "Speed (km/h)", "Travel Time (seconds)")) +
@@ -61,8 +61,8 @@ map_segments <- function(f = "segment_states.csv", t = max(data$timestamp)) {
         mutate(speed = length / travel_time) %>%
         filter(speed < 35) %>%
         mutate(speed = speed / 1000 * 60 * 60,
-               speed_fct = case_when(speed < 30 ~ "< 30 kmh",
-                                     speed < 60 ~ "30-60 kmh",
+               speed_fct = case_when(speed < 40 ~ "< 40 kmh",
+                                     speed < 60 ~ "40-60 kmh",
                                      speed < 80 ~ "60-80 kmh",
                                      TRUE ~ "80+ kmh"))
     
@@ -78,9 +78,11 @@ map_segments <- function(f = "segment_states.csv", t = max(data$timestamp)) {
         xlab("") + ylab("")
 }
 
-view_segment_states()
 
-view_segment_states("simulations/sim000/segment_states.csv")
+view_segment_states("simulations/sim000/segment_states.csv", n = 20)
+view_segment_states("simulations/sim000/segment_states.csv", speed = TRUE, n = 20)
+
+map_segments("simulations/sim000/segment_states.csv")
 
 view_segment_states("simulations/sim100/segment_states.csv")
 view_segment_states("simulations/sim100/segment_states.csv", speed = TRUE)

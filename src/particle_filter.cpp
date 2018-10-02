@@ -414,7 +414,7 @@ namespace Gtfs {
 
 
         double speed_mean = 15.0;
-        double speed_sd = 8.0;
+        double speed_sd = 100.0;
         if (segments->at (l).segment->travel_time () > 0 &&
             segments->at (l).segment->uncertainty () > 0) 
         {
@@ -476,7 +476,7 @@ namespace Gtfs {
                 else
                 {
                     speed_mean = 15.0;
-                    speed_sd = 8.0;
+                    speed_sd = 100.0;
                 }
             }
 
@@ -519,6 +519,7 @@ namespace Gtfs {
         if (!vehicle || !vehicle->trip ()) return;
         stops = &(vehicle->trip ()->stops ());
         int M (stops->size ());
+        if (M == 0) return;
         at.clear ();
         at.resize (M, 0);
         unsigned int m (find_stop_index (distance, stops));

@@ -7,8 +7,7 @@ namespace Gtfs {
         // use current estimate and (historical) prior to predict future state
         double xhat, Phat;
         xhat = _travel_time;
-        Phat = _uncertainty + delta * 2.0 / 60 / 30;
-        // Phat = _uncertainty + 2.0;
+        Phat = _uncertainty + (double) delta * 2.0 / 60.0 / 30.0;
 
         return std::make_pair (xhat, Phat);
     }
@@ -22,7 +21,7 @@ namespace Gtfs {
         if (_uncertainty == 0)
         {
             xhat = _length / 15.0;
-            Phat = 100;
+            Phat = 1000;
         }
         else
         {
@@ -31,34 +30,37 @@ namespace Gtfs {
             Phat = res.second;
         }
 
-        // std::cout << "\n + Segment " << _segment_id << " >> "
-        //     << "[" << xhat << ", " << Phat << "] >> ";
+        std::cout << "\n + Segment " << _segment_id << " >> "
+            << "[" << xhat << ", " << Phat << "] >> ";
+
         
         // then update with observations
         {
-            double y = std::accumulate (_data.begin (), _data.end (), 0.0, 
+            // transform to information 
+            double Z = pow(Phat, -1);
+            double z = xhat * Z;
+
+            double I = std::accumulate (_data.begin (), _data.end (), 0.0, 
                                         [](double a, std::pair<int, double>& b) {
-                                            return a + b.first;
+                                            return a + pow (b.second, -1);
                                         });
-            y /= (double) _data.size ();
-            double R = std::accumulate (_data.begin (), _data.end (), 0.0,
-                                        [y](double a, std::pair<int, double>& b) {
-                                            return a + (pow(b.first, 2) + pow(b.second, 2)) - pow(y, 2);
+            std::cout << "(";
+            double i = std::accumulate (_data.begin (), _data.end (), 0.0, 
+                                        [](double a, std::pair<int, double>& b) {
+                                            std::cout << b.first << ", " << b.second << " ; ";
+                                            return a + (double) b.first * pow (b.second, -1);
                                         });
-            R /= (double) _data.size ();
-            if (R == 0.0) R = 20.0;
+            std::cout << ") >> ";
 
-            // std::cout << "[" << y << ", " << R << "] >> ";
+            Z += I;
+            z += i;
 
-            double z = y - xhat;
-            double S = R + Phat;
-            double K = Phat * pow(S, -1);
-
-            xhat += K * z;
-            Phat *= 1 - K;
+            // reverse transform information to travel time state space
+            Phat = pow (Z, -1);
+            xhat = z * Phat;
         }
 
-        // std::cout << "[" << xhat << ", " << Phat << "]";
+        std::cout << "[" << xhat << ", " << Phat << "]";
 
         _travel_time = xhat;
         _uncertainty = Phat;
