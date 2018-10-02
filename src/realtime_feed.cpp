@@ -146,7 +146,7 @@ void write_vehicles (Gtfs::vehicle_map* vehicles, std::string& file)
     // write vehicles
     for (auto v = vehicles->begin (); v != vehicles->end (); ++v)
     {
-        if (!v->second.complete () || !v->second.valid ()) continue;
+        if (v->second.complete () || !v->second.valid ()) continue;
         transit_realtime::FeedEntity* entity = feed.add_entity ();
         entity->set_id (v->second.vehicle_id ());
 
@@ -205,6 +205,12 @@ void write_vehicles (Gtfs::vehicle_map* vehicles, std::string& file)
             stu->set_stop_sequence (si+1);
             transit_network::TimePrediction* tpi = stu->MutableExtension(transit_network::eta);
             tpi->set_estimate (etas.at (si).estimate);
+            for (auto q : etas.at (si).quantiles)
+            {
+                transit_network::Quantile* qi = tpi->add_quantiles ();
+                qi->set_quantile (q.quantile);
+                qi->set_value (q.time);
+            }
         }
 
     }
@@ -213,7 +219,7 @@ void write_vehicles (Gtfs::vehicle_map* vehicles, std::string& file)
     std::fstream output (file.c_str (), std::ios::out | std::ios::trunc | std::ios::binary);
     if (!feed.SerializeToOstream (&output)) 
     {
-        std::cerr << "\n x Failed to write feed.\n";
+        std::cerr << "\n x Failed to write feed to `" << file << "`\n";
     }
 
 }

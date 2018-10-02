@@ -8,7 +8,7 @@
 ##' @export
 construct <- function(nw) {
     create_network_tables(nw)
-    tmp_construct_network(nw)
+    construct_network(nw)
     
     invisible(nw)
 }
@@ -36,7 +36,7 @@ create_network_tables <- function(nw) {
     if (RSQLite::dbExistsTable(con, "road_segments") ||
         RSQLite::dbExistsTable(con, "intersections") ||
         RSQLite::dbExistsTable(con, "trip_segments")) {
-        stop("Database already has network tables")
+        return()
     }
     
     res <- RSQLite::dbSendQuery(

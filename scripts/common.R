@@ -23,7 +23,7 @@ loadsim <- function(sim, time) {
             lapply(ent, function(e) {
                 stus <- e$trip_update$stop_time_update
                 if (length(stus) == 0) return(NULL)
-                tibble(
+                xdf <- tibble(
                     vehicle_id = e$trip_update$vehicle$id,
                     trip_id = e$trip_update$trip$trip_id,
                     route_id = e$trip_update$trip$route_id,
@@ -38,6 +38,20 @@ loadsim <- function(sim, time) {
                         else NA
                         )
                 )
+                qq <- stus[[length(stus)]]$getExtension(transit_network.eta)$quantiles
+                if (length(qq) > 0) {
+                    ## fetch quantiles and bind to xdf
+                    quantiles <- sapply(qq, function(x) x$quantile)
+                    qs <- sapply(stus, function(stu) {
+                        qs <- sapply(stu$getExtension(transit_network.eta)$quantiles, 
+                            function(x) ifelse(x$value == 0, NA, x$value))
+                        if (length(qs) != length(quantiles)) return(integer(length(quantiles)))
+                        qs
+                    }) %>% t %>% as.tibble
+                    names(qs) <- paste0("q", quantiles)
+                    xdf <- bind_cols(xdf, qs)
+                }
+                xdf
             })
         ) %>%
             mutate(time = as.POSIXct(time, origin = "1970-01-01")) %>%
@@ -47,3 +61,8 @@ loadsim <- function(sim, time) {
     etas
 }
 
+all_sims <- function(sim) {
+    times <- gsub("etas_|\\.pb", "", list.files(file.path("simulations", sim, "etas"), ".pb")) %>%
+        as.integer
+    do.call(bind_rows, pbapply::pblapply(times, function(t) loadsim(sim, t)))
+}

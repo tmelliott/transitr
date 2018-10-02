@@ -22,6 +22,7 @@ if (!is.null(config$simulation_history)) {
 
 if (dir.exists("etas")) unlink("etas", recursive = TRUE, force = TRUE)
 dir.create("etas")
+if (file.exists("segment_states.csv")) unlink("segment_states.csv")
 
 nw <- load_gtfs("../../fulldata.db", output = "etas.pb") %>%
     realtime_feed(sprintf("http://localhost:3000/%s/vehicle_positions", ca[1]), 

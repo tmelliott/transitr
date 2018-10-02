@@ -127,9 +127,33 @@ void run_realtime_model (List nw)
         }
         timer.report ("updating vehicle states");
 
-        // Now update the network state, using `params.n_core - 1` threads
-        // std::this_thread::sleep_for (std::chrono::milliseconds (1 * 1000));
-        // timer.report ("updating network state");
+        // Now update the network state
+        #pragma omp parallel for num_threads (1)
+        for (unsigned l=0; l<gtfs.segments ().bucket_count (); ++l)
+        {
+            for (auto sl = gtfs.segments ().begin (l); sl != gtfs.segments ().end (l); ++sl)
+            {
+                sl->second.update (rtfeed.feed()->header ().timestamp ());
+            }
+        }
+        timer.report ("updating network state");
+
+        {
+            std::ofstream fout;
+            fout.open ("segment_states.csv", std::ofstream::app);
+            // fout << "segment_id,timestamp,travel_time,uncertainty\n";
+            for (auto sl = gtfs.segments ().begin (); sl != gtfs.segments ().end (); ++sl)
+            {
+                if (sl->second.uncertainty () > 0)
+                {
+                    fout << sl->second.segment_id () << ","
+                        << sl->second.timestamp () << ","
+                        << sl->second.travel_time () << "," 
+                        << sl->second.uncertainty () << "\n";
+                }
+            }
+            fout.close ();
+        }
         
         // Predict ETAs
         #pragma omp parallel for num_threads(params.n_core)

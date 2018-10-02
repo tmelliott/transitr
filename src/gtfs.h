@@ -5,6 +5,7 @@
 #include <memory>
 #include <unordered_map>
 #include <ctime>
+#include <mutex>
 
 #include "geo.h"
 #include "time.h"
@@ -31,6 +32,8 @@ namespace Gtfs
     class Route;
     class Trip;
     class Shape;
+    class Segment;
+    class Intersection;
     class Stop;
     class Calendar;
 
@@ -52,10 +55,13 @@ namespace Gtfs
     {
         float quantile;
         uint64_t time;
+        etaQ (float q, uint64_t t) : quantile (q), time (t) {};
     };
 
     unsigned int 
     find_stop_index (double distance, std::vector<StopTime>* stops);
+    unsigned int
+    find_segment_index (double distance, std::vector<ShapeSegment>* segments);
 
     typedef std::unordered_map<std::string, Vehicle> vehicle_map;
 
@@ -80,8 +86,10 @@ namespace Gtfs
     };
     struct ShapeSegment
     {
-        // Segment* segment;
+        Segment* segment;
         double distance;
+        ShapeSegment ();
+        ShapeSegment (Segment* s, double d);
     };
     struct StopTime
     {
@@ -235,6 +243,70 @@ namespace Gtfs
         latlng coordinates_of (double& d);
     };
 
+    class Segment
+    {
+    private:
+        Gtfs* gtfs;
+        int _segment_id;
+        Intersection* _from;
+        Intersection* _to;
+        double _length;
+
+        bool loaded = false;
+
+        // network state
+        std::vector<std::pair<int, double> > _data; // new observations as vehicles traverse network
+        std::mutex data_mutex;
+        uint64_t _timestamp;
+        double _travel_time;
+        double _uncertainty;
+
+    public:
+        Segment (int id, Gtfs* gtfs);
+
+        void load ();
+        void unload ();
+        bool is_loaded ();
+
+        int segment_id ();
+        Intersection* from ();
+        Intersection* to ();
+        double length ();
+
+        std::vector<std::pair<int, double> >& data ();
+        uint64_t timestamp ();
+        double travel_time ();
+        double uncertainty ();
+
+        double get_speed ();
+        double get_speed (int delta);
+        int sample_travel_time (RNG& rng);
+        double sample_speed (RNG& rng);
+
+        void push_data (int time, double err);
+        std::pair<double,double> predict (int delta);
+        void update (uint64_t now);
+    };
+
+    class Intersection
+    {
+    private:
+        Gtfs* gtfs;
+        int _intersection_id;
+        latlng _position;
+
+        bool loaded = false;
+
+    public:
+        Intersection (int id, Gtfs* gtfs);
+
+        void load ();
+        void unload ();
+
+        int intersection_id ();
+        latlng& position ();
+    };
+
 
     class Stop
     {
@@ -331,6 +403,8 @@ namespace Gtfs
         std::unordered_map<std::string, Route> _routes;
         std::unordered_map<std::string, Trip> _trips;
         std::unordered_map<std::string, Shape> _shapes;
+        std::unordered_map<int, Segment> _segments;
+        std::unordered_map<int, Intersection> _intersections;
         std::unordered_map<std::string, Stop> _stops;
         std::unordered_map<std::string, Calendar> _calendar;
 
@@ -345,6 +419,8 @@ namespace Gtfs
         std::unordered_map<std::string, Route>& routes ();
         std::unordered_map<std::string, Trip>& trips ();
         std::unordered_map<std::string, Shape>& shapes ();
+        std::unordered_map<int, Segment>& segments ();
+        std::unordered_map<int, Intersection>& intersections ();
         std::unordered_map<std::string, Stop>& stops ();
         std::unordered_map<std::string, Calendar>& calendar ();
 
@@ -353,6 +429,8 @@ namespace Gtfs
         Route* find_route (std::string& id);
         Trip* find_trip (std::string& id);
         Shape* find_shape (std::string& id);
+        Segment* find_segment (int id);
+        Intersection* find_intersection (int id);
         Stop* find_stop (std::string& id);
         Calendar* find_calendar (std::string& id);
 
@@ -376,6 +454,11 @@ namespace Gtfs
             int _N;
             std::vector<Particle> _state;
             bool bad_sample;
+
+            std::vector<unsigned int> _segment_travel_times; // segment travel times
+            std::vector<uint64_t> _stop_arrival_times;     // stop arrival times
+            int _current_segment;
+            int _current_stop;
 
         public:
             Vehicle (std::string& id, par* params);
@@ -405,6 +488,13 @@ namespace Gtfs
             int progress ();
             float gps_error ();
             float system_noise ();
+
+            std::vector<unsigned int>& segment_travel_times ();
+            unsigned int segment_travel_time (int l);
+            int current_segment ();
+            std::vector<uint64_t>& stop_arrival_times ();
+            uint64_t stop_arrival_time (int m);
+            int current_stop ();
     };
 
     class Particle {
@@ -414,7 +504,7 @@ namespace Gtfs
         double speed = 0.0;
         double acceleration = 0.0;
         int accelerating = 0.0;
-        std::vector<unsigned int> tt; // segment travel times
+        std::vector<int> tt; // segment travel times
         std::vector<uint64_t> at; // stop arrival times
 
         bool complete = false;
@@ -433,6 +523,8 @@ namespace Gtfs
         double get_ll ();
         std::vector<uint64_t>& get_arrival_times ();
         uint64_t get_arrival_time (int i);
+        std::vector<int>& get_travel_times ();
+        int get_travel_time (int i);
 
         void travel (unsigned delta, RNG& rng);
         void predict_etas (RNG& rng);

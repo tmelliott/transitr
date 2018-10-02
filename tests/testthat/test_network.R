@@ -12,7 +12,7 @@ test_that("network shapes makes sense", {
 
 test_that("network gets constructed correctly", {
     n <- construct(nw)
-    expect_equal(dim(load_road_segments(nw)), c(17, 4))
-    expect_equal(dim(load_intersections(nw)), c(34, 3))
-    expect_equal(dim(load_shape_segments(nw)), c(17, 4))
+    expect_equal(dim(load_road_segments(nw)), c(379, 4))
+    expect_equal(dim(load_intersections(nw)), c(369, 3))
+    expect_equal(dim(load_shape_segments(nw)), c(581, 4))
 })

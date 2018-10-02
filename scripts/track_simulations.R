@@ -53,6 +53,8 @@ names(rl) <- paste(routes$route_short_name, routes$route_long_name)
 ## Clean them at the start of the vis
 # system("rm -f simulations/*/etas/*.rda")
 
+astime <- function(x) as.POSIXct(x, origin = "1970-01-01")
+
 ## Load simulations
 whatOrder <- c("number of vehicles", "loading vehicle positions", 
                "updating vehicle information", "updating vehicle states", 
@@ -76,13 +78,32 @@ eta <- function(sim, ta, ts) {
     config <- jsonlite::read_json(file.path("simulations", sim, "config.json"))
     
     etatime <- as.POSIXct(as.numeric(ts), origin = "1970-01-01")
-    etadata <- loadsim(sim, as.integer(ts)) %>%
-        filter(trip_id == ta$trip_id[1])
-    ggplot(ta, aes(time, stop_sequence)) +
+    etadata <- loadsim(sim, as.integer(ts))
+    # cat(" 3 ------\n")
+    # print(etadata)
+    # cat(" 4 ------\n")
+    # print(unique(etadata$trip_id))
+    # cat(" 5 ------\n")
+    # print(ta$trip_id[1])
+    etadata <- etadata %>% filter(trip_id == ta$trip_id[1])
+    # cat(" 6 ------\n")
+    # print(etadata %>% select(timestamp, stop_sequence, time))
+    p <- ggplot(ta, aes(time, stop_sequence)) +
         geom_point(aes(colour = type)) +
         geom_vline(aes(xintercept = etatime), data = NULL, col = "red", lty = 3) + 
         ggtitle(sprintf("ETAs at %s", format(etatime, "%H:%M:%S"))) +
-        geom_point(data = etadata, color = "black", pch = 3)
+        xlim(min(ta$time), max(ta$time))
+    # print(etadata %>% select(stop_sequence, time, q5, q100))
+    if (all(c("q5", "q95") %in% names(etadata))) {
+        p <- p + geom_segment(aes(x = astime(q5), xend = pmin(max(ta$time), astime(q95)), yend = stop_sequence), 
+            data = etadata %>% filter(q5 > 0 & q95 > 0))
+    }
+    if ("q50" %in% names(etadata)) {
+        p <- p + geom_point(aes(x = astime(q50)), data = etadata %>% filter(q50 > 0), color = "black")
+    } else {
+        p <- p + geom_point(data = etadata, color = "black", pch = 3)
+    }
+    p
 }
 vehicle <- function(vps, ts, prop) {
     obstime <- as.POSIXct(as.numeric(ts), origin = "1970-01-01")
@@ -203,6 +224,8 @@ server <- function(input, output, session) {
             rv$etatimes <- NULL
             rv$tatimes <- NULL
         } else {
+            # rv$etatimes <- all_sims(input$simnum) %>% filter(!is.na(time))
+            # rv$tatimes <- rv$etatimes %>% filter(trip_id == )
             rv$etatimes <- as.POSIXct(as.numeric(gsub("etas_|\\.pb", "", fts)), origin = "1970-01-01")
             rv$tatimes <- rv$etatimes[rv$etatimes >= min(rv$ta$time) &
                                       rv$etatimes <= max(rv$ta$time)]
@@ -210,20 +233,28 @@ server <- function(input, output, session) {
     })
     observeEvent(input$routeid, {
         ti <- trips[trips$trip_id %in% ids[[input$routeid]], ]
+        cat(" 1 -----\n")
+        print(input$routeid)
+        cat(" 2 -----\n")
+        print(ti)
         tl <- as.list(ti$trip_id)
         names(tl) <- ti$departure_time
         updateSelectInput(session, "tripid", choices = tl)
     })
     observeEvent(input$tripid, {
         if (input$tripid != "") {
+            cat(" 10 -----\n")
+            print(input$tripid)
             rv$ta <- arrivaldata %>% filter(trip_id == input$tripid)
             day <- format(rv$ta$time[1], "%Y-%m-%d")
             
             tstart <- as.POSIXct(paste(day, trips[trips$trip_id == rv$ta$trip_id[1], "departure_time"]))
             rv$ta <- rv$ta %>% filter(stop_sequence > 1 | time < tstart + 60*30)
             if (!is.null(rv$etatimes)) {
-                rv$tatimes <- rv$etatimes[rv$etatimes >= min(rv$ta$time) &
-                                          rv$etatimes <= max(rv$ta$time)]
+                # rv$tatimes <- rv$etatimes %>% filter(trip_id == input$tripid) %>%
+                #     pluck("timestamp") %>% unique() %>% sort()
+                rv$tatimes <- rv$etatimes[rv$etatimes >= min(rv$ta$time) - 60*30 &
+                                          rv$etatimes <= max(rv$ta$time) + 60*60]
             } else {
                 rv$tatimes <- NULL
             }

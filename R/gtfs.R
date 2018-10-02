@@ -91,6 +91,7 @@ update.trgtfs <- function(object, source, quiet = FALSE, ...) {
 
     ## Create a function call e.g., `.update_url(object, source)`
     eval(parse(text = sprintf(".update_%s", fn)))(object, source, quiet)
+    ## Update versions
     update_versions(object)
 }
 
