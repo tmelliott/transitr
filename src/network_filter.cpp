@@ -20,7 +20,7 @@ namespace Gtfs {
         double xhat, Phat;
         if (_uncertainty == 0)
         {
-            xhat = _length / 15.0;
+            xhat = _length / 10.0;
             Phat = 1000;
         }
         else
@@ -30,8 +30,8 @@ namespace Gtfs {
             Phat = res.second;
         }
 
-        std::cout << "\n + Segment " << _segment_id << " >> "
-            << "[" << xhat << ", " << Phat << "] >> ";
+        // std::cout << "\n + Segment " << _segment_id << " >> "
+        //     << "[" << xhat << ", " << Phat << "] >> ";
 
         
         // then update with observations
@@ -44,13 +44,13 @@ namespace Gtfs {
                                         [](double a, std::pair<int, double>& b) {
                                             return a + pow (b.second, -1);
                                         });
-            std::cout << "(";
+            // std::cout << "(";
             double i = std::accumulate (_data.begin (), _data.end (), 0.0, 
                                         [](double a, std::pair<int, double>& b) {
-                                            std::cout << b.first << ", " << b.second << " ; ";
+                                            // std::cout << b.first << ", " << b.second << " ; ";
                                             return a + (double) b.first * pow (b.second, -1);
                                         });
-            std::cout << ") >> ";
+            // std::cout << ") >> ";
 
             Z += I;
             z += i;
@@ -60,7 +60,7 @@ namespace Gtfs {
             xhat = z * Phat;
         }
 
-        std::cout << "[" << xhat << ", " << Phat << "]";
+        // std::cout << "[" << xhat << ", " << Phat << "]";
 
         _travel_time = xhat;
         _uncertainty = Phat;

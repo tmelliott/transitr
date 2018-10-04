@@ -1686,6 +1686,9 @@ namespace Gtfs
         Rcpp::IntegerVector nc = parameters["n_core"];
         Rcpp::NumericVector sigy = parameters["gps_error"];
         Rcpp::NumericVector sigx = parameters["system_noise"];
+        Rcpp::NumericVector prstop = parameters["pr_stop"];
+        Rcpp::NumericVector dwell = parameters["dwell_time"];
+        Rcpp::NumericVector gam = parameters["gamma"];
         Rcpp::LogicalVector tim = parameters["save_timings"];
 
         // set the parameters
@@ -1693,6 +1696,9 @@ namespace Gtfs
         n_core = (int) nc[0];
         gps_error = (float) sigy[0];
         system_noise = (float) sigx[0];
+        pr_stop = (float) prstop[0];
+        dwell_time = (float) dwell[0];
+        gamma = (float) gam[0];
         save_timings = (bool) tim[0];
     }
 
@@ -1703,6 +1709,9 @@ namespace Gtfs
             << "\n - n_core = " << n_core
             << "\n - gps_error = " << gps_error
             << "\n - system_noise = " << system_noise
+            << "\n - pr_stop = " << pr_stop
+            << "\n - dwell_time = " << dwell_time
+            << "\n - gamma = " << gamma
             << "\n - save_timings = " << (save_timings ? "true" : "false")
             << "\n";
     }
@@ -1714,6 +1723,9 @@ namespace Gtfs
         // set the parameters here
         _gpserror = params->gps_error;
         _systemnoise = params->system_noise;
+        _prstop = params->pr_stop;
+        _dwelltime = params->dwell_time;
+        _gamma = params->gamma;
         _N = params->n_particles;
     }
 
@@ -1828,6 +1840,19 @@ namespace Gtfs
     float Vehicle::system_noise ()
     {
         return _systemnoise;
+    }
+
+    float Vehicle::pr_stop ()
+    {
+        return _prstop;
+    }
+    float Vehicle::dwell_time ()
+    {
+        return _dwelltime;
+    }
+    float Vehicle::gamma ()
+    {
+        return _gamma;
     }
 
     std::vector<unsigned int>& Vehicle::segment_travel_times ()

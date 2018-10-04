@@ -43,6 +43,13 @@ routes <- con %>% tbl("routes") %>% select(route_id, route_short_name, route_lon
 trips <- con %>% tbl("stop_times") %>% filter(stop_sequence == 1) %>% select(trip_id, departure_time) %>% collect
 dbDisconnect(con)
 
+get_stop_times <- function(tid) {
+    con <- dbConnect(SQLite(), "fulldata.db")
+    on.exit(dbDisconnect(con))
+    con %>% tbl("stop_times") %>% filter(trip_id == tid) %>%
+        select(stop_sequence, arrival_time) %>% arrange(stop_sequence) %>% collect
+}
+
 routes <- routes[routes$route_id %in% names(ids), ] %>%
     arrange(route_short_name, route_long_name)
 trips <- trips[trips$trip_id %in% arrivaldata$trip_id, ] %>% 
@@ -74,7 +81,7 @@ view <- function(sim) {
         geom_line() +
         facet_grid(what~., scales = "free_y")
 }
-eta <- function(sim, ta, ts) {
+eta <- function(sim, ta, ts, sched) {
     config <- jsonlite::read_json(file.path("simulations", sim, "config.json"))
     
     etatime <- as.POSIXct(as.numeric(ts), origin = "1970-01-01")
@@ -88,14 +95,26 @@ eta <- function(sim, ta, ts) {
     etadata <- etadata %>% filter(trip_id == ta$trip_id[1])
     # cat(" 6 ------\n")
     # print(etadata %>% select(timestamp, stop_sequence, time))
+    
+    ## calculate the actual arrival/departure time at the most recently visited stop
+    delay <- 0
+    Slast <- ta %>% filter(time <= astime(ts)) %>% tail(1)
+    if (nrow(Slast) == 1)
+        delay <- Slast$time - sched$arrival_time[Slast$stop_sequence]
+
+    if (nrow(Slast) == 1)
+        sched2 <- sched %>% filter(stop_sequence > Slast$stop_sequence)
+    else sched2 <- sched
     p <- ggplot(ta, aes(time, stop_sequence)) +
         geom_point(aes(colour = type)) +
+        geom_point(aes(x = arrival_time), data = sched, color = "magenta", pch = 4) +
+        geom_point(aes(x = arrival_time + delay), data = sched2, color = "magenta", pch = 2) +
         geom_vline(aes(xintercept = etatime), data = NULL, col = "red", lty = 3) + 
         ggtitle(sprintf("ETAs at %s", format(etatime, "%H:%M:%S"))) +
-        xlim(min(ta$time), max(ta$time))
+        xlim(min(ta$time, sched$arrival_time), max(ta$time, sched$arrival_time))
     # print(etadata %>% select(stop_sequence, time, q5, q100))
     if (all(c("q5", "q95") %in% names(etadata))) {
-        p <- p + geom_segment(aes(x = astime(q5), xend = pmin(max(ta$time), astime(q95)), yend = stop_sequence), 
+        p <- p + geom_segment(aes(x = astime(q5), xend = pmin(max(ta$time, sched$arrival_time), astime(q95)), yend = stop_sequence), 
             data = etadata %>% filter(q5 > 0 & q95 > 0))
     }
     if ("q50" %in% names(etadata)) {
@@ -200,6 +219,7 @@ server <- function(input, output, session) {
     rv$ta <- NULL
     rv$etatimes <- NULL
     rv$tatimes <- NULL
+    rv$schedule <- NULL
     rv$config <- NULL
     rv$vehicledata <- NULL
     rv$hdir <- NULL
@@ -250,12 +270,15 @@ server <- function(input, output, session) {
             
             tstart <- as.POSIXct(paste(day, trips[trips$trip_id == rv$ta$trip_id[1], "departure_time"]))
             rv$ta <- rv$ta %>% filter(stop_sequence > 1 | time < tstart + 60*30)
+            rv$schedule <- get_stop_times(input$tripid) %>% 
+                mutate(arrival_time = as.POSIXct(paste(day, arrival_time)))
             if (!is.null(rv$etatimes)) {
                 # rv$tatimes <- rv$etatimes %>% filter(trip_id == input$tripid) %>%
                 #     pluck("timestamp") %>% unique() %>% sort()
                 rv$tatimes <- rv$etatimes[rv$etatimes >= min(rv$ta$time) - 60*30 &
                                           rv$etatimes <= max(rv$ta$time) + 60*60]
             } else {
+                rv$tatimes <- NULL
                 rv$tatimes <- NULL
             }
             updateSliderInput(session, "predtime", max = length(rv$tatimes))
@@ -275,7 +298,7 @@ server <- function(input, output, session) {
         # refresh()
         switch(input$plottype, 
             "Timings" = view(input$simnum),
-            "ETAs" = eta(input$simnum, rv$ta, rv$tatimes[input$predtime]),
+            "ETAs" = eta(input$simnum, rv$ta, rv$tatimes[input$predtime], rv$schedule),
             "Vehicles" = vehicle(rv$vehicledata, rv$vehicletimes[input$obstime], rv$vehicleprop)
         )
     })

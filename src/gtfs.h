@@ -71,6 +71,9 @@ namespace Gtfs
         int n_core = 1;
         float gps_error = 5;     // std. dev. of observation error
         float system_noise = 5;  // std. dev. of speed variance/second
+        float pr_stop = 0.5;
+        float dwell_time = 10.0;
+        float gamma = 5.0;
         bool save_timings = false;
         par () {}
         par (Rcpp::List parameters);
@@ -448,6 +451,9 @@ namespace Gtfs
             unsigned _delta;
             float _gpserror;
             float _systemnoise;
+            float _prstop;
+            float _dwelltime;
+            float _gamma;
 
             bool _newtrip = true;
             bool _complete = false;
@@ -488,6 +494,9 @@ namespace Gtfs
             int progress ();
             float gps_error ();
             float system_noise ();
+            float pr_stop ();
+            float dwell_time ();
+            float gamma ();
 
             std::vector<unsigned int>& segment_travel_times ();
             unsigned int segment_travel_time (int l);

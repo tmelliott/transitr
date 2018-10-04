@@ -384,14 +384,14 @@ namespace Gtfs {
         
         // allow vehicle to remain stationary if at a stop:
         if (distance == stops->at (m).distance &&
-            rng.runif () < 0.5)
+            rng.runif () < 0.05)
         {
             double w = - log (rng.runif ()) * delta;
             delta = fmax (0, delta - round (w));
             // we don't want this to affect the speed
         }
         else if (distance == segments->at (l).distance &&
-                 rng.runif () < 0.5)
+                 rng.runif () < 0.05)
         {
             double w = - log (rng.runif ()) * delta;
             delta = fmax (0, delta - round (w));
@@ -413,7 +413,7 @@ namespace Gtfs {
         }
 
 
-        double speed_mean = 15.0;
+        double speed_mean = 10.0;
         double speed_sd = 100.0;
         if (segments->at (l).segment->travel_time () > 0 &&
             segments->at (l).segment->uncertainty () > 0) 
@@ -475,7 +475,7 @@ namespace Gtfs {
                 }
                 else
                 {
-                    speed_mean = 15.0;
+                    speed_mean = 10.0;
                     speed_sd = 100.0;
                 }
             }
@@ -490,12 +490,10 @@ namespace Gtfs {
                     distance = next_stop_d;
                     break;
                 }
-                if (rng.runif () < 0.5)
+                if (rng.runif () < vehicle->pr_stop ())
                 {
                     // stop dwell time ~ Exp(tau = 10)
-                    double gamma = 6;
-                    double tau = 10;
-                    double dwell = gamma - tau * log (rng.runif ());
+                    double dwell = vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
                     delta = fmax(0, delta - dwell);
                     distance = next_stop_d;
                     speed = 0.0;
@@ -577,6 +575,10 @@ namespace Gtfs {
             dcur = dnext;
             // and add some dwell time
             t0 = at.at (m);
+            if (rng.runif () < vehicle->dwell_time ())
+            {
+                t0 += vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
+            }
             // std::cout << "(" << m << ") " << at.at (m) << ", ";
         }
     }
