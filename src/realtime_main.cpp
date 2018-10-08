@@ -138,6 +138,7 @@ void run_realtime_model (List nw)
         }
         timer.report ("updating network state");
 
+#if SIMULATION
         {
             std::ofstream fout;
             fout.open ("segment_states.csv", std::ofstream::app);
@@ -154,6 +155,7 @@ void run_realtime_model (List nw)
             }
             fout.close ();
         }
+#endif
         
         // Predict ETAs
         #pragma omp parallel for num_threads(params.n_core)
