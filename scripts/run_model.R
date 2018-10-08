@@ -33,17 +33,14 @@ nw <- nw %>%
     realtime_feed("https://dl.dropboxusercontent.com/s/1fvto9ex649mkri/vehicle_locations.pb?dl=1", 
                   response = "protobuf")
 
-if (Sys.info()["nodename"] == "certellprd01") {
-    nw <- nw %>% set_parameters(n_particles = 5000, n_core = 6, gps_error = 5, system_noise = 0.5)
-    if (Sys.getenv("GPSERROR") == "")
-        nw %>% model
-    else {
-        nw$output <- sprintf("at_predictions_%s.pb", Sys.getenv("GPSERROR"))
-        nw %>% set_parameters(gps_error = as.numeric(Sys.getenv("GPSERROR"))) %>% model
-    }
-
+if (file.exists("config.json")) {
+    config <- jsonlite::read_json("config.json")
+    nw$output <- sprintf("at_predictions.pb")
+    nw <- do.call(set_parameters, c(list(nw), config))
+    nw %>% model
 } else {
-    nw %>% set_parameters(n_particles = 1000, n_core = 1, gps_error = 5, system_noise = 0.5) %>% model
+    ## run with defaults
+    cat(" +++ No config.json file found - running with defaults +++\n")
+    nw %>% model 
 }
-
 

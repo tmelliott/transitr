@@ -9,6 +9,8 @@ fulldata.db
 .gtfs_date
 *.pb
 
+config.json
+
 *.db-shm
 *.db-wal
 
