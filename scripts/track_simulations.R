@@ -253,7 +253,6 @@ server <- function(input, output, session) {
 
         rv$hdir <- file.path("simulations", input$simnum, "history")
         rv$config <- jsonlite::fromJSON(conf)
-        print("1---")
         if (!is.null(rv$config$simulation_history)) 
             rv$hdir <- rv$config$simulation_history
         if (dir.exists(rv$hdir)) {
@@ -261,7 +260,6 @@ server <- function(input, output, session) {
             vids <- vids[!grepl("_", vids)]
             updateSelectInput(session, "vehicleid", choices = vids)
         }
-        print("2---")
 
         ## sim stuff
         fts <- list.files(file.path("simulations", input$simnum, "etas"), pattern = "*.pb")
