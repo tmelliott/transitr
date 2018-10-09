@@ -14,6 +14,8 @@ fulldata.db
 *.db-shm
 *.db-wal
 
+yarn.lock
+
 ### Emacs ###
 # -*- mode: gitignore; -*-
 *~

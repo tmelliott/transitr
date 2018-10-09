@@ -41,3 +41,8 @@ coverage:
 
 exports:
 	R -e "Rcpp::compileAttributes()"
+
+
+DRY?=n
+syncSims:
+	rsync -avP$(DRY) --delete --exclude="sim1*" --exclude="sim0*" --exclude node_modules tell029@certellprd01.its.auckland.ac.nz:/data/transitr/simulations/ simulations
