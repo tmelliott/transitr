@@ -189,6 +189,27 @@ vehicle <- function(vps, ts, prop) {
         layout_matrix = cbind(c(1, 1, 1, 1, 6), c(2:6)))
 }
 
+modeleval <- function(data, n, gps) {
+    data <- data %>% mutate(ts = astime(ts))
+
+    p <- ggplot(data, aes(ts)) + xlab("Time")
+
+    p_neff <- p + geom_point(aes(y = Neff, color = factor(resample, levels = 0:1))) +
+        theme(legend.position = "top") + ylim(0, n) + ylab("Effective Sample Size")
+    p_prior <- p + 
+        geom_hline(aes(yintercept = gps^2), lty = 3) + 
+        geom_path(aes(y = pmin(10 * gps^2, prior_mse %>% sqrt))) + 
+        geom_path(aes(y = pmin(10 * gps^2, posterior_mse %>% sqrt)), color = 'orangered') +
+        ylim(0, 10 * gps^2) + ylab("MSE (m)")
+    p_dist <- p + geom_point(aes(y = pmin(10 * gps^2, dist_to_path))) + 
+        ylim(0, 10 * gps^2) + ylab("Distance to Path (m)")
+
+    
+    gridExtra::grid.arrange(
+        p_neff, p_prior, p_dist,
+        layout_matrix = cbind(1:3))
+}
+
 library(shiny)
 ui <- fluidPage(
     sidebarLayout(
@@ -196,14 +217,16 @@ ui <- fluidPage(
             selectInput("simnum", label="Simulation", choices = simnames),
             verbatimTextOutput("simconfig"),
             hr(),
-            selectInput("plottype", label="Graph", choices = c("Timings", "Vehicles", "ETAs")),
+            selectInput("plottype", label="Graph", choices = c("Timings", "Vehicles", "ETAs", "Model Evaluation")),
             conditionalPanel(condition = "input.plottype == 'ETAs'",
                 selectInput("routeid", label="Route ID", choices = rl),
                 selectInput("tripid", label="Trip ID", ""),
                 sliderInput("predtime", label="Prediction Time", min = 1, max = 1, step=1, value = 1)
             ),
+            conditionalPanel(condition = "input.plottype == 'Vehicles' || input.plottype == 'Model Evaluation'",
+                selectInput("vehicleid", label="Vehicle ID", choices = "")
+            ),
             conditionalPanel(condition = "input.plottype == 'Vehicles'",
-                selectInput("vehicleid", label="Vehicle ID", choices = ""),
                 sliderInput("obstime", label="Observation Time", min = 1, max = 1, step=1, value = 1)
             )
         ),
@@ -230,6 +253,7 @@ server <- function(input, output, session) {
 
         rv$hdir <- file.path("simulations", input$simnum, "history")
         rv$config <- jsonlite::fromJSON(conf)
+        print("1---")
         if (!is.null(rv$config$simulation_history)) 
             rv$hdir <- rv$config$simulation_history
         if (dir.exists(rv$hdir)) {
@@ -237,6 +261,7 @@ server <- function(input, output, session) {
             vids <- vids[!grepl("_", vids)]
             updateSelectInput(session, "vehicleid", choices = vids)
         }
+        print("2---")
 
         ## sim stuff
         fts <- list.files(file.path("simulations", input$simnum, "etas"), pattern = "*.pb")
@@ -253,18 +278,12 @@ server <- function(input, output, session) {
     })
     observeEvent(input$routeid, {
         ti <- trips[trips$trip_id %in% ids[[input$routeid]], ]
-        cat(" 1 -----\n")
-        print(input$routeid)
-        cat(" 2 -----\n")
-        print(ti)
         tl <- as.list(ti$trip_id)
         names(tl) <- ti$departure_time
         updateSelectInput(session, "tripid", choices = tl)
     })
     observeEvent(input$tripid, {
         if (input$tripid != "") {
-            cat(" 10 -----\n")
-            print(input$tripid)
             rv$ta <- arrivaldata %>% filter(trip_id == input$tripid)
             day <- format(rv$ta$time[1], "%Y-%m-%d")
             
@@ -285,21 +304,40 @@ server <- function(input, output, session) {
         }
     })
     observeEvent(input$vehicleid, {
-        if (input$vehicleid != "") {
+        if (input$vehicleid == "") return()
+        if (input$plottype == "Vehicles") {
             rv$vehicledata <- read_csv(sprintf("%s/vehicle_%s.csv", rv$hdir, input$vehicleid),
                 col_names = c('timestamp', 'trip_id', 'obs_lat', 'obs_lon', 'distance', 'speed', 'acceleration', 'll', 'model_lat', 'model_lon'))
             rv$vehicleprop <- read_csv(sprintf("%s/vehicle_%s_proposals.csv", rv$hdir, input$vehicleid),
                 col_names = c('timestamp', 'trip_id', 'distance', 'speed', 'acceleration', 'll', 'model_lat', 'model_lon'))
             rv$vehicletimes <- unique(rv$vehicledata$timestamp)
             updateSliderInput(session, "obstime", max = length(rv$vehicletimes))
+        } else {
+            rv$vehicledata <- read_csv(sprintf("simulations/%s/modeleval/vehicle_%s.csv", input$simnum, input$vehicleid),
+                col_names = c("vehicle_id", "trip_id", "ts", "prior_mse", "posterior_mse", "dist_to_path", "Neff", "resample"))
+            print(rv$vehicledata)
         }
+    })
+    observeEvent(input$plottype, {
+        if (input$plottype == "Vehicles" && 
+            dir.exists(rv$hdir)) {
+            vids <- gsub("vehicle_|\\.csv", "", list.files(rv$hdir))
+            vids <- vids[!grepl("_", vids)]
+            updateSelectInput(session, "vehicleid", choices = vids)
+        }
+        if (input$plottype == "Model Evaluation" && 
+            dir.exists(file.path("simulations", input$simnum, "modeleval"))) {
+            vids <- gsub("vehicle_|\\.csv", "", list.files(file.path("simulations", input$simnum, "modeleval")))
+            updateSelectInput(session, "vehicleid", choices = vids)
+        }    
     })
     output$graph <- renderPlot({
         # refresh()
         switch(input$plottype, 
             "Timings" = view(input$simnum),
             "ETAs" = eta(input$simnum, rv$ta, rv$tatimes[input$predtime], rv$schedule),
-            "Vehicles" = vehicle(rv$vehicledata, rv$vehicletimes[input$obstime], rv$vehicleprop)
+            "Vehicles" = vehicle(rv$vehicledata, rv$vehicletimes[input$obstime], rv$vehicleprop),
+            "Model Evaluation" = modeleval(rv$vehicledata, rv$config$n_particles, rv$config$gps_error)
         )
     })
 }

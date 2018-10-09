@@ -29,6 +29,7 @@ namespace Gtfs {
         _newtrip = false;
         _complete = false;
         bad_sample = false;
+        resample = true;
 
         _current_segment = 0;
         _current_stop = 0;
@@ -111,36 +112,6 @@ namespace Gtfs {
         // update
         select (rng);
 
-#if SIMULATION
-        // POSTERIOR model eval stuff
-        double posterior_mse = 0.0; // = SUM [W * d(h(X), Y)^2]
-        for (auto p = _state.begin (); p != _state.end (); ++p)
-        {
-            dxy = p->get_distance ();
-            hx = _trip->shape ()->coordinates_of (dxy);
-            posterior_mse += p->get_weight () * 
-                pow(distanceEarth (_position, hx), 2);
-        }
-
-        std::ostringstream mename;
-        mename << "modeleval/vehicle_" << _vehicle_id << ".csv";
-        std::ofstream modeleval;
-        modeleval.open (mename.str ().c_str (), std::ofstream::app);
-        double atd = _trip->shape ()->distance_of (_position);
-        latlng closest_pt = _trip->shape ()->coordinates_of (atd);
-        double ctd = distanceEarth (_position, closest_pt);
-        modeleval << _vehicle_id 
-            << "," << _trip->trip_id ()
-            << "," << _timestamp
-            << "," << prior_mse 
-            << "," << posterior_mse
-            << "," << ctd
-            << "," << _Neff
-            << "," << (resample ? 1 : 0)
-            << "\n";
-        modeleval.close ();
-#endif
-
         // (re)initialize if the particle sample is bad
         if (bad_sample)
         {
@@ -172,27 +143,26 @@ namespace Gtfs {
                 n = 0;
                 for (auto p = _state.begin (); p != _state.end (); ++p)
                 {
-                    ttp = p->get_travel_time (_current_segment);
+                    ttp = p->get_travel_time (_current_segment) * p->get_weight ();
                     if (ttp > 0)
                     {
                         tt += ttp;
                         n++;
                     }
                 }
-
-                if (n > _N/2 && tt > 0)
+                if (n < _N)
                 {
-                    tt /= (double) n;
-                    err = std::accumulate (_state.begin (), _state.end (), 0.0,
-                                           [=](double a, Particle& p) {
-                                               if (p.get_travel_time (_current_segment) == 0) return a;
-                                               return a + pow(p.get_travel_time (_current_segment) - tt, 2);
-                                           });
-                    err /= (double) (n - 1);
-                    _segment_travel_times.at (_current_segment) = round (tt);
-                    segs.at (_current_segment).segment->push_data (round (tt), fmax(2.0, err));
+                    _current_segment++;
+                    continue;
                 }
 
+                err = std::accumulate (_state.begin (), _state.end (), 0.0,
+                                       [=](double a, Particle& p) {
+                                            return a + p.get_weight () * pow(p.get_travel_time (_current_segment) - tt, 2);
+                                       });
+
+                _segment_travel_times.at (_current_segment) = round (tt);
+                segs.at (_current_segment).segment->push_data (round (tt), fmax(2.0, err));
                 _current_segment++;
             }
             
@@ -201,6 +171,37 @@ namespace Gtfs {
             
             
         }
+
+#if SIMULATION
+        // POSTERIOR model eval stuff
+        double posterior_mse = 0.0; // = SUM [W * d(h(X), Y)^2]
+        for (auto p = _state.begin (); p != _state.end (); ++p)
+        {
+            dxy = p->get_distance ();
+            hx = _trip->shape ()->coordinates_of (dxy);
+            posterior_mse += p->get_weight () * 
+                pow(distanceEarth (_position, hx), 2);
+        }
+
+        std::ostringstream mename;
+        mename << "modeleval/vehicle_" << _vehicle_id << ".csv";
+        std::ofstream modeleval;
+        modeleval.open (mename.str ().c_str (), std::ofstream::app);
+        double atd = _trip->shape ()->distance_of (_position);
+        latlng closest_pt = _trip->shape ()->coordinates_of (atd);
+        double ctd = distanceEarth (_position, closest_pt);
+        modeleval << _vehicle_id 
+            << "," << _trip->trip_id ()
+            << "," << _timestamp
+            << "," << prior_mse 
+            << "," << posterior_mse
+            << "," << ctd
+            << "," << _Neff
+            << "," << (resample ? 1 : 0)
+            << "\n";
+        modeleval.close ();
+#endif
+
 
 #if WRITE_PARTICLES
         for (auto p = _state.begin (); p != _state.end (); ++p)
@@ -266,19 +267,12 @@ namespace Gtfs {
         }
 
         // if (maxlh < threshold) return;
-
-        // compute particle CUMULATIVE weights ll - log(sum(likelihood)))
-        // double lsumlh (log (sumlh));
-        // for (auto p = _state.begin (); p != _state.end (); ++p)
-        // {
-        // }
         
         if (sumwt == 0) return;
 
         // normalize weights
         std::vector<double> wt;
         wt.reserve (_N);
-        // wt.push_back (0);
         for (auto p = _state.begin (); p != _state.end (); ++p)
         {
             p->set_weight (p->get_weight () / sumwt);
@@ -287,7 +281,8 @@ namespace Gtfs {
 
 
         // some condition for resampling (1/wt^2 < N? or something ...)
-        if (std::accumulate (wt.begin (), wt.end (), 0.0) < 0.99) return;
+        sumwt = std::accumulate (wt.begin (), wt.end (), 0.0);
+        if (sumwt < 0.9) return;
 
         {
             double sumwt2 = std::accumulate(wt.begin (), wt.end (), 0.0,
@@ -297,9 +292,12 @@ namespace Gtfs {
             _Neff = 1.0 / sumwt2;
             // std::cout << "\n sumwt2 = " << sumwt2 <<", Neff = " << _Neff;
         }
-        if (_Neff >= _N / 2.0) return;
 
+        bad_sample = false;
+        
+        if (_Neff >= 1000) return;
         resample = true;
+
         // resample u \in [0, 1)
         double u;
         unsigned int j;
@@ -307,7 +305,7 @@ namespace Gtfs {
         _newstate.reserve (_N);
         for (int i=0; i<_N; ++i)
         {
-            u = rng.runif () * wt.back ();
+            u = rng.runif () * sumwt;
             for (j=0; j<_N; ++j)
             {
                 if (u < wt[j])
@@ -332,7 +330,6 @@ namespace Gtfs {
         double initwt = pow(_N, -1);
         for (auto p = _state.begin (); p != _state.end (); ++p) p->set_weight (initwt);
         
-        bad_sample = false;
     }
 
     void Vehicle::predict_etas (RNG& rng)
@@ -366,7 +363,10 @@ namespace Gtfs {
         if (!valid ()) return etas;
         // std::cout << "\n Vehicle " << _vehicle_id << " =============================";
         std::vector<uint64_t> etam;
+        std::vector<double> wts;
         etam.reserve (_state.size ());
+        wts.reserve (_state.size ());
+        double sumwt;
         for (int i=0; i<M; ++i)
         {
             // need to center each particle's arrival time
@@ -374,28 +374,50 @@ namespace Gtfs {
             int tarr = 0;
             int ni = 0;
             etam.clear ();
+            wts.clear ();
+
             for (auto p = _state.begin (); p != _state.end (); ++p)
             {
                 // std::cout << p->get_arrival_time (i) << ", ";
                 if (p->get_arrival_time (i) > 0)
                 {
-                    tarr += (p->get_arrival_time (i) - _timestamp);
-                    ni++;
+                    tarr += p->get_weight () * (p->get_arrival_time (i) - _timestamp);
                     etam.push_back (p->get_arrival_time (i));
+                    wts.push_back (p->get_weight ());
                 }
             }
-            // std::cout << tarr << " / " << ni;
+            if (wts.size () != _N) continue;
+            sumwt = std::accumulate (wts.begin (), wts.end (), 0.0);
+            if (sumwt != 1.0) continue;
+
             etas.at (i).stop_id = stops.at (i).stop->stop_id ();
-            if (ni == 0) continue;
-            tarr /= ni;
             etas.at (i).estimate = _timestamp + tarr;
-            if (ni != _N) continue;
             // generate quantiles [0, 5, 50, 95, 100] -> [0, 50, 500, 950, 999]
             std::sort (etam.begin (), etam.end ());
             etas.at (i).quantiles.emplace_back (0.0, etam.front ());
-            etas.at (i).quantiles.emplace_back (5.0, etam.at (round (_N * 0.05)));
-            etas.at (i).quantiles.emplace_back (50.0, etam.at (round (_N * 0.5)));
-            etas.at (i).quantiles.emplace_back (95.0, etam.at (round (_N * 0.95)));
+            int qi = 0;
+            double cwt = 0.0;
+            while (cwt <= 0.05 && qi < wts.size ())
+            {
+                cwt += wts.at (qi);
+                qi++;
+                // std::cout << ".";
+            }
+            etas.at (i).quantiles.emplace_back (5.0, etam.at (qi));
+            while (cwt <= 0.5 && qi < wts.size ())
+            {
+                cwt += wts.at (qi);
+                qi++;
+                // std::cout << ".";
+            }
+            etas.at (i).quantiles.emplace_back (50.0, etam.at (qi));
+            while (cwt <= 0.95 && qi < wts.size ())
+            {
+                cwt += wts.at (qi);
+                qi++;
+                // std::cout << ".";
+            }
+            etas.at (i).quantiles.emplace_back (95.0, etam.at (qi));
             etas.at (i).quantiles.emplace_back (100.0, etam.back ());
         }
         return etas;
@@ -404,15 +426,17 @@ namespace Gtfs {
     double Vehicle::distance ()
     {
         double distance = 0.0;
-        for (auto p = _state.begin (); p != _state.end (); ++p) distance += p->get_distance ();
-        return distance / (double)_state.size ();
+        for (auto p = _state.begin (); p != _state.end (); ++p) 
+            distance += p->get_weight () * p->get_distance ();
+        return distance;
     }
 
     double Vehicle::speed ()
     {
         double speed = 0.0;
-        for (auto p = _state.begin (); p != _state.end (); ++p) speed += p->get_speed ();
-        return speed / (double)_state.size ();
+        for (auto p = _state.begin (); p != _state.end (); ++p) 
+            speed += p->get_weight () * p->get_speed ();
+        return speed;
     }
 
     int Vehicle::progress ()
