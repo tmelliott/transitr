@@ -22,6 +22,10 @@ if (!is.null(config$simulation_history)) {
 
 if (dir.exists("etas")) unlink("etas", recursive = TRUE, force = TRUE)
 dir.create("etas")
+
+if (dir.exists("modeleval")) unlink("modeleval", recursive = TRUE, force = TRUE)
+dir.create("modeleval")
+
 if (file.exists("segment_states.csv")) unlink("segment_states.csv")
 
 nw <- load_gtfs("../../fulldata.db", output = "etas.pb") %>%

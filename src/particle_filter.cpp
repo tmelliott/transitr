@@ -23,6 +23,9 @@ namespace Gtfs {
             //     << _state.back ().get_speed () << "," << _state.back ().get_acceleration () << "]";
         }
 
+        double initwt = 1.0 / (double) _N;
+        for (auto p = _state.begin (); p != _state.end (); ++p) p->set_weight (initwt);
+
         _newtrip = false;
         _complete = false;
         bad_sample = false;
@@ -92,8 +95,51 @@ namespace Gtfs {
         }
 #endif
 
+#if SIMULATION
+        // PRIOR model eval stuff
+        double prior_mse = 0.0; // = SUM [W * d(h(X), Y)^2]
+        double dxy;
+        latlng hx;
+        for (auto p = _state.begin (); p != _state.end (); ++p)
+        {
+            dxy = p->get_distance ();
+            hx = _trip->shape ()->coordinates_of (dxy);
+            prior_mse += p->get_weight () * 
+                pow(distanceEarth (_position, hx), 2);
+        }
+#endif
         // update
         select (rng);
+
+#if SIMULATION
+        // POSTERIOR model eval stuff
+        double posterior_mse = 0.0; // = SUM [W * d(h(X), Y)^2]
+        for (auto p = _state.begin (); p != _state.end (); ++p)
+        {
+            dxy = p->get_distance ();
+            hx = _trip->shape ()->coordinates_of (dxy);
+            posterior_mse += p->get_weight () * 
+                pow(distanceEarth (_position, hx), 2);
+        }
+
+        std::ostringstream mename;
+        mename << "modeleval/vehicle_" << _vehicle_id << ".csv";
+        std::ofstream modeleval;
+        modeleval.open (mename.str ().c_str (), std::ofstream::app);
+        double atd = _trip->shape ()->distance_of (_position);
+        latlng closest_pt = _trip->shape ()->coordinates_of (atd);
+        double ctd = distanceEarth (_position, closest_pt);
+        modeleval << _vehicle_id 
+            << "," << _trip->trip_id ()
+            << "," << _timestamp
+            << "," << prior_mse 
+            << "," << posterior_mse
+            << "," << ctd
+            << "," << _Neff
+            << "," << (resample ? 1 : 0)
+            << "\n";
+        modeleval.close ();
+#endif
 
         // (re)initialize if the particle sample is bad
         if (bad_sample)
@@ -198,6 +244,7 @@ namespace Gtfs {
     void Vehicle::select (RNG& rng)
     {
         bad_sample = true;
+        resample = false;
 
         // calculate loglikelihood of particles
         double sumlh = 0.0;
@@ -206,29 +253,53 @@ namespace Gtfs {
         double maxlh = threshold;
         std::vector<ShapePt>* path = &(_trip->shape ()->path ());
         double plh;
+        double sumwt = 0.0;
         for (auto p = _state.begin (); p != _state.end (); ++p)
         {
             p->calculate_likelihood (_position, path, _gpserror);
             plh = p->get_ll ();
             sumlh += exp (plh);
             if (plh > maxlh) maxlh = plh;
+
+            p->set_weight (p->get_weight () * exp (plh));
+            sumwt += p->get_weight ();
         }
 
         // if (maxlh < threshold) return;
 
-        // compute particle (cumulative) weights ll - log(sum(likelihood)))
+        // compute particle CUMULATIVE weights ll - log(sum(likelihood)))
+        // double lsumlh (log (sumlh));
+        // for (auto p = _state.begin (); p != _state.end (); ++p)
+        // {
+        // }
+        
+        if (sumwt == 0) return;
+
+        // normalize weights
         std::vector<double> wt;
-        wt.reserve (_N+1);
-        wt.push_back (0);
-        double lsumlh (log (sumlh));
+        wt.reserve (_N);
+        // wt.push_back (0);
         for (auto p = _state.begin (); p != _state.end (); ++p)
         {
-            wt.push_back (wt.back () + exp (p->get_ll () - lsumlh));
+            p->set_weight (p->get_weight () / sumwt);
+            wt.push_back (p->get_weight ());
         }
 
-        // some condition for resampling (1/wt^2 < N? or something ...)
-        if (wt.back () < 0.99) return;
 
+        // some condition for resampling (1/wt^2 < N? or something ...)
+        if (std::accumulate (wt.begin (), wt.end (), 0.0) < 0.99) return;
+
+        {
+            double sumwt2 = std::accumulate(wt.begin (), wt.end (), 0.0,
+                                            [](double a, double b) {
+                                                return a + pow(b, 2);
+                                            });
+            _Neff = 1.0 / sumwt2;
+            // std::cout << "\n sumwt2 = " << sumwt2 <<", Neff = " << _Neff;
+        }
+        if (_Neff >= _N / 2.0) return;
+
+        resample = true;
         // resample u \in [0, 1)
         double u;
         unsigned int j;
@@ -239,11 +310,13 @@ namespace Gtfs {
             u = rng.runif () * wt.back ();
             for (j=0; j<_N; ++j)
             {
-                if (u < wt[j+1])
+                if (u < wt[j])
                 {
                     _newstate.emplace_back (_state[j]);
                     break;
                 }
+                // if not less, subtract wt from u
+                u -= wt[j];
             }
         }
 
@@ -255,6 +328,9 @@ namespace Gtfs {
         // std::cout << "\n";
         // for (auto p = _state.begin (); p != _state.end (); ++p)
         //     std::cout << "[" << p->get_distance () << ", " << p->get_speed () << "] ; ";
+
+        double initwt = pow(_N, -1);
+        for (auto p = _state.begin (); p != _state.end (); ++p) p->set_weight (initwt);
         
         bad_sample = false;
     }
@@ -595,6 +671,11 @@ namespace Gtfs {
         double lX2 = 2 * (ld - log (sigma));
         // log pdf of lX2 ~ Exp(2)
         log_likelihood = log (0.5) - 0.5 * exp(lX2);
+    }
+
+    void Particle::set_weight (double w)
+    {
+        weight = w;
     }
 
 }; // namespace Gtfs

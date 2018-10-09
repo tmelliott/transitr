@@ -9,7 +9,7 @@
 #define WRITE_PARTICLES 0
 #endif
 
-#if WRITE_PARTICLES
+#if WRITE_PARTICLES || SIMULATION
 #include <iostream>
 #include <fstream>
 #endif

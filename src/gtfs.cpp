@@ -1891,6 +1891,8 @@ namespace Gtfs
         // initialize travel times to -1 and set to 0 when starting segment
         tt.resize (vehicle->trip ()->shape ()->segments ().size () + 1, -1);
         at.resize (vehicle->trip ()->stops ().size ());
+        // weights initialized to ZERO
+        weight = 0.0;
     }
 
     Particle::Particle (const Particle &p)
@@ -1904,6 +1906,7 @@ namespace Gtfs
         at = p.at;
         complete = p.complete;
         log_likelihood = p.log_likelihood;
+        weight = 0.0;
     }
 
     Particle::~Particle ()
@@ -1935,6 +1938,11 @@ namespace Gtfs
     double Particle::get_ll ()
     {
         return log_likelihood;
+    }
+
+    double Particle::get_weight ()
+    {
+        return weight;
     }
 
     std::vector<uint64_t>& Particle::get_arrival_times ()

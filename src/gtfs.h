@@ -458,8 +458,10 @@ namespace Gtfs
             bool _newtrip = true;
             bool _complete = false;
             int _N;
+            double _Neff;
             std::vector<Particle> _state;
             bool bad_sample;
+            bool resample;
 
             std::vector<unsigned int> _segment_travel_times; // segment travel times
             std::vector<uint64_t> _stop_arrival_times;     // stop arrival times
@@ -519,6 +521,7 @@ namespace Gtfs
         bool complete = false;
 
         double log_likelihood = -1e6;
+        double weight = 0.0;
 
     public:
         Particle (double d, double s, double a, Vehicle* v);
@@ -530,6 +533,7 @@ namespace Gtfs
         double get_speed ();
         double get_acceleration ();
         double get_ll ();
+        double get_weight ();
         std::vector<uint64_t>& get_arrival_times ();
         uint64_t get_arrival_time (int i);
         std::vector<int>& get_travel_times ();
@@ -539,6 +543,7 @@ namespace Gtfs
         void predict_etas (RNG& rng);
         
         void calculate_likelihood (latlng& y, std::vector<ShapePt>* path, double sigma);
+        void set_weight (double w);
     };
 
 }; // namespace Gtfs
