@@ -198,16 +198,15 @@ modeleval <- function(data, n, gps) {
         theme(legend.position = "top") + ylim(0, n) + ylab("Effective Sample Size")
     p_prior <- p + 
         geom_hline(aes(yintercept = gps^2), lty = 3) + 
+        geom_path(aes(y = pmin(10 * gps^2, dist_to_path)), lty = 2, col = 'darkblue') + 
         geom_path(aes(y = pmin(10 * gps^2, prior_mse %>% sqrt))) + 
         geom_path(aes(y = pmin(10 * gps^2, posterior_mse %>% sqrt)), color = 'orangered') +
-        ylim(0, 10 * gps^2) + ylab("MSE (m)")
-    p_dist <- p + geom_point(aes(y = pmin(10 * gps^2, dist_to_path))) + 
-        ylim(0, 10 * gps^2) + ylab("Distance to Path (m)")
+        ylim(0, 10 * gps^2) + ylab("MSE (m)") +
+        facet_wrap(~trip_id, scales = "free_x")
 
-    
     gridExtra::grid.arrange(
-        p_neff, p_prior, p_dist,
-        layout_matrix = cbind(1:3))
+        p_neff, p_prior,
+        layout_matrix = cbind(1:2), heights = c(1, 3))
 }
 
 library(shiny)
@@ -313,7 +312,7 @@ server <- function(input, output, session) {
         } else {
             rv$vehicledata <- read_csv(sprintf("simulations/%s/modeleval/vehicle_%s.csv", input$simnum, input$vehicleid),
                 col_names = c("vehicle_id", "trip_id", "ts", "prior_mse", "posterior_mse", "dist_to_path", "Neff", "resample"))
-            print(rv$vehicledata)
+            # print(rv$vehicledata)
         }
     })
     observeEvent(input$plottype, {
