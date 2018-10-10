@@ -388,7 +388,7 @@ namespace Gtfs {
             }
             if (wts.size () != _N) continue;
             sumwt = std::accumulate (wts.begin (), wts.end (), 0.0);
-            if (sumwt != 1.0) continue;
+            if (sumwt < 0.9) continue;
 
             etas.at (i).stop_id = stops.at (i).stop->stop_id ();
             etas.at (i).estimate = _timestamp + tarr;
@@ -397,21 +397,21 @@ namespace Gtfs {
             etas.at (i).quantiles.emplace_back (0.0, etam.front ());
             int qi = 0;
             double cwt = 0.0;
-            while (cwt <= 0.05 && qi < wts.size ())
+            while (cwt <= 0.05 * sumwt && qi < wts.size ())
             {
                 cwt += wts.at (qi);
                 qi++;
                 // std::cout << ".";
             }
             etas.at (i).quantiles.emplace_back (5.0, etam.at (qi));
-            while (cwt <= 0.5 && qi < wts.size ())
+            while (cwt <= 0.5 * sumwt && qi < wts.size ())
             {
                 cwt += wts.at (qi);
                 qi++;
                 // std::cout << ".";
             }
             etas.at (i).quantiles.emplace_back (50.0, etam.at (qi));
-            while (cwt <= 0.95 && qi < wts.size ())
+            while (cwt <= 0.95 * sumwt && qi < wts.size ())
             {
                 cwt += wts.at (qi);
                 qi++;
