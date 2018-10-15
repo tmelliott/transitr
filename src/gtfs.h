@@ -460,6 +460,10 @@ namespace Gtfs
             int _N;
             double _Neff;
             std::vector<Particle> _state;
+            std::vector<Particle> _previous_state;
+            uint64_t _previous_ts = 0;
+            
+            double estimated_dist = 0.0;
             bool bad_sample;
             bool resample;
 

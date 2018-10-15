@@ -1793,6 +1793,11 @@ namespace Gtfs
             std::string tid = vp.trip ().trip_id ();
             set_trip (gtfs->find_trip (tid));
             _newtrip = _trip != nullptr;
+
+            _previous_state.clear ();
+            _previous_ts = 0;
+            _state.clear ();
+            estimated_dist = 0.0;
         }
 
         if (_trip == nullptr)
@@ -1816,7 +1821,24 @@ namespace Gtfs
         _position = latlng (vp.position ().latitude (),
                             vp.position ().longitude ());
 
-        _delta = _timestamp == 0 ? 0 : vp.timestamp () - _timestamp;
+        double est_dist = _trip->shape ()->distance_of (_position);
+        if (!_newtrip && est_dist < estimated_dist && _previous_state.size () == _N && _previous_ts > 0)
+        {
+            std::cout << "\n x DIE v" << _vehicle_id;
+            // If current observation est dist is LESS than previous, revert state
+            _delta = vp.timestamp () - _previous_ts;
+            _state = _previous_state;
+            _previous_state.clear ();
+            _previous_ts = 0;
+        }
+        else
+        {
+            // this state is OK - keep it
+            _delta = _timestamp == 0 ? 0 : vp.timestamp () - _timestamp;
+            _previous_state = _state;
+            _previous_ts = _timestamp;
+        }
+        estimated_dist = est_dist;
         _timestamp = vp.timestamp ();
     }
 

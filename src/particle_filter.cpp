@@ -10,6 +10,9 @@ namespace Gtfs {
     {
         _state.clear ();
         _state.reserve (_N);
+
+        if (_trip == nullptr || _trip->shape () == nullptr) return;
+
         double dmax = _trip->shape ()->path ().back ().distance;
         // std::cout << "\n + Initialize " << _vehicle_id << " [N=" << _N << "]: ";
         for (int i=0; i<_N; ++i)
@@ -36,7 +39,6 @@ namespace Gtfs {
         _segment_travel_times.clear ();
         _stop_arrival_times.clear ();
 
-        if (_trip == nullptr || _trip->shape () == nullptr) return;
         _segment_travel_times.resize (_trip->shape ()->segments ().size (), 0);
         _stop_arrival_times.resize (_trip->stops ().size (), 0);
     }
@@ -52,10 +54,14 @@ namespace Gtfs {
         if (_complete || !valid () || _delta == 0) return;
 
         // There probably need to be a bunch of checks here ...
-        
 
+        // std::cout << "\n v" << _vehicle_id 
+        //     << " - M = " << _trip->stops ().size ()
+        //     << "; L = " << _trip->shape ()->segments ().size ();
+        
         // do the transition ("mutation")
         int ncomplete = 0;
+        // std::cout << " -> travel ... \n";
         for (auto p = _state.begin (); p != _state.end (); ++p)
         {
             if (p->is_complete ())
@@ -64,9 +70,13 @@ namespace Gtfs {
             }
             else
             {
+                // std::cout << "\r";
                 p->travel (_delta, rng);
             }
         }
+        // std::cout << "ok";
+
+
         if (ncomplete == _state.size ())
         {
             _complete = true;
@@ -110,7 +120,9 @@ namespace Gtfs {
         }
 #endif
         // update
+        // std::cout << " -> select ... ";
         select (rng);
+        // std::cout << "ok";
 
         // (re)initialize if the particle sample is bad
         if (bad_sample)
@@ -171,6 +183,7 @@ namespace Gtfs {
             
             
         }
+        // std::cout << " -> nw";
 
 #if SIMULATION
         // POSTERIOR model eval stuff
@@ -465,6 +478,7 @@ namespace Gtfs {
         stops = &(vehicle->trip ()->stops ());
         int M (stops->size ());
         unsigned int m (find_stop_index (distance, stops));
+        // std::cout << " [M=" << M << ",m=" << m << "], ";
         if (m == M-1) 
         {
             distance = Dmax;
@@ -479,8 +493,12 @@ namespace Gtfs {
         segments = &(vehicle->trip ()->shape ()->segments ());
         int L (segments->size ());
         unsigned int l (find_segment_index (distance, segments));
+        // std::cout << " [L=" << L << ",l=" << l << "], ";
         double next_segment_d;
         next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
+
+        // std::cout << " tt.size = " << tt.size ()
+            // << ", at.size = " << at.size ();
         
         // allow vehicle to remain stationary if at a stop:
         if (distance == stops->at (m).distance &&
@@ -585,7 +603,7 @@ namespace Gtfs {
                 // about to reach a stop ... slow? stop? just drive past?
                 m++; // the stop we are about to reach
                 at.at (m) = vehicle->timestamp () - delta;
-                if (m == M-1) 
+                if (m >= M-1)
                 {
                     distance = next_stop_d;
                     break;
