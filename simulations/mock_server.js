@@ -16,6 +16,22 @@ var pids = [] // {"pid001": 1}
 
 app.use('/archive', express.static('archive'))
 
+app.use('/:pid/:start/:end/vehicle_positions', (req, res) => {
+    const pid = req.params.pid
+    const start = parseInt(req.params.start)
+    const end = parseInt(req.params.end)
+    if (!(pid in pids)) pids[pid] = start
+    if (pids[pid] < start) {
+        pids[pid] = start
+    }
+    if (pids[pid] >= end) {
+        res.send('simulation complete')
+        return
+    }
+    res.download(path.join(__dirname, 'archive/' + files[pids[pid]]));
+    pids[pid]++
+})
+
 app.use('/:pid/vehicle_positions', (req, res) => {
     const pid = req.params.pid
     if (!(pid in pids)) pids[pid] = 0
