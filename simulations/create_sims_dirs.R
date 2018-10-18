@@ -3,7 +3,7 @@ gps <- c(3, 5, 8, 10)
 noise <- c(0.01, 0.02, 0.05, 0.1, 0.5)
 
 config <- list(
-    n_core = 1,
+    n_core = 8,
     n_particles = NA,
     gps_error = NA,
     system_noise = NA,

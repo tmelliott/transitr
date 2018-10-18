@@ -1,5 +1,5 @@
 {
-  "n_core": 1,
+  "n_core": 8,
   "n_particles": 10000,
   "gps_error": 3,
   "system_noise": 0.02,
