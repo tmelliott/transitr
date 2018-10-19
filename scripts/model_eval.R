@@ -28,6 +28,8 @@ sims <- do.call(get_sims, as.list(sims))
 
 sims <- sims %>% filter(dist_to_path >= 0 & dist_to_path < 50)
 
+pdf("~/Dropbox/modeleval.pdf", onefile = TRUE, width = 14, height = 10)
+
 ## Observation from path
 ggplot(sims %>% filter(dist_to_path >= 0 & dist_to_path < 30)) + 
     geom_density(aes(x = dist_to_path), fill = "gray")
@@ -56,22 +58,22 @@ ggplot(sims) +
     facet_grid(gps_error~system_noise)
 
 
+dev.off()
 
-
-ggplot(sims %>% filter(posterior_mse < 200 & dist_to_path < 100)) +
-    geom_point(aes(dist_to_path, posterior_mse / prior_mse)) +
-    facet_grid(gps_error~system_noise)
+#ggplot(sims %>% filter(posterior_mse < 200 & dist_to_path < 100)) +
+#    geom_point(aes(dist_to_path, posterior_mse / prior_mse)) +
+#    facet_grid(gps_error~system_noise)
     
-ggplot(sims %>% filter(prior_mse < 1000 & posterior_mse < 200)) +
-    geom_point(aes(prior_mse, posterior_mse)) +
-    facet_grid(sim~.)
+#ggplot(sims %>% filter(prior_mse < 1000 & posterior_mse < 200)) +
+#    geom_point(aes(prior_mse, posterior_mse)) +
+#    facet_grid(sim~.)
 
 # ggplot(sims %>% filter(posterior_mse < 100)) +
 #     geom_hex(aes(ts, posterior_mse)) +
 #     facet_grid(sim~.)
 
-ggplot(sims %>% filter(prior_mse < 1000 & posterior_mse < 200 & dist_to_path < 100)) +
-    geom_violin(aes(x = factor(sim), y = posterior_mse / prior_mse))
+#ggplot(sims %>% filter(prior_mse < 1000 & posterior_mse < 200 & dist_to_path < 100)) +
+#    geom_violin(aes(x = factor(sim), y = posterior_mse / prior_mse))
 
 
 
