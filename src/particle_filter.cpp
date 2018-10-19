@@ -124,7 +124,7 @@ namespace Gtfs {
         double prior_speed_var;
         prior_speed_var = std::accumulate (_state.begin (), _state.end (), 0.0, 
                                           [&prior_speed](double a, Particle& p) {
-                                            return a + pow(p.get_speed () - prior_speed, 2);
+                                            return a + p.get_weight () * pow(p.get_speed () - prior_speed, 2);
                                           });
 #endif
         // update
@@ -209,7 +209,7 @@ namespace Gtfs {
         double post_speed_var;
         post_speed_var = std::accumulate (_state.begin (), _state.end (), 0.0, 
                                           [&post_speed](double a, Particle& p) {
-                                            return a + pow(p.get_speed () - post_speed, 2);
+                                            return a + p.get_weight () * pow(p.get_speed () - post_speed, 2);
                                           });
 
         std::ostringstream mename;
