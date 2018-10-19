@@ -10,6 +10,7 @@ namespace Gtfs {
     {
         _state.clear ();
         _state.reserve (_N);
+        resample_count = 0;
 
         if (_trip == nullptr || _trip->shape () == nullptr) return;
 
@@ -229,6 +230,7 @@ namespace Gtfs {
             << "," << ctd
             << "," << _Neff
             << "," << (resample ? 1 : 0)
+            << "," << resample_count
             << "\n";
         modeleval.close ();
 #endif
@@ -360,7 +362,7 @@ namespace Gtfs {
 
         double initwt = pow(_N, -1);
         for (auto p = _state.begin (); p != _state.end (); ++p) p->set_weight (initwt);
-        
+        resample_count++;
     }
 
     void Vehicle::predict_etas (RNG& rng)

@@ -466,6 +466,7 @@ namespace Gtfs
             double estimated_dist = 0.0;
             bool bad_sample;
             bool resample;
+            int resample_count = 0;
 
             std::vector<unsigned int> _segment_travel_times; // segment travel times
             std::vector<uint64_t> _stop_arrival_times;     // stop arrival times
