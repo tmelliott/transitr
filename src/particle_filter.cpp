@@ -118,6 +118,14 @@ namespace Gtfs {
             prior_mse += p->get_weight () * 
                 pow(distanceEarth (_position, hx), 2);
         }
+
+        // prior speed variance
+        double prior_speed = speed ();
+        double prior_speed_var;
+        prior_speed_var = std::accumulate (_state.begin (), _state.end (), 0.0, 
+                                          [&prior_speed](double a, Particle& p) {
+                                            return a + pow(p.get_speed () - prior_speed, 2);
+                                          });
 #endif
         // update
         // std::cout << " -> select ... ";
@@ -196,6 +204,14 @@ namespace Gtfs {
                 pow(distanceEarth (_position, hx), 2);
         }
 
+        // posterior speed variance
+        double post_speed = speed ();
+        double post_speed_var;
+        post_speed_var = std::accumulate (_state.begin (), _state.end (), 0.0, 
+                                          [&post_speed](double a, Particle& p) {
+                                            return a + pow(p.get_speed () - post_speed, 2);
+                                          });
+
         std::ostringstream mename;
         mename << "modeleval/vehicle_" << _vehicle_id << ".csv";
         std::ofstream modeleval;
@@ -208,6 +224,8 @@ namespace Gtfs {
             << "," << _timestamp
             << "," << prior_mse 
             << "," << posterior_mse
+            << "," << prior_speed_var
+            << "," << post_speed_var
             << "," << ctd
             << "," << _Neff
             << "," << (resample ? 1 : 0)

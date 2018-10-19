@@ -3,7 +3,7 @@ source("scripts/common.R")
 library(RSQLite)
 library(dbplyr)
 
-simnames <- list.files("simulations", pattern = "sim*", include.dirs = TRUE)
+simnames <- list.files("simulations", pattern = "^sim*", include.dirs = TRUE)
 if (file.exists("simulations/arrivaldata.rda")) {
     load("simulations/arrivaldata.rda")
 } else {
