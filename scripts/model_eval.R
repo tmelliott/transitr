@@ -8,7 +8,7 @@ get_sim_files <- function(sim) {
                 function(x) 
                     read_csv(x, 
                         col_names = c("vehicle_id", "trip_id", "ts", "prior_mse", "posterior_mse", 
-                                      "prior_speed_var", "posterior_speed_var", "dist_to_path", "Neff", "resample"),
+                                      "prior_speed_var", "posterior_speed_var", "dist_to_path", "Neff", "resample", "n_resample"),
                         col_types = "cciddddddi", progress = FALSE) %>%
                     mutate(ts = as.POSIXct(ts, origin = "1970-01-01"))
             )
@@ -38,6 +38,11 @@ ggplot(sims %>% filter(dist_to_path >= 0 & dist_to_path < 30)) +
 ggplot(sims %>% filter(Neff <= n_particles & Neff >= 0)) + 
     geom_violin(aes(x = factor(system_noise), Neff, fill = factor(system_noise))) +
     facet_grid(n_particles~gps_error, scales="free_y")
+
+## Number of consecutive resamples
+ggplot(sims) +
+    geom_violin(aes(x = factor(n_particles), n_resample, fill = factor(n_particles))) +
+    facet_grid(gps_error  ~ system_noise)
 
 ## Distance from sample to obs
 ggplot(sims %>% filter(dist_to_path < 200 & prior_mse < 5000)) + 
