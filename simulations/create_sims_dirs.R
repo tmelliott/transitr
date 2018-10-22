@@ -20,9 +20,10 @@ dirs <- apply(grid, 1, function(x) {
     config$system_noise <- x[["noise"]]
     dirname <- glue::glue("sim_{config$n_particles}_{config$gps_error}_{config$system_noise}")
     dirname <- gsub("\\.", "-", dirname)
-    if (dir.exists(dirname)) return(dirname)
-    dir.create(dirname)
-    jsonlite::write_json(config, file.path(dirname, "config.json"), auto_unbox = TRUE, pretty = TRUE)
+    if (!dir.exists(dirname))
+        dir.create(dirname)
+    if (!file.exists(file.path(dirname, "config.json")))
+        jsonlite::write_json(config, file.path(dirname, "config.json"), auto_unbox = TRUE, pretty = TRUE)
     dirname
 })
 
