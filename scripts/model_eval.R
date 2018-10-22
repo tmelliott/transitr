@@ -39,10 +39,21 @@ ggplot(sims %>% filter(Neff <= n_particles & Neff >= 0)) +
     geom_violin(aes(x = factor(system_noise), Neff, fill = factor(system_noise))) +
     facet_grid(n_particles~gps_error, scales="free_y")
 
+ggplot(sims %>% filter(Neff < n_particles & Neff >= 0 & system_noise < 0.1 & gps_error == 3)) +
+    geom_point(aes(x = Neff, y = n_resample, color = factor(system_noise))) + 
+    geom_smooth(aes(Neff, n_resample, color = factor(system_noise)), method = "loess") +
+    facet_wrap(~ n_particles, scales = "free_x")
+
 ## Number of consecutive resamples
 ggplot(sims) +
     geom_violin(aes(x = factor(n_particles), n_resample, fill = factor(n_particles))) +
     facet_grid(gps_error  ~ system_noise)
+
+ggplot(sims %>% filter(dist_to_path < 100) %>% group_by(n_particles, gps_error, system_noise) %>%
+        summarize(p_resample = mean(resample))) + 
+    geom_col(aes(as.factor(n_particles), y = p_resample, fill = as.factor(system_noise)), position = "dodge") +
+    facet_wrap( ~ gps_error)
+
 
 ## Distance from sample to obs
 ggplot(sims %>% filter(dist_to_path < 200 & prior_mse < 5000)) + 
