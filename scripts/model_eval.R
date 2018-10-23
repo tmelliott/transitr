@@ -2,7 +2,9 @@ library(tidyverse)
 
 get_sim_files <- function(sim) {
     x <- try({
-        siminfo <- as.numeric(gsub("-", ".", strsplit(sim, "_")[[1]][-1]))
+        siminfo <- strsplit(sim, "_")[[1]][-1]
+        if (grepl("e", siminfo[3])) siminfo[3] <- format(as.numeric(siminfo[3]), scientific = FALSE)
+        siminfo <- as.numeric(gsub("-", ".", siminfo))
         do.call(bind_rows, 
             lapply(list.files(file.path("simulations", sim, "modeleval"), pattern="vehicle_.*\\.csv", full.names = TRUE), 
                 function(x) 
@@ -41,7 +43,6 @@ ggplot(sims %>% filter(Neff <= n_particles & Neff >= 0)) +
 
 ggplot(sims %>% filter(Neff < n_particles & Neff >= 0 & system_noise < 0.1 & gps_error == 3)) +
     geom_point(aes(x = Neff, y = n_resample, color = factor(system_noise))) + 
-    geom_smooth(aes(Neff, n_resample, color = factor(system_noise)), method = "loess") +
     facet_wrap(~ n_particles, scales = "free_x")
 
 ## Number of consecutive resamples
@@ -49,18 +50,18 @@ ggplot(sims) +
     geom_violin(aes(x = factor(n_particles), n_resample, fill = factor(n_particles))) +
     facet_grid(gps_error  ~ system_noise)
 
-ggplot(sims %>% filter(dist_to_path < 100) %>% group_by(n_particles, gps_error, system_noise) %>%
+ggplot(sims %>% group_by(n_particles, gps_error, system_noise) %>%
         summarize(p_resample = mean(resample))) + 
     geom_col(aes(as.factor(n_particles), y = p_resample, fill = as.factor(system_noise)), position = "dodge") +
     facet_wrap( ~ gps_error)
 
 
 ## Distance from sample to obs
-ggplot(sims %>% filter(dist_to_path < 200 & prior_mse < 5000)) + 
+ggplot(sims %>% filter(prior_mse < 5000)) + 
     geom_violin(aes(factor(n_particles), prior_mse, fill = factor(n_particles)), alpha = 0.5) +
     facet_grid(gps_error~system_noise)
 
-ggplot(sims %>% filter(dist_to_path < 200) %>% mutate(posterior_mse = pmin(100, posterior_mse))) +
+ggplot(sims %>% filter(posterior_mse < 1000)) +
     geom_violin(aes(factor(n_particles), posterior_mse, fill = factor(n_particles)), alpha = 0.5) +
     facet_grid(system_noise~gps_error)
 
@@ -72,6 +73,11 @@ ggplot(sims) +
 ggplot(sims) + 
     geom_violin(aes(factor(n_particles), posterior_speed_var, fill = factor(n_particles)), alpha = 0.5) +
     facet_grid(gps_error~system_noise)
+
+
+ggplot(sims %>% filter(gps_error == 3 & posterior_speed_var < 50)) +
+    geom_point(aes(Neff, posterior_speed_var), alpha = 0.5) +
+    facet_grid(system_noise~n_particles, scales = "free_x")
 
 
 dev.off()
@@ -95,3 +101,13 @@ dev.off()
 
 
 ### OK OK OK so, actually, what is the RMSE for ETAs based on our super basic bitchin' algorithm?
+
+
+
+
+
+
+
+
+
+####### Timings
