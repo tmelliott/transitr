@@ -221,11 +221,15 @@ namespace Gtfs {
         double atd = _trip->shape ()->distance_of (_position);
         latlng closest_pt = _trip->shape ()->coordinates_of (atd);
         double ctd = distanceEarth (_position, closest_pt);
+        double sumwt = std::accumulate (_state.begin (), _state.end (), 0.0, [](double a, Particle& p) {
+            return a + p.get_weight ();
+        });
         modeleval << _vehicle_id 
             << "," << _trip->trip_id ()
             << "," << _timestamp
             << "," << prior_mse 
             << "," << posterior_mse
+            << "," << sumwt
             << "," << post_speed
             << "," << prior_speed_var
             << "," << post_speed_var

@@ -127,8 +127,9 @@ ggplot(sims %>% filter(post_speed > 0 & posterior_speed_var > 0 & n_particles ==
     geom_point(aes(post_speed, posterior_speed_var)) +
     facet_grid(gps_error~system_noise)
 
-ggplot(sims %>% filter(posterior_speed_var > 0 & n_resample > 1 & bad_sample == 0)) + 
-    geom_violin(aes(factor(n_particles), sqrt(posterior_speed_var), fill = factor(n_particles))) +
+ggplot(sims %>% filter(posterior_speed_var > 0 & n_resample > 1 & bad_sample == 0 & posterior_speed_var < 10 & prior_speed_var < 10)) + 
+    geom_violin(aes(factor(n_particles), (prior_speed_var)), color = 'gray') +
+    geom_violin(aes(factor(n_particles), (posterior_speed_var), fill = factor(n_particles))) +
     facet_grid(gps_error~system_noise)
 
 
