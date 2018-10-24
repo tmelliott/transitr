@@ -1,6 +1,9 @@
 library(tidyverse)
 
 get_sim_files <- function(sim) {
+    if (file.exists(file.path("simulations", sim, "modeleval.rds"))) {
+        return(readRDS(file.path("simulations", sim, "modeleval.rds")))
+    }
     x <- try({
         siminfo <- strsplit(sim, "_")[[1]][-1]
         if (grepl("e", siminfo[3])) siminfo[3] <- format(as.numeric(siminfo[3]), scientific = FALSE)
@@ -17,6 +20,7 @@ get_sim_files <- function(sim) {
         ) %>% mutate(sim = sim, n_particles = siminfo[1], gps_error = siminfo[2], system_noise = siminfo[3])
     })
     if (inherits(x, "try-error")) return(NULL)
+    saveRDS(x, file.path("simulations", sim, "modeleval.rds"))
     x
 }
 
@@ -37,7 +41,7 @@ ggplot(sims %>% filter(dist_to_path >= 0 & dist_to_path < 30)) +
     geom_density(aes(x = dist_to_path), fill = "gray")
 
 ## Effective sample size
-ggplot(sims %>% filter(Neff <= n_particles & Neff >= 0)) + 
+ggplot(sims %>% filter(Neff <= 20 & Neff >= 0)) + 
     geom_violin(aes(x = factor(system_noise), Neff, fill = factor(system_noise))) +
     facet_grid(n_particles~gps_error, scales="free_y")
 
@@ -57,13 +61,13 @@ ggplot(sims %>% group_by(n_particles, gps_error, system_noise) %>%
 
 
 ## Distance from sample to obs
-ggplot(sims %>% filter(prior_mse < 5000)) + 
-    geom_violin(aes(factor(n_particles), prior_mse, fill = factor(n_particles)), alpha = 0.5) +
+ggplot(sims %>% filter(prior_mse < 1000 & prior_mse > 0)) + 
+    geom_violin(aes(factor(n_particles), prior_mse, fill = factor(n_particles))) +
     facet_grid(gps_error~system_noise)
 
-ggplot(sims %>% filter(posterior_mse < 1000)) +
-    geom_violin(aes(factor(n_particles), posterior_mse, fill = factor(n_particles)), alpha = 0.5) +
-    facet_grid(system_noise~gps_error)
+ggplot(sims %>% filter(posterior_mse < 200 & posterior_mse > 0)) +
+    geom_violin(aes(factor(n_particles), posterior_mse, fill = factor(n_particles))) +
+    facet_grid(gps_error~system_noise)
 
 ## Speed variance
 ggplot(sims) + 

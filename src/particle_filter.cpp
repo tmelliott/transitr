@@ -134,6 +134,7 @@ namespace Gtfs {
         // std::cout << "ok";
 
         // (re)initialize if the particle sample is bad
+        bool isbad = bad_sample;
         if (bad_sample)
         {
             initialize (rng);
@@ -225,12 +226,14 @@ namespace Gtfs {
             << "," << _timestamp
             << "," << prior_mse 
             << "," << posterior_mse
+            << "," << post_speed
             << "," << prior_speed_var
             << "," << post_speed_var
             << "," << ctd
             << "," << _Neff
             << "," << (resample ? 1 : 0)
             << "," << resample_count
+            << "," << isbad
             << "\n";
         modeleval.close ();
 #endif
@@ -301,6 +304,7 @@ namespace Gtfs {
 
         // if (maxlh < threshold) return;
         
+        _Neff = 0;
         if (sumwt == 0) return;
 
         // normalize weights
@@ -315,16 +319,14 @@ namespace Gtfs {
 
         // some condition for resampling (1/wt^2 < N? or something ...)
         sumwt = std::accumulate (wt.begin (), wt.end (), 0.0);
-        if (sumwt < 0.9) return;
+        if (sumwt - 1.0 > 0.01) return;
 
-        {
-            double sumwt2 = std::accumulate(wt.begin (), wt.end (), 0.0,
-                                            [](double a, double b) {
-                                                return a + pow(b, 2);
-                                            });
-            _Neff = 1.0 / sumwt2;
-            // std::cout << "\n sumwt2 = " << sumwt2 <<", Neff = " << _Neff;
-        }
+        double sumwt2 = std::accumulate(wt.begin (), wt.end (), 0.0,
+                                        [](double a, double b) {
+                                            return a + pow(b, 2);
+                                        });
+        _Neff = pow (sumwt2, -1);
+        // std::cout << "\n sumwt2 = " << sumwt2 <<", Neff = " << _Neff;
 
         bad_sample = false;
         
@@ -539,15 +541,15 @@ namespace Gtfs {
         else if (rng.runif () < 0.05)
         {
             // a very small chance for particles to remain stationary
-            speed = 0.0;
+            // speed = 0.0;
             // when /not/ at a bus stop, set speed to 0 and wait
             double w = - log (rng.runif ()) * delta;
             delta = fmax (0.0, delta - round (w));
             if (tt.at (l) >= 0)
                 tt.at (l) = tt.at (l) + 1;
             // then the bus needs to accelerate back up to speed ... for how many seconds?
-            accelerating = 5.0 + rng.runif () * 10.0;
-            acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
+            // accelerating = 5.0 + rng.runif () * 10.0;
+            // acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
         }
 
 
@@ -571,14 +573,15 @@ namespace Gtfs {
                 accel_prop = rng.rnorm () * vehicle->system_noise () * 
                     (1.0 + (double)n / 100.0);
                 n++;
-                if (accelerating > 0.0)
-                {
-                    accel_prop += acceleration;
-                    accelerating--;
-                }
+                // if (accelerating > 0.0)
+                // {
+                //     accel_prop += acceleration;
+                //     accelerating--;
+                // }
             }
 
-            double v = fmax (0, fmin (30, speed + acceleration));
+            // double v = fmax (0, fmin (30, speed + acceleration));
+            double v = speed;
             double vstar = speed + accel_prop;
             double alpha = (pow (v - speed_mean, 2) - pow(vstar - speed_mean, 2)) / (2 * pow (speed_sd, 2));
             alpha = fmin (0, alpha);
@@ -634,9 +637,9 @@ namespace Gtfs {
                     double dwell = vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
                     delta = fmax(0, delta - dwell);
                     distance = next_stop_d;
-                    speed = 0.0;
-                    accelerating = 5.0 + rng.runif () * 10.0;
-                    acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
+                    // speed = 0.0;
+                    // accelerating = 5.0 + rng.runif () * 10.0;
+                    // acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
                 }
                 next_stop_d = stops->at (m+1).distance;
                 continue;
