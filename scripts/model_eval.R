@@ -12,10 +12,10 @@ get_sim_files <- function(sim) {
             lapply(list.files(file.path("simulations", sim, "modeleval"), pattern="vehicle_.*\\.csv", full.names = TRUE), 
                 function(x) 
                     read_csv(x, 
-                        col_names = c("vehicle_id", "trip_id", "ts", "prior_mse", "posterior_mse", 
+                        col_names = c("vehicle_id", "trip_id", "ts", "prior_mse", "posterior_mse", "sumwt",
                                       "post_speed", "prior_speed_var", "posterior_speed_var", "dist_to_path", 
                                       "Neff", "resample", "n_resample", "bad_sample"),
-                        col_types = "ccidddddddiii", progress = FALSE) %>%
+                        col_types = "cciddddddddiii", progress = FALSE) %>%
                     mutate(ts = as.POSIXct(ts, origin = "1970-01-01"))
             )
         ) %>% mutate(sim = sim, n_particles = siminfo[1], gps_error = siminfo[2], system_noise = siminfo[3])
@@ -44,6 +44,11 @@ ggplot(sims %>% filter(dist_to_path >= 0 & dist_to_path < 30)) +
 ggplot(sims %>% filter(Neff <= n_particles & Neff > 0 & bad_sample == 0)) + 
     geom_violin(aes(x = factor(system_noise), Neff, fill = factor(system_noise))) +
     facet_grid(n_particles~gps_error, scales="free_y")
+
+## sum of weights
+ggplot(sims) + 
+    geom_violin(aes(x = factor(system_noise), sumwt, fill = factor(system_noise))) +
+    facet_grid(n_particles~gps_error)
 
 # ggplot(sims %>% filter(Neff < n_particles & Neff >= 0 & system_noise < 0.1 & gps_error == 3)) +
 #     geom_point(aes(x = Neff, y = n_resample, color = factor(system_noise))) + 

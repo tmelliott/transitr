@@ -224,12 +224,18 @@ namespace Gtfs {
         double sumwt = std::accumulate (_state.begin (), _state.end (), 0.0, [](double a, Particle& p) {
             return a + p.get_weight ();
         });
+        double meanwt = sumwt / (double) _N;
+        double varwt = std::accumulate (_state.begin (), _state.end (), 0.0, [&meanwt](double a, Particle& p) {
+            return a + pow (p.get_weight () - meanwt, 2);
+        });
+        varwt /= _N;
         modeleval << _vehicle_id 
             << "," << _trip->trip_id ()
             << "," << _timestamp
             << "," << prior_mse 
             << "," << posterior_mse
             << "," << sumwt
+            << "," << varwt
             << "," << post_speed
             << "," << prior_speed_var
             << "," << post_speed_var
