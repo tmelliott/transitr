@@ -12,10 +12,10 @@ get_sim_files <- function(sim) {
             lapply(list.files(file.path("simulations", sim, "modeleval"), pattern="vehicle_.*\\.csv", full.names = TRUE), 
                 function(x) 
                     read_csv(x, 
-                        col_names = c("vehicle_id", "trip_id", "ts", "prior_mse", "posterior_mse", "sumwt",
+                        col_names = c("vehicle_id", "trip_id", "ts", "prior_mse", "posterior_mse", #"sumwt", "varwt",
                                       "post_speed", "prior_speed_var", "posterior_speed_var", "dist_to_path", 
                                       "Neff", "resample", "n_resample", "bad_sample"),
-                        col_types = "cciddddddddiii", progress = FALSE) %>%
+                        col_types = "ccidddddddiii", progress = FALSE) %>%
                     mutate(ts = as.POSIXct(ts, origin = "1970-01-01"))
             )
         ) %>% mutate(sim = sim, n_particles = siminfo[1], gps_error = siminfo[2], system_noise = siminfo[3])
@@ -45,10 +45,15 @@ ggplot(sims %>% filter(Neff <= n_particles & Neff > 0 & bad_sample == 0)) +
     geom_violin(aes(x = factor(system_noise), Neff, fill = factor(system_noise))) +
     facet_grid(n_particles~gps_error, scales="free_y")
 
-## sum of weights
-ggplot(sims) + 
-    geom_violin(aes(x = factor(system_noise), sumwt, fill = factor(system_noise))) +
-    facet_grid(n_particles~gps_error)
+# ## sum of weights
+# ggplot(sims) + 
+#     geom_violin(aes(x = factor(system_noise), sumwt, fill = factor(system_noise))) +
+#     facet_grid(n_particles~gps_error)
+
+# ggplot(sims) + 
+#     geom_violin(aes(x = factor(system_noise), varwt, fill = factor(system_noise))) +
+#     facet_grid(n_particles~gps_error)
+
 
 # ggplot(sims %>% filter(Neff < n_particles & Neff >= 0 & system_noise < 0.1 & gps_error == 3)) +
 #     geom_point(aes(x = Neff, y = n_resample, color = factor(system_noise))) + 
@@ -95,8 +100,8 @@ ggplot(sims %>% filter(prior_mse < 1000 & prior_mse > 0)) +
     geom_violin(aes(factor(n_particles), prior_mse, fill = factor(n_particles))) +
     facet_grid(gps_error~system_noise)
 
-ggplot(sims %>% filter(posterior_mse < 200 & posterior_mse > 0)) +
-    geom_violin(aes(factor(n_particles), ifelse(posterior_mse / dist_to_path < 5, posterior_mse / dist_to_path, NA), fill = factor(n_particles))) +
+ggplot(sims %>% filter(posterior_mse < 200 & posterior_mse > 0 & bad_sample == 0 & n_resample > 1)) +
+    geom_violin(aes(factor(n_particles), pmin(posterior_mse / dist_to_path, 5), fill = factor(n_particles))) +
     facet_grid(gps_error~system_noise)
 
 
@@ -164,13 +169,57 @@ dev.off()
 
 
 ### OK OK OK so, actually, what is the RMSE for ETAs based on our super basic bitchin' algorithm?
+source('scripts/common.R')
 
+get_etas <- function(sim) {
+    siminfo <- strsplit(sim, "_")[[1]][-1]
+    if (grepl("e", siminfo[3])) siminfo[3] <- format(as.numeric(siminfo[3]), scientific = FALSE)
+    siminfo <- as.numeric(gsub("-", ".", siminfo))
+    all_sims(sim) %>%
+        mutate(sim = sim, n_particles = siminfo[1], gps_error = siminfo[2], system_noise = siminfo[3])
+}
 
+get_all_etas <- function() {
+    sims <- list.files("simulations", pattern = "sim_")
+    sims <- sims[sapply(sims, function(s) file.exists(file.path("simulations", s, "timings.csv")))]
+    do.call(get_sims, as.list(sims))
+}
 
+# etas <- get_all_etas()
 
+load("simulations/arrivaldata.rda")
+etas <- get_etas(sim)
 
+arrdat <- arrivaldata %>% filter(type == "arrival") %>%
+    mutate(id = paste(trip_id, stop_sequence, sep = ":")) %>%
+    group_by(id) %>% do((.) %>% tail(1)) %>% ungroup()
 
+etasc <- etas %>% mutate(id = paste(trip_id, stop_sequence, sep = ":")) %>%
+    inner_join(arrdat %>% select(id, time), by = "id", suffix = c("_estimated", "_actual"))
 
+ed <- etasc %>% filter(!is.na(q50) & !is.na(time_actual)) %>%
+    filter(time_actual >= timestamp & abs(q50 - as.numeric(time_actual)) < 60*60) %>%
+    mutate(in_pred_int = time_actual > q0 & time_actual < q100)
 
+ggplot(ed %>% filter(time_actual - timestamp < 60*60)) + geom_bar(aes(in_pred_int))
+
+ggplot(ed) +
+    geom_point(aes(as.integer(time_actual - timestamp)/60,))
+
+ggplot(ed) +
+    geom_point(aes(timestamp, (q50 - as.numeric(time_actual)) / 60), colour = 'gray') +
+    geom_point(aes(timestamp, (q50 - as.numeric(time_actual)) / 60), data = ed %>% filter(in_pred_int)) +
+    xlab("Time") +
+    ylab("ETA error (minutes)")
+
+## in 95% CI
+ggplot(ed) +
+    geom_point(aes(as.integer(time_actual - timestamp)/60, 
+        ifelse(in_pred_int, 0, ifelse(time_actual < q0, as.numeric(time_actual) - q0,
+                                        as.numeric(time_actual) - q100)) / 60)) +
+        # (as.numeric(time_actual) - q5) / 60)) +
+    ylab("ETA error (minutes)") +
+    xlab("Time until arrival (min)")
+    # geom_point(aes(timestamp, as.integer(time_actual - timestamp) / 60))
 
 ####### Timings

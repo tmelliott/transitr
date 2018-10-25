@@ -234,8 +234,6 @@ namespace Gtfs {
             << "," << _timestamp
             << "," << prior_mse 
             << "," << posterior_mse
-            << "," << sumwt
-            << "," << varwt
             << "," << post_speed
             << "," << prior_speed_var
             << "," << post_speed_var

@@ -184,9 +184,12 @@ vehicle <- function(vps, ts, prop) {
         theme(legend.position = 'none') +
         xlab("Distance Traveled (m)") + xlim(0, Dmax) +
         ylab("Log Likelihood")
+    p7 <- ggplot(p, aes(wt)) +
+        geom_density(col = 'orangered', data = prop %>% filter(timestamp == as.integer(obstime))) +
+        geom_density()
 
-    gridExtra::grid.arrange(p1, p3, p5, p2, p4, p6, 
-        layout_matrix = cbind(c(1, 1, 1, 1, 6), c(2:6)))
+    gridExtra::grid.arrange(p1, p3, p5, p2, p4, p6, p7,
+        layout_matrix = cbind(c(1, 1, 1, 1, 6), c(2:5, 7)))
 }
 
 modeleval <- function(data, n, gps) {
@@ -304,9 +307,9 @@ server <- function(input, output, session) {
         if (input$vehicleid == "") return()
         if (input$plottype == "Vehicles") {
             rv$vehicledata <- read_csv(sprintf("%s/vehicle_%s.csv", rv$hdir, input$vehicleid),
-                col_names = c('timestamp', 'trip_id', 'obs_lat', 'obs_lon', 'distance', 'speed', 'acceleration', 'll', 'model_lat', 'model_lon'))
+                col_names = c('timestamp', 'trip_id', 'obs_lat', 'obs_lon', 'distance', 'speed', 'acceleration', 'll', 'wt', 'model_lat', 'model_lon'))
             rv$vehicleprop <- read_csv(sprintf("%s/vehicle_%s_proposals.csv", rv$hdir, input$vehicleid),
-                col_names = c('timestamp', 'trip_id', 'distance', 'speed', 'acceleration', 'll', 'model_lat', 'model_lon'))
+                col_names = c('timestamp', 'trip_id', 'distance', 'speed', 'acceleration', 'll', 'wt', 'model_lat', 'model_lon'))
             rv$vehicletimes <- unique(rv$vehicledata$timestamp)
             updateSliderInput(session, "obstime", max = length(rv$vehicletimes))
         } else {
