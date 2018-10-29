@@ -70,14 +70,14 @@ ggplot(sims %>% group_by(n_particles, gps_error, system_noise) %>%
 ggplot(sims %>% group_by(n_particles, gps_error, system_noise) %>%
         summarize(p_good = mean(Neff >= 1000))) + 
     geom_col(aes(as.factor(n_particles), y = p_good, fill = as.factor(system_noise)), position = "dodge") +
-    facet_wrap( ~ gps_error) +
+    facet_grid( ~ gps_error) +
     xlab("Numer of particles") + ylab("1 / Rexampling rate (Neff large enough)")
 
 
 ggplot(sims %>% group_by(n_particles, gps_error, system_noise) %>%
         summarize(p_bad = mean(bad_sample), p_good = mean(Neff < 1000))) + 
     geom_point(aes(p_good, p_bad, shape = as.factor(gps_error), color = as.factor(system_noise))) +
-    facet_wrap( ~ n_particles, scales = "free") +
+    facet_wrap( ~ n_particles) +
     xlab("Resampling Rate") + ylab("Degeneration Rate")
 
 ## Number of consecutive resamples
@@ -105,13 +105,13 @@ ggplot(sims %>% filter(posterior_mse < 200 & posterior_mse > 0 & bad_sample == 0
     facet_grid(gps_error~system_noise)
 
 
-ggplot(sims %>% group_by(n_particles, gps_error, system_noise) %>%
+ggplot(sims %>% filter(dist_to_path < 50) %>% group_by(n_particles, gps_error, system_noise) %>%
         summarize(p_bad = mean(posterior_mse / dist_to_path > 2), p_good = mean(Neff < 1000))) + 
     geom_point(aes(p_good, p_bad, shape = as.factor(gps_error), color = as.factor(system_noise))) +
     facet_wrap( ~ n_particles, scales = "free") +
     xlab("Resampling Rate") + ylab("Proportion Posterior Mean Dist Too Large")
 
-ggplot(sims %>% group_by(n_particles, gps_error, system_noise) %>%
+ggplot(sims %>% filter(dist_to_path < 20) %>% group_by(n_particles, gps_error, system_noise) %>%
         summarize(p_bad = mean(posterior_mse / dist_to_path > 2), p_good = mean(bad_sample))) + 
     geom_point(aes(p_good, p_bad, shape = as.factor(gps_error), color = as.factor(system_noise))) +
     facet_wrap( ~ n_particles) +
@@ -164,6 +164,95 @@ dev.off()
 
 #ggplot(sims %>% filter(prior_mse < 1000 & posterior_mse < 200 & dist_to_path < 100)) +
 #    geom_violin(aes(x = factor(sim), y = posterior_mse / prior_mse))
+
+
+
+get_nw_times <- function(sim) {
+    siminfo <- strsplit(sim, "_")[[1]][-1]
+    if (grepl("e", siminfo[3])) siminfo[3] <- format(as.numeric(siminfo[3]), scientific = FALSE)
+    siminfo <- as.numeric(gsub("-", ".", siminfo))
+    read_csv(file.path("simulations", sim, "segment_states.csv"),
+        col_names = c("segment_id", "timestamp", "mean", "var"), col_types = "cinn") %>%
+        mutate(timestamp = as.POSIXct(timestamp, origin = "1970-01-01"),
+               segment_id = factor(segment_id),
+               sim = sim, n_particles = siminfo[1], gps_error = siminfo[2], system_noise = siminfo[3])
+}
+
+get_all_nw_times <- function() {
+    sims <- list.files("simulations", pattern = "sim_")
+    sims <- sims[sapply(sims, function(s) file.exists(file.path("simulations", s, "timings.csv")))]
+    lapply(sims, get_nw_times) %>% bind_rows
+}
+
+nwtimes <- get_all_nw_times()
+
+# library(lme4)
+# fit <- lmer(var ~ (n_particles + gps_error + system_noise | segment_id), data = nwtimes)
+
+nwtimes.smry1 <- nwtimes %>% group_by(n_particles, gps_error, system_noise, segment_id) %>%
+    summarize(sd.time = sd(var, na.rm = TRUE), mean.var = mean(var, na.rm = TRUE)) %>% ungroup
+
+nwtimes.smry <- nwtimes.smry1 %>% group_by(n_particles, gps_error, system_noise) %>%
+    summarize(mean = mean(sd.time, na.rm = TRUE), sd = mean(mean.var, na.rm = TRUE)) %>% ungroup()
+
+# ggplot(nwtimes.smry) +
+#     geom_point(aes(sqrt(mean.var/n_particles), var.var, color = as.factor(system_noise))) +
+#     facet_grid(~n_particles)
+
+ggplot(nwtimes.smry) +
+    geom_point(aes(mean / sqrt(n_particles), sd / sqrt(n_particles), 
+        shape = as.factor(system_noise))) +
+    facet_grid(gps_error~n_particles) +
+    xlab("Standard deviation of travel times") + ylab("Standard deviation of travel time uncertainty") +
+    labs(color = "GPS Error (m)", shape = "System noise")
+
+ggplot(nwtimes.smry) +
+    geom_point(aes(as.numeric(as.factor(gps_error)) + as.numeric(as.factor(system_noise)) / 5, 
+        mean.var/n_particles, color = as.factor(system_noise))) +
+    facet_grid(~n_particles+gps_error)
+
+ggplot(nwtimes.smry) +
+    geom_point(aes(as.factor(system_noise), mean.var, color = as.factor(gps_error))) +
+    facet_grid(~n_particles)
+
+ggplot(nwtimes.smry) +
+    geom_point(aes(gps_error, sqrt(mean.var/n_particles))) +
+    facet_grid(~n_particles)
+
+
+
+
+
+myacf <- function(x) {
+    # x <- x[-(1:2)]
+    cor(x[-1], x[-length(x)])
+}
+nwtimes.smry <- nwtimes %>% group_by(n_particles, gps_error, system_noise, segment_id) %>%
+    summarize(autocov = myacf(mean)) %>% ungroup
+
+    # summarize(speed.mean = mean(var), speed.var = var(var))
+
+ggplot(nwtimes.smry %>% group_by(gps_error, n_particles, system_noise) %>%
+        summarize(autocov = mean(autocov))) + 
+    geom_point(aes(as.factor(n_particles), autocov, color = as.factor(gps_error))) +
+    facet_grid( ~ system_noise)
+
+# lm(autocov ~ n_particles + poly(system_noise, 2) + poly(gps_error, 2), data = nwtimes.smry) %>% summary
+
+
+
+ggplot(nwtimes) +
+    geom_point(aes(mean, var))
+
+ggplot(nwtimes %>% filter(segment_id == "3073")) +
+    geom_path(aes(timestamp, mean, color = as.factor(gps_error))) +
+    facet_grid(as.factor(n_particles) ~ system_noise)
+
+
+ggplot(nwtimes %>% filter(segment_id == "3073")) +
+    geom_path(aes(timestamp, mean, color = as.factor(n_particles))) +
+    facet_grid(system_noise ~ gps_error)
+
 
 
 
