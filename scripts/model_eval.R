@@ -186,6 +186,10 @@ get_all_nw_times <- function() {
 
 nwtimes <- get_all_nw_times()
 
+## one segment
+
+
+
 # library(lme4)
 # fit <- lmer(var ~ (n_particles + gps_error + system_noise | segment_id), data = nwtimes)
 
