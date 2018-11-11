@@ -25,7 +25,8 @@ if (!file.exists("fulldata.db")) {
 } else {
     nw <- load_gtfs("fulldata.db", output = "at_predictions.pb")
     if (outdated(url)) {
-        nw %>% update(url) %>% construct()
+        try(nw %>% update(url))
+        nw %>% construct()
     }
 }
 
