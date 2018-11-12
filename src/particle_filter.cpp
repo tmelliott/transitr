@@ -183,8 +183,9 @@ namespace Gtfs {
                                             return a + p.get_weight () * pow(p.get_travel_time (_current_segment) - tt, 2);
                                        });
 
+                std::cout << " [[ " << round (tt) << ", " << err << " ]] ";
                 _segment_travel_times.at (_current_segment) = round (tt);
-                segs.at (_current_segment).segment->push_data (round (tt), fmax(2.0, err));
+                segs.at (_current_segment).segment->push_data (tt, err);
                 _current_segment++;
             }
             
@@ -689,7 +690,7 @@ namespace Gtfs {
         double dnext;
         uint64_t t0 = vehicle->timestamp ();
         // std::cout << t0 << " > ";
-        int etat;
+        int etat, tt_total = 0;
         double vel;
         vel = segments->at (l).segment->sample_speed (rng);
         if (vel == 0.0 && speed >= 0.0) vel = speed;
@@ -707,10 +708,11 @@ namespace Gtfs {
             {
                 // time to get to end of segment
                 etat += (next_segment_d - dcur) / vel;
+                tt_total += (next_segment_d - dcur) / vel;
                 dcur = next_segment_d;
                 l++;
                 next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
-                vel = segments->at (l).segment->sample_speed (rng);
+                vel = segments->at (l).segment->sample_speed (rng, tt_total);
                 if (vel == 0.0 && speed >= 0.0) vel = speed;
                 while (vel <= 0.0 || vel > 30)
                 {
@@ -720,6 +722,7 @@ namespace Gtfs {
             }
             // std::cout << "] ";
             etat += (dnext - dcur) / vel;
+            tt_total += (dnext - dcur) / vel;
             at.at (m) = t0 + etat; // makes no sense because speeds are noise
             dcur = dnext;
             // and add some dwell time

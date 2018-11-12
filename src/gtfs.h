@@ -257,10 +257,14 @@ namespace Gtfs
 
         bool loaded = false;
 
+        double max_speed = 100.0 * 1000 / 60 / 60; // 100kmh is the max speed of a bus (presumably)
+        double min_tt = 0.0; // assuming vehicle traveling at max speed, this is the min time
+        double min_err = 2.0; // minimum travel time measurement error
+
         // network state
         std::vector<std::pair<int, double> > _data; // new observations as vehicles traverse network
         std::mutex data_mutex;
-        uint64_t _timestamp;
+        uint64_t _timestamp = 0;
         double _travel_time;
         double _uncertainty;
 
@@ -284,7 +288,9 @@ namespace Gtfs
         double get_speed ();
         double get_speed (int delta);
         int sample_travel_time (RNG& rng);
+        int sample_travel_time (RNG& rng, int delta);
         double sample_speed (RNG& rng);
+        double sample_speed (RNG& rng, int delta);
 
         void push_data (int time, double err);
         std::pair<double,double> predict (int delta);

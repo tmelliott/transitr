@@ -1234,8 +1234,11 @@ namespace Gtfs
         sqlite3_finalize (stmt);
         gtfs->close_connection ();
 
-        _travel_time = 0.0;
-        _uncertainty = 0.0;
+        _travel_time = _length / 10.0;
+        _uncertainty = _travel_time; // m/s
+
+        min_tt = _length / max_speed;
+        // min_err = sqrt (min_tt);
 
         loaded = true;
     }
@@ -1296,8 +1299,9 @@ namespace Gtfs
     void Segment::push_data (int time, double err)
     {
         if (!loaded) load ();
+        if (time < min_tt) return;
         std::lock_guard<std::mutex> lk (data_mutex);
-        _data.emplace_back (time, err);
+        _data.emplace_back ((int) round (time), fmax (min_err, err));
     }
 
 
@@ -1824,7 +1828,7 @@ namespace Gtfs
         double est_dist = _trip->shape ()->distance_of (_position);
         if (!_newtrip && est_dist < estimated_dist && _previous_state.size () == _N && _previous_ts > 0)
         {
-            std::cout << "\n x DIE v" << _vehicle_id;
+            // std::cout << "\n x DIE v" << _vehicle_id;
             // If current observation est dist is LESS than previous, revert state
             _delta = vp.timestamp () - _previous_ts;
             _state = _previous_state;
