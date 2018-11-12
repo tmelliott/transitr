@@ -66,3 +66,12 @@ all_sims <- function(sim) {
         as.integer
     do.call(bind_rows, pbapply::pblapply(times, function(t) loadsim(sim, t)))
 }
+
+library(RSQLite)
+library(dbplyr)
+get_schedule <- function(trip) {
+    con <- dbConnect(SQLite(), "fulldata.db")
+    on.exit(dbDisconnect(con))
+    con %>% tbl("stop_times") %>% filter(trip_id == trip) %>% arrange(stop_sequence) %>%
+        select(trip_id, stop_sequence, arrival_time, departure_time) %>% collect
+}

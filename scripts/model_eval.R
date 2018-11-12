@@ -281,7 +281,34 @@ get_all_etas <- function() {
 # etas <- get_all_etas()
 
 load("simulations/arrivaldata.rda")
-etas <- get_etas(sim)
+etas <- get_etas("sim000")
+
+## Baseline - schedule RMSE ~ time-until-arrival
+t1 <- arrivaldata %>% filter(trip_id == arrivaldata$trip_id[1]) %>% arrange(stop_sequence, type)
+sched <- get_schedule(t1$trip_id[1]) %>%
+    gather(key = "schedule_type", value = "schedule_time", arrival_time, departure_time) %>%
+    mutate(schedule_type = gsub("_time", "", schedule_type)) %>%
+    arrange(stop_sequence, schedule_type)
+
+as.time <- function(x, date) as.POSIXct(paste(date, x))
+t1delay <- t1 %>% select(trip_id, stop_sequence, type, time) %>% 
+    left_join(sched, by = c("trip_id", "stop_sequence", "type" = "schedule_type")) %>% 
+    mutate(time = as.POSIXct(time), 
+           schedule_time = as.time(schedule_time, format(time[1], "%Y-%m-%d")),
+           delay = as.integer(time - schedule_time))
+
+schedETAs <- #lapply(seq_along(1:nrow(t1delay)), function(i) {
+    as.tibble(
+        expand.grid(stop_sequence = 2:max(sched$stop_sequence),
+                    time = t1delay$time[-1])) %>%
+        left_join(t1delay %>% ungroup %>% select(time, delay), by = "time") %>%
+        left_join(t1delay %>% ungroup %>% select(stop_sequence, schedule_time), by = "stop_sequence") %>%
+        mutate(eta = schedule_time + delay)
+#})
+
+ggplot(schedETAs) + 
+    geom_point(aes(time, eta, colour = as.factor(stop_sequence)))
+
 
 arrdat <- arrivaldata %>% filter(type == "arrival") %>%
     mutate(id = paste(trip_id, stop_sequence, sep = ":")) %>%
