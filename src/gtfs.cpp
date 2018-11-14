@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <thread>
+#include <fstream>
 
 #include "timing.h"
 
@@ -25,7 +26,7 @@ namespace Gtfs
             close_connection ();
             return;
         }
-
+        
         sqlite3_stmt* stmt;
         std::string qry;
         // load AGENCIES
@@ -1296,12 +1297,22 @@ namespace Gtfs
         return _uncertainty;
     }
 
-    void Segment::push_data (int time, double err)
+    void Segment::push_data (int time, double err, uint64_t ts)
     {
         if (!loaded) load ();
         if (time < min_tt) return;
         std::lock_guard<std::mutex> lk (data_mutex);
         _data.emplace_back ((int) round (time), fmax (min_err, err));
+
+#if SIMULATION
+        // write observation to file
+        std::ostringstream fname;
+        fname << "history/segment_" << _segment_id << ".csv";
+        std::ofstream fout;
+        fout.open (fname.str ().c_str (), std::ofstream::app);
+        fout << _segment_id << "," << ts << "," << time << "," << err << "\n";
+        fout.close ();
+#endif
     }
 
 

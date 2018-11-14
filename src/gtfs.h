@@ -292,7 +292,7 @@ namespace Gtfs
         double sample_speed (RNG& rng);
         double sample_speed (RNG& rng, int delta);
 
-        void push_data (int time, double err);
+        void push_data (int time, double err, uint64_t ts);
         std::pair<double,double> predict (int delta);
         void update (uint64_t now);
     };

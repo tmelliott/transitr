@@ -8,7 +8,15 @@ namespace Gtfs {
         double xhat, Phat;
         xhat = _travel_time;
         // Phat = _uncertainty + (double) delta * 2.0 / 60.0 / 30.0;
+        // if (delta > 60*10)
+        // {
+        //     Phat = _uncertainty + 10.0 * (double) delta / 60.0;
+        // }
+        // else
+        // {
+        // }
         Phat = _uncertainty + 2.0 * (double) delta / 60.0;
+
 
         return std::make_pair (xhat, Phat);
     }
