@@ -88,3 +88,53 @@ view_segment_states("simulations/sim100/segment_states.csv", n = 20)
 view_segment_states("simulations/sim100/segment_states.csv", speed = TRUE, n = 20)
 
 map_segments("simulations/sim100/segment_states.csv")
+
+
+### raw "data"
+
+read_segment_data <- function(sim) {
+    file.path("simulations", sim, "history") %>%
+        list.files(pattern = "segment_", full.names = TRUE) %>%
+        lapply(read_csv, col_types = "ciid", col_names = c("segment_id", "timestamp", "travel_time", "error")) %>%
+        bind_rows() %>%
+        mutate(timestamp = as.POSIXct(timestamp, origin = "1970-01-01"))
+}
+
+## segment lengths?
+con <- dbConnect(SQLite(), "fulldata.db")
+seglens <- con %>% tbl("road_segments") %>% select(road_segment_id, length) %>% collect %>%
+    mutate(road_segment_id = as.character(road_segment_id))
+dbDisconnect(con)
+
+# segdata <- read_segment_data("sim000")
+segdata <- read_segment_data("sim002")
+segids <- table(segdata$segment_id) %>% sort %>% tail(100) %>% names %>% sample(20)
+
+# segids <- table(segdata$segment_id) %>% names %>% sample(20)
+segd <- segdata %>% filter(segment_id %in% segids) %>% 
+    left_join(seglens, by = c("segment_id" = "road_segment_id")) %>%
+    mutate(speed = length / travel_time)
+
+ggplot(segd) +
+    # geom_smooth(aes(timestamp, travel_time), formula = y ~ 1, method = "lm") +
+    # geom_smooth(aes(timestamp, travel_time)) +
+    geom_hline(aes(yintercept = length / (100 * 1000 / 60 / 60)), color = "orangered") +
+    geom_hline(aes(yintercept = length / (50 * 1000 / 60 / 60)), color = "orangered", lty = 2) +
+    geom_hline(aes(yintercept = length / (30 * 1000 / 60 / 60)), color = "orangered", lty = 3) +
+    geom_hline(aes(yintercept = length / (10 * 1000 / 60 / 60)), color = "orangered", lty = 4) +
+    geom_pointrange(
+        aes(timestamp, travel_time, ymin = pmax(0, travel_time - error), ymax = travel_time + pmin(error, 30)),
+        size = 0.2
+        ) +
+    facet_wrap(~segment_id, scales = "free_y")
+
+ggplot(segd, aes(timestamp, speed / 1000 * 60 * 60)) +
+    # geom_smooth(formula = y ~ 1, method = "lm") +
+    # geom_smooth(aes(timestamp, travel_time)) +
+    geom_hline(aes(yintercept = 10 / 1000 * 60 * 60), color = "orangered") +
+    geom_pointrange(
+        aes(ymin = pmax(0, length / (travel_time + error) / 1000 * 60 * 60), 
+            ymax = pmin(100, length / pmax(1, travel_time - error) / 1000 * 60 * 60)),
+        size = 0.2
+        ) +
+    facet_wrap(~paste0(segment_id, " [", round(length), "m]"))

@@ -114,8 +114,8 @@ eta <- function(sim, ta, ts, sched) {
         xlim(min(ta$time, sched$arrival_time), max(ta$time, sched$arrival_time))
     # print(etadata %>% select(stop_sequence, time, q5, q100))
     if (all(c("q5", "q95") %in% names(etadata))) {
-        p <- p + geom_segment(aes(x = astime(q5), xend = pmin(max(ta$time, sched$arrival_time), astime(q95)), yend = stop_sequence), 
-            data = etadata %>% filter(q5 > 0 & q95 > 0))
+        p <- p + geom_segment(aes(x = astime(q0), xend = pmin(max(ta$time, sched$arrival_time), astime(q95)), yend = stop_sequence), 
+            data = etadata %>% filter(q0 > 0 & q95 > 0))
     }
     if ("q50" %in% names(etadata)) {
         p <- p + geom_point(aes(x = astime(q50)), data = etadata %>% filter(q50 > 0), color = "black")
@@ -294,7 +294,7 @@ server <- function(input, output, session) {
             if (!is.null(rv$etatimes)) {
                 # rv$tatimes <- rv$etatimes %>% filter(trip_id == input$tripid) %>%
                 #     pluck("timestamp") %>% unique() %>% sort()
-                rv$tatimes <- rv$etatimes[rv$etatimes >= min(rv$ta$time) - 60*30 &
+                rv$tatimes <- rv$etatimes[rv$etatimes >= min(rv$ta$time) &
                                           rv$etatimes <= max(rv$ta$time) + 60*60]
             } else {
                 rv$tatimes <- NULL

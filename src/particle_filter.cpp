@@ -183,8 +183,11 @@ namespace Gtfs {
                                             return a + p.get_weight () * pow(p.get_travel_time (_current_segment) - tt, 2);
                                        });
 
+                // if the error is effectively 0 ...
+                if (err < 0.001) err = 10.0;
+
                 _segment_travel_times.at (_current_segment) = round (tt);
-                segs.at (_current_segment).segment->push_data (round (tt), fmax(2.0, err));
+                segs.at (_current_segment).segment->push_data (tt, err, _timestamp);
                 _current_segment++;
             }
             
@@ -531,30 +534,34 @@ namespace Gtfs {
             // << ", at.size = " << at.size ();
         
         // allow vehicle to remain stationary if at a stop:
-        if (distance == stops->at (m).distance &&
-            rng.runif () < 0.05)
+        if (distance == stops->at (m).distance)
         {
-            double w = - log (rng.runif ()) * delta;
-            delta = fmax (0, delta - round (w));
-            // we don't want this to affect the speed
+            if (rng.runif () < 0.05)
+            {
+                double w = vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
+                delta = fmax (0, delta - round (w));
+                // we don't want this to affect the speed
+            }
         }
-        else if (distance == segments->at (l).distance &&
-                 rng.runif () < 0.05)
-        {
-            double w = - log (rng.runif ()) * delta;
-            delta = fmax (0, delta - round (w));
-            if (tt.at (l) >= 0)
-                tt.at (l) = tt.at (l) + 1;
-        }
-        else if (rng.runif () < 0.05)
+        // else if (distance == segments->at (l).distance &&
+        //          rng.runif () < 0.05)
+        // {
+        //     double w = - log (rng.runif ()) * delta;
+        //     delta = fmax (0, delta - round (w));
+        //     if (tt.at (l) >= 0)
+        //         tt.at (l) = tt.at (l) + 1;
+        // }
+        else if (rng.runif () < 0.01)
         {
             // a very small chance for particles to remain stationary
+            if (tt.at (l) >= 0)
+                tt.at (l) = tt.at (l) + delta;
+            delta = 0;
+
             // speed = 0.0;
             // when /not/ at a bus stop, set speed to 0 and wait
-            double w = - log (rng.runif ()) * delta;
-            delta = fmax (0.0, delta - round (w));
-            if (tt.at (l) >= 0)
-                tt.at (l) = tt.at (l) + 1;
+            // double w = - log (rng.runif ()) * delta;
+            // delta = fmax (0.0, delta - round (w));
             // then the bus needs to accelerate back up to speed ... for how many seconds?
             // accelerating = 5.0 + rng.runif () * 10.0;
             // acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
@@ -571,12 +578,17 @@ namespace Gtfs {
                 segments->at (l).segment->uncertainty ();
             speed_sd = pow(speed_sd, 0.5);
         }
+        double vmax = rng.runif () < 0.05 ? 30.0 : 15.0;
         while (distance < Dmax && delta > 0.0)
         {
-            // add system noise to acceleration to ensure speed remains in [0, 30]
+            // add system noise to acceleration to ensure speed remains in [0, vmax]
             double accel_prop (-100.0);
             double n = 0;
-            while (speed + accel_prop < 0.0 || speed + accel_prop > 30.0)
+            if (speed > vmax)
+            {
+                speed = rng.runif () * vmax;
+            }
+            while (speed + accel_prop < 0.0 || speed + accel_prop > vmax && n < 1000)
             {
                 accel_prop = rng.rnorm () * vehicle->system_noise () * 
                     (1.0 + (double)n / 100.0);
@@ -589,20 +601,21 @@ namespace Gtfs {
             }
 
             // double v = fmax (0, fmin (30, speed + acceleration));
-            double v = speed;
-            double vstar = speed + accel_prop;
-            double alpha = (pow (v - speed_mean, 2) - pow(vstar - speed_mean, 2)) / (2 * pow (speed_sd, 2));
-            alpha = fmin (0, alpha);
-            if (rng.runif () < exp (alpha))
-            {
-                acceleration = accel_prop;
-                speed = vstar;
-            }
-            else
-            {
-                speed = v;
-            }
+            // double v = speed;
+            // double vstar = speed + accel_prop;
+            // double alpha = (pow (v - speed_mean, 2) - pow(vstar - speed_mean, 2)) / (2 * pow (speed_sd, 2));
+            // alpha = fmin (0, alpha);
+            // if (rng.runif () < exp (alpha))
+            // {
+            //     acceleration = accel_prop;
+            //     speed = vstar;
+            // }
+            // else
+            // {
+            //     speed = v;
+            // }
 
+            speed += accel_prop;
             distance += speed;
             delta--;
             if (tt.at (l) >= 0)
@@ -614,6 +627,7 @@ namespace Gtfs {
                 l++;
                 tt.at (l) = 0;
                 next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
+                vmax = rng.runif () < 0.05 ? 30.0 : 15.0;
                 if (segments->at (l).segment->travel_time () > 0 &&
                     segments->at (l).segment->uncertainty () > 0) 
                 {
@@ -653,6 +667,19 @@ namespace Gtfs {
                 continue;
             }
         }
+
+        // almost at next stop ...
+        if (m < M-1 &&
+            next_stop_d - distance < 20)
+        {
+            distance = next_stop_d;
+            m++;
+            at.at (m) = vehicle->timestamp ();
+            if (m < M-1)
+            {
+                next_stop_d = stops->at (m+1).distance;
+            }
+        }
     }
 
     void Particle::predict_etas (RNG& rng)
@@ -689,7 +716,7 @@ namespace Gtfs {
         double dnext;
         uint64_t t0 = vehicle->timestamp ();
         // std::cout << t0 << " > ";
-        int etat;
+        int etat, tt_total = 0;
         double vel;
         vel = segments->at (l).segment->sample_speed (rng);
         if (vel == 0.0 && speed >= 0.0) vel = speed;
@@ -707,10 +734,11 @@ namespace Gtfs {
             {
                 // time to get to end of segment
                 etat += (next_segment_d - dcur) / vel;
+                tt_total += (next_segment_d - dcur) / vel;
                 dcur = next_segment_d;
                 l++;
                 next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
-                vel = segments->at (l).segment->sample_speed (rng);
+                vel = segments->at (l).segment->sample_speed (rng, tt_total);
                 if (vel == 0.0 && speed >= 0.0) vel = speed;
                 while (vel <= 0.0 || vel > 30)
                 {
@@ -720,6 +748,7 @@ namespace Gtfs {
             }
             // std::cout << "] ";
             etat += (dnext - dcur) / vel;
+            tt_total += (dnext - dcur) / vel;
             at.at (m) = t0 + etat; // makes no sense because speeds are noise
             dcur = dnext;
             // and add some dwell time
