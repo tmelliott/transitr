@@ -48,10 +48,16 @@ void run_realtime_model (List nw)
     // Construct the realtime feed object
     List apis = nw["apis"];
     List rt = apis["realtime"];
-    String url_raw = rt["url"];
-    std::string url (url_raw);
+    CharacterVector url_raw = rt["url"];
+    int Nurl = url_raw.size ();
+    std::vector<std::string> urls;
+    for (int i=0; i<Nurl; i++)
+    {   
+        String url (url_raw[i]);
+        urls.push_back (url);
+    }
     List headers = rt["headers"];
-    RealtimeFeed rtfeed (url, headers);
+    RealtimeFeed rtfeed (urls, headers);
 
     // Connect GTFS database
     Gtfs::Gtfs gtfs (dbname);
@@ -79,14 +85,16 @@ void run_realtime_model (List nw)
     int iteration = 0;
     while (ongoing)
     {
+        Rcout << "\n --- Commence iteration ---\n";
+
         timer.reset ();
+        ongoing = 0;
         
         // call the feed once and check the result is reasonable
         int ures = rtfeed.update ();
         // 5 => "simulations completed"
         if (ures == 5) break;
         
-        Rcout << "\n --- Commence iteration ---\n";
         if (ures != 0 && tries < 10)
         {
             Rcout << "\n x Unable to fetch URL. Trying again ...\n";
@@ -96,8 +104,8 @@ void run_realtime_model (List nw)
         }
         tries = 0;
         Rcout << "\n + loaded " 
-            << rtfeed.feed ()->entity_size () 
-            << " vehicle positions.\n";
+            << rtfeed.n_vehicles () << " vehicle positions and "
+            << rtfeed.n_trip_updates () << " trip updates.\n";
 
         {
             std::ostringstream tinfo;
