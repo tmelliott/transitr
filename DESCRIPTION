@@ -38,5 +38,5 @@ LinkingTo:
     Rcpp, 
     BH,
     testthat
-RoxygenNote: 6.0.1
+RoxygenNote: 6.1.0.9000
 Biarch: TRUE
