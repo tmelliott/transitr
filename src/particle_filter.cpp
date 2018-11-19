@@ -52,30 +52,95 @@ namespace Gtfs {
             _last_stop_update_index < _stop_time_updates.size ())
         {
             STU& stu = _stop_time_updates.at (_last_stop_update_index);
-            if (!stu.used && stu.timestamp > 0)
+            if (stu.timestamp > 0)
             {
                 // most recent update (and maybe others!!) needs to be incorporated into the likelihood
                 // BUT--- for now, just using a DIFFERENT likelihood for these
-                if (stu.departure_time > 0)
+                if (!stu.used_arrival && stu.arrival_time > 0)
                 {
-                    if (_timestamp == stu.departure_time)
-                    {
-                        _skip_observation = true;
-                        std::cout << " - skipping observation because of arrival time.\n";
-                    }
-                }
-                else if (stu.arrival_time > 0)
-                {
+                    _skip_observation = true;
                     if (_timestamp == stu.arrival_time)
                     {
-                        _skip_observation = true;
-                        std::cout << " - skipping observation because of departure time.\n";
+                        // Y is from arrival, so forget it  - timestamp and delta are correct
+                        std::cout << " - Arr1 d=" << _delta << "\n";
+                        mutate2 (rng);
+                        _delta = 0;
                     }
+                    else if (_timestamp < stu.arrival_time)
+                    {
+                        std::cout << " - Arr2 d=" << _delta << "\n";
+                        // mutate to Y, then arrival
+                        mutate2 (rng);
+                        _delta = stu.arrival_time - _timestamp;
+                        _previous_ts = _timestamp;
+                        _timestamp = stu.arrival_time;
+                        mutate2 (rng);
+                        _delta = 0;
+                    }
+                    else
+                    {
+                        // mutate to arrival, then Y
+                        auto ts = _timestamp;
+                        _delta = stu.arrival_time - _previous_ts;
+                        _timestamp = stu.arrival_time;
+                        std::cout << " - Arr3 d=" << _delta << "\n";
+                        mutate2 (rng);
+                        _timestamp = ts;
+                        _delta = _timestamp - stu.arrival_time;
+                        _previous_ts = stu.arrival_time;
+                        mutate2 (rng);
+                        _delta = 0;
+                    }
+                    stu.used_arrival = true;
+                }
+
+                if (!stu.used_departure && stu.departure_time > 0)
+                {
+                    _skip_observation = true;
+                    if (_timestamp == stu.departure_time)
+                    {
+                        std::cout << " - Dep1 d=" << _delta << "\n";
+                        // Y is from departure, so forget it - timestamp and delta are correct
+                        mutate2 (rng);
+                    }
+                    else if (_timestamp < stu.departure_time)
+                    {
+                        // mutate to Y, then departure
+                        std::cout << " - Dep2 d=" << _delta << "\n";
+                        if (_delta > 0)
+                        {
+                            mutate2 (rng);
+                        }
+                        _delta = stu.departure_time - _timestamp;
+                        _previous_ts = _timestamp;
+                        _timestamp = stu.departure_time;
+                        mutate2 (rng);
+                        _delta = 0;
+                    }
+                    else
+                    {
+                        auto ts = _timestamp;
+                        _delta = stu.departure_time - _previous_ts;
+                        _timestamp = stu.departure_time;
+                        std::cout << " - Dep3 d=" << _delta << "\n";
+                        mutate2 (rng);
+                        _timestamp = ts;
+                        _delta = _timestamp - stu.departure_time;
+                        _previous_ts = stu.departure_time;
+                        mutate2 (rng);
+                        _delta = 0;
+                    }
+                    stu.used_departure = true;
                 }
             }
         }
 
-        mutate2 (rng);
+        // ok, there was no arrival stuff 
+        if (!_skip_observation) 
+        {
+            std::cout << " - Obs d=" << _delta << "\n";
+            mutate2 (rng);
+        }
 
         _skip_observation = false;
     }
@@ -328,29 +393,70 @@ namespace Gtfs {
     void Vehicle::select (RNG& rng)
     {
         // this will be made better to use alternative likelihood at some point ...
-        if (_skip_observation) return;
-
         bad_sample = true;
         resample = false;
 
+        double calculated = false;
+        double sumlh = 0.0;
+        double sumwt = 0.0;
+        double plh;
 
         // calculate loglikelihood of particles
-        double sumlh = 0.0;
-        // threshold of 100m
-        double threshold = log (0.5) - 0.5 * exp (2.0 * (log (100.0) - log (_gpserror)));
-        double maxlh = threshold;
-        std::vector<ShapePt>* path = &(_trip->shape ()->path ());
-        double plh;
-        double sumwt = 0.0;
-        for (auto p = _state.begin (); p != _state.end (); ++p)
+        if (_stop_time_updates.size () > 0 && 
+            _last_stop_update_index >= 0 && 
+            _last_stop_update_index < _stop_time_updates.size ())
         {
-            p->calculate_likelihood (_position, path, _gpserror);
-            plh = p->get_ll ();
-            sumlh += exp (plh);
-            if (plh > maxlh) maxlh = plh;
+            STU& stu = _stop_time_updates.at (_last_stop_update_index);
+            if (stu.timestamp > 0)
+            {
+                if (!stu.used_arrival && stu.arrival_time > 0 && _timestamp == stu.arrival_time)
+                {
+                    // calculate likelihood based on arrival time
+                    for (auto p = _state.begin (); p != _state.end (); ++p)
+                    {
+                        p->calculate_arrival_likelihood (_last_stop_update_index, stu.arrival_time, _arrival_error);
+                        plh = p->get_ll ();
+                        sumlh += exp (plh);
+                        p->set_weight (p->get_weight () * exp (plh));
+                        sumwt += p->get_weight ();
+                    }
+                    std::cout << " - vehicle " << _vehicle_id << " -> calculated likelihood using arrival time\n";
+                    calculated = true;
+                }
+                if (!stu.used_departure && stu.departure_time > 0 && _timestamp == stu.departure_time)
+                {
+                    // calculate likelihood based on departure time
+                    for (auto p = _state.begin (); p != _state.end (); ++p)
+                    {
+                        p->calculate_departure_likelihood (_last_stop_update_index, stu.departure_time, _departure_error);
+                        plh = p->get_ll ();
+                        sumlh += exp (plh);
+                        p->set_weight (p->get_weight () * exp (plh));
+                        sumwt += p->get_weight ();
+                    }
+                    std::cout << " - vehicle " << _vehicle_id << " -> calculated likelihood using departure time\n";
+                    calculated = true;
+                }
+            }
+        }
 
-            p->set_weight (p->get_weight () * exp (plh));
-            sumwt += p->get_weight ();
+        if (!calculated)
+        {
+            // threshold of 100m
+            double threshold = log (0.5) - 0.5 * exp (2.0 * (log (100.0) - log (_gpserror)));
+            double maxlh = threshold;
+            std::vector<ShapePt>* path = &(_trip->shape ()->path ());
+            for (auto p = _state.begin (); p != _state.end (); ++p)
+            {
+                p->calculate_likelihood (_position, path, _gpserror);
+                plh = p->get_ll ();
+                sumlh += exp (plh);
+                if (plh > maxlh) maxlh = plh;
+
+                p->set_weight (p->get_weight () * exp (plh));
+                sumwt += p->get_weight ();
+            }
+            std::cout << " - vehicle " << _vehicle_id << " -> calculated likelihood using vehicle position\n";
         }
 
         // if (maxlh < threshold) return;
@@ -813,6 +919,18 @@ namespace Gtfs {
         double lX2 = 2 * (ld - log (sigma));
         // log pdf of lX2 ~ Exp(2)
         log_likelihood = log (0.5) - 0.5 * exp(lX2);
+    }
+
+    void Particle::calculate_arrival_likelihood (int index, uint64_t time, double error)
+    {
+        // particle's arrival time at stop INDEX
+        if (get_arrival_time (index) == 0) log_likelihood = 0;
+        log_likelihood = - 0.5 * log (2 * M_PI) - log (error) - pow (get_arrival_time (index) - time, 2) / 2 / pow (error, 2);
+    }
+    void Particle::calculate_departure_likelihood (int index, uint64_t time, double error)
+    {
+        log_likelihood = 0;
+        // return - 0.5 * log (2 * pi) - log (error) - pow ()
     }
 
     void Particle::set_weight (double w)

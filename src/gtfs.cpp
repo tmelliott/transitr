@@ -1996,6 +1996,7 @@ namespace Gtfs
         // initialize travel times to -1 and set to 0 when starting segment
         tt.resize (vehicle->trip ()->shape ()->segments ().size () + 1, -1);
         at.resize (vehicle->trip ()->stops ().size ());
+        dt.resize (vehicle->trip ()->stops ().size ());
         // weights initialized to ZERO
         weight = 0.0;
     }
@@ -2009,6 +2010,7 @@ namespace Gtfs
         accelerating = p.accelerating;
         tt = p.tt;
         at = p.at;
+        dt = p.dt;
         complete = p.complete;
         log_likelihood = p.log_likelihood;
         weight = 0.0;
@@ -2059,6 +2061,17 @@ namespace Gtfs
     {
         if (i >= at.size ()) return 0;
         return at.at (i);
+    }
+
+    std::vector<uint64_t>& Particle::get_departure_times ()
+    {
+        return dt;
+    }
+
+    uint64_t Particle::get_departure_time (int i)
+    {
+        if (i >= dt.size ()) return 0;
+        return dt.at (i);
     }
 
     std::vector<int>& Particle::get_travel_times ()

@@ -455,7 +455,8 @@ namespace Gtfs
         uint64_t departure_time = 0;
         int departure_delay = 0;
 
-        bool used = false;
+        bool used_arrival = false;
+        bool used_departure = false;
 
         STU () {};
     };
@@ -472,6 +473,9 @@ namespace Gtfs
             float _prstop;
             float _dwelltime;
             float _gamma;
+
+            float _arrival_error = 5.0;
+            float _departure_error = 5.0;
 
             bool _newtrip = true;
             bool _complete = false;
@@ -549,6 +553,7 @@ namespace Gtfs
         int accelerating = 0.0;
         std::vector<int> tt; // segment travel times
         std::vector<uint64_t> at; // stop arrival times
+        std::vector<uint64_t> dt; // stop departure times
 
         bool complete = false;
 
@@ -568,6 +573,8 @@ namespace Gtfs
         double get_weight ();
         std::vector<uint64_t>& get_arrival_times ();
         uint64_t get_arrival_time (int i);
+        std::vector<uint64_t>& get_departure_times ();
+        uint64_t get_departure_time (int i);
         std::vector<int>& get_travel_times ();
         int get_travel_time (int i);
 
@@ -575,6 +582,8 @@ namespace Gtfs
         void predict_etas (RNG& rng);
         
         void calculate_likelihood (latlng& y, std::vector<ShapePt>* path, double sigma);
+        void calculate_arrival_likelihood (int index, uint64_t time, double error);
+        void calculate_departure_likelihood (int index, uint64_t time, double error);
         void set_weight (double w);
     };
 

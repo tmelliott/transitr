@@ -106,8 +106,8 @@ seglens <- con %>% tbl("road_segments") %>% select(road_segment_id, length) %>% 
     mutate(road_segment_id = as.character(road_segment_id))
 dbDisconnect(con)
 
-# segdata <- read_segment_data("sim000")
-segdata <- read_segment_data("sim002")
+segdata <- read_segment_data("sim000")
+# segdata <- read_segment_data("sim002")
 segids <- table(segdata$segment_id) %>% sort %>% tail(100) %>% names %>% sample(20)
 
 # segids <- table(segdata$segment_id) %>% names %>% sample(20)
