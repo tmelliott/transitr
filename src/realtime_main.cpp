@@ -124,6 +124,26 @@ void run_realtime_model (List nw)
         load_vehicles (&vehicles, rtfeed.feed (), &gtfs, &params);
         timer.report ("updating vehicle information");
 
+        // *** Some debugging code **********************************************
+        // Rcout << vehicles.bucket_count () << " vehicles\n";
+        // for (auto v = vehicles.begin (); v != vehicles.end (); ++v)
+        // {       
+        //     Rcout << " - vehicle " << v->second.vehicle_id () << "\n";
+        //     for (auto stu = v->second.stop_time_updates ()->begin (); 
+        //          stu != v->second.stop_time_updates ()->end (); ++stu)
+        //     {
+        //         Rcout << "   - ";
+        //         if (stu->arrival_time > 0) 
+        //             Rcout << "arrived " << stu->arrival_delay << "s late";
+        //         if (stu->arrival_time > 0 && stu->departure_time > 0)
+        //             Rcout << " and ";
+        //         if (stu->departure_time > 0)
+        //             Rcout << "departed " << stu->departure_delay << "s late";
+        //         Rcout << "\n";
+        //     }
+        // }
+        // *** end debugging code ***********************************************
+
         // Update vehicle states
         #pragma omp parallel for num_threads(params.n_core)
         for (unsigned i=0; i<vehicles.bucket_count (); ++i)

@@ -448,6 +448,16 @@ namespace Gtfs
         bool no_trips_remaining ();
     };
 
+    struct STU {
+        uint64_t timestamp = 0;
+        uint64_t arrival_time = 0;
+        int arrival_delay = 0;
+        uint64_t departure_time = 0;
+        int departure_delay = 0;
+
+        STU () {};
+    };
+
     class Vehicle {
         private:
             std::string _vehicle_id;
@@ -468,6 +478,8 @@ namespace Gtfs
             std::vector<Particle> _state;
             std::vector<Particle> _previous_state;
             uint64_t _previous_ts = 0;
+
+            std::vector<STU> _stop_time_updates;
             
             double estimated_dist = 0.0;
             bool bad_sample;
@@ -488,8 +500,12 @@ namespace Gtfs
             uint64_t timestamp ();
             unsigned delta ();
 
+            std::vector<STU>* stop_time_updates ();
+
             void set_trip (Trip* trip);
             void update (const transit_realtime::VehiclePosition& vp,
+                         Gtfs* gtfs);
+            void update (const transit_realtime::TripUpdate& tu,
                          Gtfs* gtfs);
             bool valid ();
             bool complete ();

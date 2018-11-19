@@ -1769,6 +1769,11 @@ namespace Gtfs
         return _delta;
     }
 
+    std::vector<STU>* Vehicle::stop_time_updates ()
+    {
+        return &_stop_time_updates;
+    }
+
     void Vehicle::set_trip (Trip* trip)
     {
         if (_trip != nullptr)
@@ -1813,6 +1818,12 @@ namespace Gtfs
             _previous_ts = 0;
             _state.clear ();
             estimated_dist = 0.0;
+
+            if (_trip != nullptr)
+            {
+                _stop_time_updates.clear ();
+                _stop_time_updates.resize (_trip->stops ().size ());
+            }
         }
 
         if (_trip == nullptr)
@@ -1855,6 +1866,63 @@ namespace Gtfs
         }
         estimated_dist = est_dist;
         _timestamp = vp.timestamp ();
+    }
+
+    void Vehicle::update (const transit_realtime::TripUpdate& tu,
+                          Gtfs* gtfs)
+    {
+        if (!tu.has_trip ()) return;
+        if (!tu.trip ().has_trip_id ()) return;
+        if (_trip != nullptr && _trip->trip_id () != tu.trip ().trip_id ()) return;
+        if (!tu.has_timestamp ()) return;
+
+        if (_trip == nullptr) // only if trip missing
+        {
+            // assign trip <--> vehicle
+            std::string tid = tu.trip ().trip_id ();
+            set_trip (gtfs->find_trip (tid));
+            _newtrip = _trip != nullptr;
+
+            _previous_state.clear ();
+            _previous_ts = 0;
+            _state.clear ();
+            estimated_dist = 0.0;
+
+            if (_trip != nullptr)
+            {
+                _stop_time_updates.clear ();
+                _stop_time_updates.resize (_trip->stops ().size ());
+            }
+        }
+
+        // make this a for loop for futureproofing
+        STU* stup;
+        auto stu = tu.stop_time_update ()[0];
+        {
+            if (!stu.has_stop_sequence ()) return;
+            unsigned stui = stu.stop_sequence () - 1;
+            if (_stop_time_updates.size () > 0)
+            {
+                stup = &(_stop_time_updates.at (stui));
+                stup->timestamp = tu.timestamp ();
+                if (stu.has_arrival ())
+                {
+                    auto x = stu.arrival ();
+                    if (x.has_time ())
+                        stup->arrival_time = x.time ();
+                    if (x.has_delay ())
+                        stup->arrival_delay = x.delay ();
+                }
+                if (stu.has_departure ())
+                {
+                    auto x = stu.departure ();
+                    if (x.has_time ())
+                        stup->departure_time = x.time ();
+                    if (x.has_delay ())
+                        stup->departure_delay = x.delay ();
+                }
+            }
+        }
     }
 
     bool Vehicle::valid ()

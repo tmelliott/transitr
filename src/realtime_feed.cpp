@@ -106,8 +106,6 @@ int RealtimeFeed::update ()
         }
     }
 
-
-
     return 0;
 }
 
@@ -124,10 +122,10 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
     for (int i=0; i<feed->entity_size (); ++i)
     {
         auto ent = feed->entity (i);
-        if (ent.has_vehicle ())
+        if (ent.has_vehicle () && ent.vehicle ().has_vehicle ())
         {
-            if (!ent.vehicle ().has_vehicle ()) continue;
-            
+            // std::cout << " - vehicle " << ent.vehicle ().vehicle ().id ()
+                // << " - " << ent.vehicle ().trip ().id () << "\n";
             std::string id (ent.vehicle ().vehicle ().id ());
             auto vs = vehicles->find (id);
             if (vs == vehicles->end ())
@@ -146,9 +144,26 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
             }
         } // end if vehicle position
         
-        if (ent.has_trip_update ())
+        if (ent.has_trip_update () && ent.trip_update ().stop_time_update ().size () > 0)
         {
-            // std::cout << "tripupdate - ";
+            std::string id (ent.trip_update ().vehicle ().id ());
+            auto vs = vehicles->find (id);
+            if (vs == vehicles->end ())
+            {
+                auto r = vehicles->emplace (std::piecewise_construct,
+                                            std::forward_as_tuple (id), 
+                                            std::forward_as_tuple (id, params));
+                if (r.second)
+                {
+                    r.first->second.update (ent.trip_update (), gtfs);
+                }
+                std::cout << " - new\n";
+            }
+            else
+            {
+                vs->second.update (ent.trip_update (), &(*gtfs));
+                std::cout << " - existing\n";
+            }
         } // end if trip update
     } // end feed->entity
 
