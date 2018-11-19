@@ -88,7 +88,6 @@ void run_realtime_model (List nw)
         Rcout << "\n --- Commence iteration ---\n";
 
         timer.reset ();
-        ongoing = 0;
         
         // call the feed once and check the result is reasonable
         int ures = rtfeed.update ();

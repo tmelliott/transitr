@@ -46,6 +46,42 @@ namespace Gtfs {
 
     void Vehicle::mutate (RNG& rng)
     {
+        // are there any stop updates that need accounting for?
+        if (_stop_time_updates.size () > 0 && 
+            _last_stop_update_index >= 0 && 
+            _last_stop_update_index < _stop_time_updates.size ())
+        {
+            STU& stu = _stop_time_updates.at (_last_stop_update_index);
+            if (!stu.used && stu.timestamp > 0)
+            {
+                // most recent update (and maybe others!!) needs to be incorporated into the likelihood
+                // BUT--- for now, just using a DIFFERENT likelihood for these
+                if (stu.departure_time > 0)
+                {
+                    if (_timestamp == stu.departure_time)
+                    {
+                        _skip_observation = true;
+                        std::cout << " - skipping observation because of arrival time.\n";
+                    }
+                }
+                else if (stu.arrival_time > 0)
+                {
+                    if (_timestamp == stu.arrival_time)
+                    {
+                        _skip_observation = true;
+                        std::cout << " - skipping observation because of departure time.\n";
+                    }
+                }
+            }
+        }
+
+        mutate2 (rng);
+
+        _skip_observation = false;
+    }
+
+    void Vehicle::mutate2 (RNG& rng)
+    {
         if (_newtrip)
         {
             initialize (rng);
@@ -291,8 +327,12 @@ namespace Gtfs {
 
     void Vehicle::select (RNG& rng)
     {
+        // this will be made better to use alternative likelihood at some point ...
+        if (_skip_observation) return;
+
         bad_sample = true;
         resample = false;
+
 
         // calculate loglikelihood of particles
         double sumlh = 0.0;

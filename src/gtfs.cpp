@@ -1900,10 +1900,10 @@ namespace Gtfs
         auto stu = tu.stop_time_update ()[0];
         {
             if (!stu.has_stop_sequence ()) return;
-            unsigned stui = stu.stop_sequence () - 1;
             if (_stop_time_updates.size () > 0)
             {
-                stup = &(_stop_time_updates.at (stui));
+                _last_stop_update_index = stu.stop_sequence () - 1;
+                stup = &(_stop_time_updates.at (_last_stop_update_index));
                 stup->timestamp = tu.timestamp ();
                 if (stu.has_arrival ())
                 {

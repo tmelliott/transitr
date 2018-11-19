@@ -455,6 +455,8 @@ namespace Gtfs
         uint64_t departure_time = 0;
         int departure_delay = 0;
 
+        bool used = false;
+
         STU () {};
     };
 
@@ -480,6 +482,8 @@ namespace Gtfs
             uint64_t _previous_ts = 0;
 
             std::vector<STU> _stop_time_updates;
+            int _last_stop_update_index = -1;
+            bool _skip_observation = false;
             
             double estimated_dist = 0.0;
             bool bad_sample;
@@ -513,6 +517,7 @@ namespace Gtfs
             // statistics things
             void initialize (RNG& rng);
             void mutate (RNG& rng); // mutate state
+            void mutate2 (RNG& rng); // mutate state
             void select (RNG& rng); // select state (given data)
             void predict_etas (RNG& rng);
             etavector get_etas ();

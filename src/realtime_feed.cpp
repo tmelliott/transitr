@@ -157,12 +157,10 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
                 {
                     r.first->second.update (ent.trip_update (), gtfs);
                 }
-                std::cout << " - new\n";
             }
             else
             {
                 vs->second.update (ent.trip_update (), &(*gtfs));
-                std::cout << " - existing\n";
             }
         } // end if trip update
     } // end feed->entity
