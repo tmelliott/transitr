@@ -124,7 +124,7 @@ void run_realtime_model (List nw)
         timer.report ("updating vehicle information");
 
         // *** Some debugging code **********************************************
-        Rcout << vehicles.bucket_count () << " vehicles\n";
+        Rcout << vehicles.size () << " vehicles\n";
         for (auto v = vehicles.begin (); v != vehicles.end (); ++v)
         {       
             Rcout << "+ vehicle " << v->second.vehicle_id () << "\n";

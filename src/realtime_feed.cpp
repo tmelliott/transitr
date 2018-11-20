@@ -165,6 +165,12 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
         } // end if trip update
     } // end feed->entity
 
+    // update all the vehicles
+    for (auto v = vehicles->begin (); v != vehicles->end (); ++v)
+    {
+        v->second.update (gtfs);
+    }
+
 }
 
 void write_vehicles (Gtfs::vehicle_map* vehicles, std::string& file)

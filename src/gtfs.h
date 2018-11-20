@@ -468,9 +468,15 @@ namespace Gtfs
         std::string trip_id;
         latlng position; // only for type == EventType::gps
         int stop_index;  // only for type == EventType::arrival or EventType::departure
-        
+        bool used = false; // once incorporated into likelihood, no longer use this event
+
         Event (uint64_t ts, EventType type, std::string trip, int index);
         Event (uint64_t ts, EventType type, std::string trip, latlng pos);
+
+        bool operator < (const Event& e) const
+        {
+            return (timestamp < e.timestamp);
+        }
     };
 
     class Vehicle {
@@ -525,7 +531,7 @@ namespace Gtfs
             unsigned delta ();
 
             void add_event (Event event);
-            std::vector<Event>& get_events () { return new_events; }
+            std::vector<Event>& get_events () { return time_events; }
 
             std::vector<STU>* stop_time_updates ();
 
@@ -534,6 +540,7 @@ namespace Gtfs
                          Gtfs* gtfs);
             void update (const transit_realtime::TripUpdate& tu,
                          Gtfs* gtfs);
+            void update (Gtfs* gtfs); // move new_events -> time_events, validate, etc
             bool valid ();
             bool complete ();
 

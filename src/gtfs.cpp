@@ -1904,6 +1904,31 @@ namespace Gtfs
         if (_trip != nullptr && _trip->trip_id () != tu.trip ().trip_id ()) return;
         if (!tu.has_timestamp ()) return;
 
+        for (auto stu : tu.stop_time_update ())
+        {
+            if (!stu.has_stop_sequence ()) continue;
+            const transit_realtime::TripUpdate::StopTimeEvent* ste;
+            if (stu.has_arrival ())
+            {
+                ste = &(stu.arrival ());
+            }
+            else if (stu.has_departure ())
+            {
+                ste = &(stu.departure ());
+            }
+            else
+            {
+                continue;
+            }
+            add_event (Event (ste->time (), 
+                              (stu.has_arrival () ? EventType::arrival : EventType::departure),
+                              tu.trip ().trip_id (),
+                              stu.stop_sequence ()));
+        }
+
+
+        return;
+
         if (_trip == nullptr) // only if trip missing
         {
             // assign trip <--> vehicle
@@ -1951,6 +1976,38 @@ namespace Gtfs
                 }
             }
         }
+    }
+
+    void Vehicle::update (Gtfs* gtfs)
+    {
+        if (new_events.size () == 0) return;
+
+
+        // sort events
+        std::sort (new_events.begin (), new_events.end ());
+        for (auto e : new_events)
+        {
+            if (time_events.size ()) _timestamp = time_events.back ().timestamp;
+            if (e.timestamp < _timestamp) continue;
+            if (e.timestamp == _timestamp)
+            {
+                // update ?
+                EventType prev_type = time_events.back ().type;
+                if (prev_type == EventType::departure) continue;
+                if (prev_type == EventType::arrival && 
+                    e.type != EventType::departure) continue;
+
+                time_events.back ().trip_id = e.trip_id;
+                time_events.back ().type = e.type;
+                time_events.back ().stop_index = e.stop_index;
+                time_events.back ().position = e.position;
+            }
+            else
+            {
+                time_events.push_back (e);
+            }
+        }
+        new_events.clear ();
     }
 
     bool Vehicle::valid ()
