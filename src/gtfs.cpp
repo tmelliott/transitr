@@ -1986,11 +1986,12 @@ namespace Gtfs
         // the "last" event (gps < arrival < departure)
         // - completely overwrite (trip_id too)
         std::sort (new_events.begin (), new_events.end ());
+        uint64_t ts = 0;
         for (auto e : new_events)
         {
-            if (time_events.size ()) _timestamp = time_events.back ().timestamp;
-            if (e.timestamp < _timestamp) continue;
-            if (e.timestamp == _timestamp)
+            if (time_events.size ()) ts = time_events.back ().timestamp;
+            if (e.timestamp < ts) continue;
+            if (e.timestamp == ts)
             {
                 // update ?
                 EventType prev_type = time_events.back ().type;

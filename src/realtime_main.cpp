@@ -125,27 +125,27 @@ void run_realtime_model (List nw)
 
         // *** Some debugging code **********************************************
         Rcout << vehicles.size () << " vehicles\n";
-        for (auto v = vehicles.begin (); v != vehicles.end (); ++v)
-        {       
-            Rcout << "+ vehicle " << v->second.vehicle_id () << "\n";
-                // << "  - trip id: " << v->second.trip ()->trip_id () << "\n";
+        // for (auto v = vehicles.begin (); v != vehicles.end (); ++v)
+        // {       
+        //     Rcout << "+ vehicle " << v->second.vehicle_id () << "\n";
+        //         // << "  - trip id: " << v->second.trip ()->trip_id () << "\n";
 
-            for (auto e : v->second.get_events ())
-            {
-                Rcout << "   [" << e.timestamp << "] trip " << e.trip_id << ": ";
-                if (e.type == Gtfs::EventType::gps)
-                {
-                    Rcout << "position update {" <<
-                        e.position.latitude << ", " << e.position.longitude << "}";
-                }
-                else
-                {
-                    Rcout << (e.type == Gtfs::EventType::arrival ? "arrived" : "departed")
-                        << " stop " << e.stop_index;
-                }
-                Rcout << "\n";
-            }
-        }
+        //     for (auto e : v->second.get_events ())
+        //     {
+        //         Rcout << "   [" << e.timestamp << "] trip " << e.trip_id << ": ";
+        //         if (e.type == Gtfs::EventType::gps)
+        //         {
+        //             Rcout << "position update {" <<
+        //                 e.position.latitude << ", " << e.position.longitude << "}";
+        //         }
+        //         else
+        //         {
+        //             Rcout << (e.type == Gtfs::EventType::arrival ? "arrived" : "departed")
+        //                 << " stop " << e.stop_index;
+        //         }
+        //         Rcout << "\n";
+        //     }
+        // }
         // ongoing = 0;
         // *** end debugging code ***********************************************
 
@@ -159,6 +159,7 @@ void run_realtime_model (List nw)
                 v->second.mutate (rngs.at (omp_get_thread_num ()));
             }
         }
+        Rcout << "\n\n";
         timer.report ("updating vehicle states");
 
         // Now update the network state

@@ -46,13 +46,23 @@ namespace Gtfs {
 
     void Vehicle::mutate (RNG& rng)
     {
-        std::cout << "+ vehicle " << _vehicle_id << ":\n";
+        int nnew = time_events.size () - current_event_index;
+        std::cout << "\n\n+ vehicle " << _vehicle_id << ": "       
+            << nnew << " new events";
+        if (nnew == 0) return;
+
+        std::cout << "\n    [";
+        if (_timestamp > 0) std::cout << _timestamp;
+        else std::cout << "uninitialized";
+        std::cout << "]";
 
         // repeat until there are no more events
         while (current_event_index < time_events.size ())
         {
             auto e = time_events.at (current_event_index);
-            std::cout << "   [" << e.timestamp << "] trip " << e.trip_id << ": ";
+            mutate_to (e, rng);
+            
+            std::cout << "\n    [" << e.timestamp << "] trip " << e.trip_id << ": ";
             if (e.type == EventType::gps)
             {
                 std::cout << "position update {" <<
@@ -63,11 +73,9 @@ namespace Gtfs {
                 std::cout << (e.type == EventType::arrival ? "arrived" : "departed")
                     << " stop " << e.stop_index;
             }
-            std::cout << "\n";
 
             current_event_index++;
         }
-
 
         return;
         // // are there any stop updates that need accounting for?
@@ -167,6 +175,21 @@ namespace Gtfs {
         // }
 
         // _skip_observation = false;
+    }
+
+    void Vehicle::mutate_to (Event& e, RNG& rng)
+    {
+        if (_timestamp == 0)
+        {
+            _delta = 0;
+            std::cout << " -> initializing";
+        }
+        else
+        {
+            _delta = e.timestamp - _timestamp;
+            std::cout << "\n     + " << _delta << " seconds";
+        }
+        _timestamp = e.timestamp;
     }
 
     void Vehicle::mutate2 (RNG& rng)
