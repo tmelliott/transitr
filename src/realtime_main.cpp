@@ -83,7 +83,7 @@ void run_realtime_model (List nw)
     }
     int tries = 0;
     int iteration = 0;
-    while (ongoing)
+    while (ongoing && iteration < 10)
     {
         Rcout << "\n --- Commence iteration ---\n";
 
@@ -124,23 +124,42 @@ void run_realtime_model (List nw)
         timer.report ("updating vehicle information");
 
         // *** Some debugging code **********************************************
-        // Rcout << vehicles.bucket_count () << " vehicles\n";
-        // for (auto v = vehicles.begin (); v != vehicles.end (); ++v)
-        // {       
-        //     Rcout << " - vehicle " << v->second.vehicle_id () << "\n";
-        //     for (auto stu = v->second.stop_time_updates ()->begin (); 
-        //          stu != v->second.stop_time_updates ()->end (); ++stu)
-        //     {
-        //         Rcout << "   - ";
-        //         if (stu->arrival_time > 0) 
-        //             Rcout << "arrived " << stu->arrival_delay << "s late";
-        //         if (stu->arrival_time > 0 && stu->departure_time > 0)
-        //             Rcout << " and ";
-        //         if (stu->departure_time > 0)
-        //             Rcout << "departed " << stu->departure_delay << "s late";
-        //         Rcout << "\n";
-        //     }
-        // }
+        Rcout << vehicles.bucket_count () << " vehicles\n";
+        for (auto v = vehicles.begin (); v != vehicles.end (); ++v)
+        {       
+            Rcout << "+ vehicle " << v->second.vehicle_id () << "\n";
+                // << "  - trip id: " << v->second.trip ()->trip_id () << "\n";
+
+            for (auto e : v->second.get_events ())
+            {
+                Rcout << "   [" << e.timestamp << "] trip " << e.trip_id << ": ";
+                if (e.type == Gtfs::EventType::gps)
+                {
+                    Rcout << "position update {" <<
+                        e.position.latitude << ", " << e.position.longitude << "}";
+                }
+                else
+                {
+                    Rcout << (e.type == Gtfs::EventType::arrival ? "arrived" : "departed")
+                        << " stop " << e.stop_index;
+                }
+                Rcout << "\n";
+            }
+
+            // for (auto stu = v->second.stop_time_updates ()->begin (); 
+            //      stu != v->second.stop_time_updates ()->end (); ++stu)
+            // {
+            //     Rcout << "   - ";
+            //     if (stu->arrival_time > 0) 
+            //         Rcout << "arrived " << stu->arrival_delay << "s late";
+            //     if (stu->arrival_time > 0 && stu->departure_time > 0)
+            //         Rcout << " and ";
+            //     if (stu->departure_time > 0)
+            //         Rcout << "departed " << stu->departure_delay << "s late";
+            //     Rcout << "\n";
+            // }
+        }
+        // ongoing = 0;
         // *** end debugging code ***********************************************
 
         // Update vehicle states

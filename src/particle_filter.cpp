@@ -46,6 +46,7 @@ namespace Gtfs {
 
     void Vehicle::mutate (RNG& rng)
     {
+        return;
         // are there any stop updates that need accounting for?
         if (_stop_time_updates.size () > 0 && 
             _last_stop_update_index >= 0 && 

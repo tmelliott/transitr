@@ -1731,6 +1731,16 @@ namespace Gtfs
             << "\n";
     }
 
+    Event::Event (uint64_t ts, EventType type, std::string trip, int index) :
+        timestamp (ts), type (type), trip_id (trip), position (latlng ()), stop_index (index)
+    {
+    }
+
+    Event::Event (uint64_t ts, EventType type, std::string trip, latlng pos) :
+        timestamp (ts), type (type), trip_id (trip), position (pos), stop_index (-1)
+    {
+    }
+
     /***************************************************** Vehicle */
     Vehicle::Vehicle (std::string& id, par* params) : 
     _vehicle_id (id)
@@ -1769,6 +1779,11 @@ namespace Gtfs
         return _delta;
     }
 
+    void Vehicle::add_event (Event event)
+    {
+        new_events.push_back (event);
+    }
+
     std::vector<STU>* Vehicle::stop_time_updates ()
     {
         return &_stop_time_updates;
@@ -1800,6 +1815,14 @@ namespace Gtfs
         if (!vp.trip ().has_trip_id ()) return;
         if (!vp.has_position ()) return;
         if (!vp.has_timestamp ()) return;
+        
+        add_event (Event (vp.timestamp (), 
+                          EventType::gps, 
+                          vp.trip ().trip_id (),
+                          latlng (vp.position ().latitude (), 
+                                  vp.position ().longitude ())));
+
+        return;
 
         if (vp.timestamp () <= _timestamp) 
         {
@@ -1868,6 +1891,11 @@ namespace Gtfs
         _timestamp = vp.timestamp ();
     }
 
+    /**
+     * Update vehicle with a GTFS TripUpdate
+     * @param tu   transit_realtime::TripUpdate object
+     * @param gtfs pointer to the static GTFS object
+     */
     void Vehicle::update (const transit_realtime::TripUpdate& tu,
                           Gtfs* gtfs)
     {

@@ -461,6 +461,18 @@ namespace Gtfs
         STU () {};
     };
 
+    enum class EventType { gps, arrival, departure };
+    struct Event {
+        uint64_t timestamp;
+        EventType type;
+        std::string trip_id;
+        latlng position; // only for type == EventType::gps
+        int stop_index;  // only for type == EventType::arrival or EventType::departure
+        
+        Event (uint64_t ts, EventType type, std::string trip, int index);
+        Event (uint64_t ts, EventType type, std::string trip, latlng pos);
+    };
+
     class Vehicle {
         private:
             std::string _vehicle_id;
@@ -476,6 +488,10 @@ namespace Gtfs
 
             float _arrival_error = 5.0;
             float _departure_error = 5.0;
+
+            std::vector<Event> new_events;  /** these get sorted and moved to time_events */
+            std::vector<Event> time_events;
+
 
             bool _newtrip = true;
             bool _complete = false;
@@ -507,6 +523,9 @@ namespace Gtfs
             latlng& position ();
             uint64_t timestamp ();
             unsigned delta ();
+
+            void add_event (Event event);
+            std::vector<Event>& get_events () { return new_events; }
 
             std::vector<STU>* stop_time_updates ();
 
