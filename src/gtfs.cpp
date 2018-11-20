@@ -1923,7 +1923,7 @@ namespace Gtfs
             add_event (Event (ste->time (), 
                               (stu.has_arrival () ? EventType::arrival : EventType::departure),
                               tu.trip ().trip_id (),
-                              stu.stop_sequence ()));
+                              stu.stop_sequence () - 1));
         }
 
 

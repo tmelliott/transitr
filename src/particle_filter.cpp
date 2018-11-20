@@ -6,6 +6,49 @@
 
 namespace Gtfs {
 
+    void Vehicle::initialize (Event& e, RNG& rng)
+    {
+        initialize (rng);
+
+        // initialize based on the event
+        double dmax, dist;
+        if (e.type == EventType::gps)
+        {
+            dmax = _trip->shape ()->path ().back ().distance;
+            dist = _trip->shape ()->distance_of (_position);
+        }
+        else
+        {
+            if (_stop_index >= _trip->stops ().size ()) return;
+            dist = _trip->stops ().at (_stop_index).distance;
+        }
+        
+        for (int i=0; i<_N; ++i)
+        {
+            switch (e.type)
+            {
+                case EventType::gps :
+                    // initialize each particle within 300m of obs
+                    _state.emplace_back (fmin(dmax, rng.runif () * 600 + dist / 2.0),
+                                         rng.runif () * 30.0, 
+                                         rng.rnorm () * _systemnoise,
+                                         this);
+                    break;
+                case EventType::arrival :
+                case EventType::departure :
+                    // initialize points at the stop, I guess ...
+                    _state.emplace_back (dist, rng.runif () * 30,
+                                         rng.rnorm () * _systemnoise,
+                                         this);
+                    break;
+            }
+        }
+
+        double initwt = 1.0 / (double) _N;
+        for (auto p = _state.begin (); p != _state.end (); ++p) p->set_weight (initwt);
+
+    }
+
     void Vehicle::initialize (RNG& rng)
     {
         _state.clear ();
@@ -13,22 +56,6 @@ namespace Gtfs {
         resample_count = 0;
 
         if (_trip == nullptr || _trip->shape () == nullptr) return;
-
-        double dmax = _trip->shape ()->path ().back ().distance;
-        // std::cout << "\n + Initialize " << _vehicle_id << " [N=" << _N << "]: ";
-        for (int i=0; i<_N; ++i)
-        {
-            // initialize each particle with a state X(i) - distance, speed
-            _state.emplace_back ((double)i / (double)(_N - 1) * dmax, //rng.runif () * dmax,
-                                 rng.runif () * 30.0, 
-                                 rng.rnorm () * _systemnoise,
-                                 this);
-            // std::cout << " [" << _state.back ().get_distance () << ", " 
-            //     << _state.back ().get_speed () << "," << _state.back ().get_acceleration () << "]";
-        }
-
-        double initwt = 1.0 / (double) _N;
-        for (auto p = _state.begin (); p != _state.end (); ++p) p->set_weight (initwt);
 
         _newtrip = false;
         _complete = false;
@@ -44,7 +71,7 @@ namespace Gtfs {
         _stop_arrival_times.resize (_trip->stops ().size (), 0);
     }
 
-    void Vehicle::mutate (RNG& rng)
+    void Vehicle::mutate (RNG& rng, Gtfs* gtfs)
     {
         int nnew = time_events.size () - current_event_index;
         std::cout << "\n\n+ vehicle " << _vehicle_id << ": "       
@@ -52,27 +79,54 @@ namespace Gtfs {
         if (nnew == 0) return;
 
         std::cout << "\n    [";
-        if (_timestamp > 0) std::cout << _timestamp;
-        else std::cout << "uninitialized";
-        std::cout << "]";
+        if (_timestamp > 0) 
+        {
+            std::cout << _timestamp << "] "
+                << _trip->route ()->route_short_name ()
+                << " (" << _trip->stops ().at (0).departure_time << "): ";
+            time_events.at (current_event_index - 1).print ();
+        }
+        else std::cout << "uninitialized]";
 
         // repeat until there are no more events
         while (current_event_index < time_events.size ())
         {
             auto e = time_events.at (current_event_index);
-            mutate_to (e, rng);
-            
-            std::cout << "\n    [" << e.timestamp << "] trip " << e.trip_id << ": ";
+
+            if (_trip == nullptr || _trip->trip_id () != e.trip_id)
+            {
+                // assign trip <--> vehicle
+                set_trip (gtfs->find_trip (e.trip_id));
+                _newtrip = _trip != nullptr;
+
+                _previous_state.clear ();
+                _previous_ts = 0;
+                _timestamp = 0;
+                _state.clear ();
+                estimated_dist = 0.0;
+            }
+
+            if (_trip == nullptr)
+            {
+                throw std::runtime_error ("Trip not found");
+            }
+
+            // pass the event data
             if (e.type == EventType::gps)
             {
-                std::cout << "position update {" <<
-                    e.position.latitude << ", " << e.position.longitude << "}";
+                _position = latlng (e.position.latitude, e.position.longitude);
             }
             else
             {
-                std::cout << (e.type == EventType::arrival ? "arrived" : "departed")
-                    << " stop " << e.stop_index;
+                _stop_index = e.stop_index;
             }
+
+            mutate_to (e, rng);
+            
+            std::cout << "\n    [" << e.timestamp << "] "
+                << _trip->route ()->route_short_name ()
+                << " (" << _trip->stops ().at (0).departure_time << "): ";
+            e.print ();
 
             current_event_index++;
         }
@@ -179,16 +233,16 @@ namespace Gtfs {
 
     void Vehicle::mutate_to (Event& e, RNG& rng)
     {
-        if (_timestamp == 0)
+        if (_newtrip)
         {
             _delta = 0;
-            std::cout << " -> initializing";
+            std::cout << "\n    -> initializing";
+            initialize (e, rng);
+            return;
         }
-        else
-        {
-            _delta = e.timestamp - _timestamp;
-            std::cout << "\n     + " << _delta << " seconds";
-        }
+
+        _delta = e.timestamp - _timestamp;
+        std::cout << "\n     + " << _delta << " seconds";
         _timestamp = e.timestamp;
     }
 

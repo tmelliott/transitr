@@ -156,7 +156,7 @@ void run_realtime_model (List nw)
         {       
             for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
             {
-                v->second.mutate (rngs.at (omp_get_thread_num ()));
+                v->second.mutate (rngs.at (omp_get_thread_num ()), &gtfs);
             }
         }
         Rcout << "\n\n";

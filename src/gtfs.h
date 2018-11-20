@@ -477,6 +477,20 @@ namespace Gtfs
         {
             return (timestamp < e.timestamp);
         }
+
+        void print ()
+        {
+            if (type == EventType::gps)
+            {
+                std::cout << "position update {" <<
+                    position.latitude << ", " << position.longitude << "}";
+            }
+            else
+            {
+                std::cout << (type == EventType::arrival ? "arrived" : "departed")
+                    << " stop " << (stop_index + 1);
+            }
+        }
     };
 
     class Vehicle {
@@ -484,6 +498,7 @@ namespace Gtfs
             std::string _vehicle_id;
             Trip* _trip = nullptr;
             latlng _position;
+            int _stop_index;
             uint64_t _timestamp = 0;
             unsigned _delta;
             float _gpserror;
@@ -547,7 +562,8 @@ namespace Gtfs
 
             // statistics things
             void initialize (RNG& rng);
-            void mutate (RNG& rng); // mutate state
+            void initialize (Event& e, RNG& rng);
+            void mutate (RNG& rng, Gtfs* gtfs); // mutate state
             void mutate_to (Event& e, RNG& rng); // mutate state
             void mutate2 (RNG& rng); // mutate state
             void select (RNG& rng); // select state (given data)
