@@ -145,24 +145,12 @@ void run_realtime_model (List nw)
                 }
                 Rcout << "\n";
             }
-
-            // for (auto stu = v->second.stop_time_updates ()->begin (); 
-            //      stu != v->second.stop_time_updates ()->end (); ++stu)
-            // {
-            //     Rcout << "   - ";
-            //     if (stu->arrival_time > 0) 
-            //         Rcout << "arrived " << stu->arrival_delay << "s late";
-            //     if (stu->arrival_time > 0 && stu->departure_time > 0)
-            //         Rcout << " and ";
-            //     if (stu->departure_time > 0)
-            //         Rcout << "departed " << stu->departure_delay << "s late";
-            //     Rcout << "\n";
-            // }
         }
         // ongoing = 0;
         // *** end debugging code ***********************************************
 
         // Update vehicle states
+        Rcout << "\n\n >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Mutations\n";
         #pragma omp parallel for num_threads(params.n_core)
         for (unsigned i=0; i<vehicles.bucket_count (); ++i)
         {       

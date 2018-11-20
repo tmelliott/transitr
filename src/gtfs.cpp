@@ -1824,71 +1824,71 @@ namespace Gtfs
 
         return;
 
-        if (vp.timestamp () <= _timestamp) 
-        {
-            _delta = 0;
-            return;
-        }
+//         if (vp.timestamp () <= _timestamp) 
+//         {
+//             _delta = 0;
+//             return;
+//         }
 
-        if (_trip == nullptr || _trip->trip_id () != vp.trip ().trip_id ())
-        {
-            // assign trip <--> vehicle
-            std::string tid = vp.trip ().trip_id ();
-            set_trip (gtfs->find_trip (tid));
-            _newtrip = _trip != nullptr;
+//         if (_trip == nullptr || _trip->trip_id () != vp.trip ().trip_id ())
+//         {
+//             // assign trip <--> vehicle
+//             std::string tid = vp.trip ().trip_id ();
+//             set_trip (gtfs->find_trip (tid));
+//             _newtrip = _trip != nullptr;
 
-            _previous_state.clear ();
-            _previous_ts = 0;
-            _state.clear ();
-            estimated_dist = 0.0;
+//             _previous_state.clear ();
+//             _previous_ts = 0;
+//             _state.clear ();
+//             estimated_dist = 0.0;
 
-            if (_trip != nullptr)
-            {
-                _stop_time_updates.clear ();
-                _stop_time_updates.resize (_trip->stops ().size ());
-            }
-        }
+//             if (_trip != nullptr)
+//             {
+//                 _stop_time_updates.clear ();
+//                 _stop_time_updates.resize (_trip->stops ().size ());
+//             }
+//         }
 
-        if (_trip == nullptr)
-        {
-            throw std::runtime_error ("Trip not found");
-        }
+//         if (_trip == nullptr)
+//         {
+//             throw std::runtime_error ("Trip not found");
+//         }
 
-#if VERBOSE == 2
-        Timer timer;
-#endif
-        _trip->route ()->load ();
-#if VERBOSE == 2
-        std::cout << " - load route (" << timer.cpu_seconds () << "ms)";
-        timer.reset ();
-#endif
-        _trip->shape ()->load ();
-#if VERBOSE == 2
-        std::cout << " - load shape (" << timer.cpu_seconds () << "ms)";
-#endif
+// #if VERBOSE == 2
+//         Timer timer;
+// #endif
+//         _trip->route ()->load ();
+// #if VERBOSE == 2
+//         std::cout << " - load route (" << timer.cpu_seconds () << "ms)";
+//         timer.reset ();
+// #endif
+//         _trip->shape ()->load ();
+// #if VERBOSE == 2
+//         std::cout << " - load shape (" << timer.cpu_seconds () << "ms)";
+// #endif
 
-        _position = latlng (vp.position ().latitude (),
-                            vp.position ().longitude ());
+//         _position = latlng (vp.position ().latitude (),
+//                             vp.position ().longitude ());
 
-        double est_dist = _trip->shape ()->distance_of (_position);
-        if (!_newtrip && est_dist < estimated_dist && _previous_state.size () == _N && _previous_ts > 0)
-        {
-            // std::cout << "\n x DIE v" << _vehicle_id;
-            // If current observation est dist is LESS than previous, revert state
-            _delta = vp.timestamp () - _previous_ts;
-            _state = _previous_state;
-            _previous_state.clear ();
-            _previous_ts = 0;
-        }
-        else
-        {
-            // this state is OK - keep it
-            _delta = _timestamp == 0 ? 0 : vp.timestamp () - _timestamp;
-            _previous_state = _state;
-            _previous_ts = _timestamp;
-        }
-        estimated_dist = est_dist;
-        _timestamp = vp.timestamp ();
+//         double est_dist = _trip->shape ()->distance_of (_position);
+//         if (!_newtrip && est_dist < estimated_dist && _previous_state.size () == _N && _previous_ts > 0)
+//         {
+//             // std::cout << "\n x DIE v" << _vehicle_id;
+//             // If current observation est dist is LESS than previous, revert state
+//             _delta = vp.timestamp () - _previous_ts;
+//             _state = _previous_state;
+//             _previous_state.clear ();
+//             _previous_ts = 0;
+//         }
+//         else
+//         {
+//             // this state is OK - keep it
+//             _delta = _timestamp == 0 ? 0 : vp.timestamp () - _timestamp;
+//             _previous_state = _state;
+//             _previous_ts = _timestamp;
+//         }
+//         estimated_dist = est_dist;
+//         _timestamp = vp.timestamp ();
     }
 
     /**
@@ -1929,61 +1929,62 @@ namespace Gtfs
 
         return;
 
-        if (_trip == nullptr) // only if trip missing
-        {
-            // assign trip <--> vehicle
-            std::string tid = tu.trip ().trip_id ();
-            set_trip (gtfs->find_trip (tid));
-            _newtrip = _trip != nullptr;
+        // if (_trip == nullptr) // only if trip missing
+        // {
+        //     // assign trip <--> vehicle
+        //     std::string tid = tu.trip ().trip_id ();
+        //     set_trip (gtfs->find_trip (tid));
+        //     _newtrip = _trip != nullptr;
 
-            _previous_state.clear ();
-            _previous_ts = 0;
-            _state.clear ();
-            estimated_dist = 0.0;
+        //     _previous_state.clear ();
+        //     _previous_ts = 0;
+        //     _state.clear ();
+        //     estimated_dist = 0.0;
 
-            if (_trip != nullptr)
-            {
-                _stop_time_updates.clear ();
-                _stop_time_updates.resize (_trip->stops ().size ());
-            }
-        }
+        //     if (_trip != nullptr)
+        //     {
+        //         _stop_time_updates.clear ();
+        //         _stop_time_updates.resize (_trip->stops ().size ());
+        //     }
+        // }
 
         // make this a for loop for futureproofing
-        STU* stup;
-        auto stu = tu.stop_time_update ()[0];
-        {
-            if (!stu.has_stop_sequence ()) return;
-            if (_stop_time_updates.size () > 0)
-            {
-                _last_stop_update_index = stu.stop_sequence () - 1;
-                stup = &(_stop_time_updates.at (_last_stop_update_index));
-                stup->timestamp = tu.timestamp ();
-                if (stu.has_arrival ())
-                {
-                    auto x = stu.arrival ();
-                    if (x.has_time ())
-                        stup->arrival_time = x.time ();
-                    if (x.has_delay ())
-                        stup->arrival_delay = x.delay ();
-                }
-                if (stu.has_departure ())
-                {
-                    auto x = stu.departure ();
-                    if (x.has_time ())
-                        stup->departure_time = x.time ();
-                    if (x.has_delay ())
-                        stup->departure_delay = x.delay ();
-                }
-            }
-        }
+        // STU* stup;
+        // auto stu = tu.stop_time_update ()[0];
+        // {
+        //     if (!stu.has_stop_sequence ()) return;
+        //     if (_stop_time_updates.size () > 0)
+        //     {
+        //         _last_stop_update_index = stu.stop_sequence () - 1;
+        //         stup = &(_stop_time_updates.at (_last_stop_update_index));
+        //         stup->timestamp = tu.timestamp ();
+        //         if (stu.has_arrival ())
+        //         {
+        //             auto x = stu.arrival ();
+        //             if (x.has_time ())
+        //                 stup->arrival_time = x.time ();
+        //             if (x.has_delay ())
+        //                 stup->arrival_delay = x.delay ();
+        //         }
+        //         if (stu.has_departure ())
+        //         {
+        //             auto x = stu.departure ();
+        //             if (x.has_time ())
+        //                 stup->departure_time = x.time ();
+        //             if (x.has_delay ())
+        //                 stup->departure_delay = x.delay ();
+        //         }
+        //     }
+        // }
     }
 
     void Vehicle::update (Gtfs* gtfs)
     {
         if (new_events.size () == 0) return;
 
-
-        // sort events
+        // sort events, replacing any duplicated timestamps with 
+        // the "last" event (gps < arrival < departure)
+        // - completely overwrite (trip_id too)
         std::sort (new_events.begin (), new_events.end ());
         for (auto e : new_events)
         {

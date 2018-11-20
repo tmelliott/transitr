@@ -46,104 +46,127 @@ namespace Gtfs {
 
     void Vehicle::mutate (RNG& rng)
     {
-        return;
-        // are there any stop updates that need accounting for?
-        if (_stop_time_updates.size () > 0 && 
-            _last_stop_update_index >= 0 && 
-            _last_stop_update_index < _stop_time_updates.size ())
+        std::cout << "+ vehicle " << _vehicle_id << ":\n";
+
+        // repeat until there are no more events
+        while (current_event_index < time_events.size ())
         {
-            STU& stu = _stop_time_updates.at (_last_stop_update_index);
-            if (stu.timestamp > 0)
+            auto e = time_events.at (current_event_index);
+            std::cout << "   [" << e.timestamp << "] trip " << e.trip_id << ": ";
+            if (e.type == EventType::gps)
             {
-                // most recent update (and maybe others!!) needs to be incorporated into the likelihood
-                // BUT--- for now, just using a DIFFERENT likelihood for these
-                if (!stu.used_arrival && stu.arrival_time > 0)
-                {
-                    _skip_observation = true;
-                    if (_timestamp == stu.arrival_time)
-                    {
-                        // Y is from arrival, so forget it  - timestamp and delta are correct
-                        std::cout << " - Arr1 d=" << _delta << "\n";
-                        mutate2 (rng);
-                        _delta = 0;
-                    }
-                    else if (_timestamp < stu.arrival_time)
-                    {
-                        std::cout << " - Arr2 d=" << _delta << "\n";
-                        // mutate to Y, then arrival
-                        mutate2 (rng);
-                        _delta = stu.arrival_time - _timestamp;
-                        _previous_ts = _timestamp;
-                        _timestamp = stu.arrival_time;
-                        mutate2 (rng);
-                        _delta = 0;
-                    }
-                    else
-                    {
-                        // mutate to arrival, then Y
-                        auto ts = _timestamp;
-                        _delta = stu.arrival_time - _previous_ts;
-                        _timestamp = stu.arrival_time;
-                        std::cout << " - Arr3 d=" << _delta << "\n";
-                        mutate2 (rng);
-                        _timestamp = ts;
-                        _delta = _timestamp - stu.arrival_time;
-                        _previous_ts = stu.arrival_time;
-                        mutate2 (rng);
-                        _delta = 0;
-                    }
-                    stu.used_arrival = true;
-                }
-
-                if (!stu.used_departure && stu.departure_time > 0)
-                {
-                    _skip_observation = true;
-                    if (_timestamp == stu.departure_time)
-                    {
-                        std::cout << " - Dep1 d=" << _delta << "\n";
-                        // Y is from departure, so forget it - timestamp and delta are correct
-                        mutate2 (rng);
-                    }
-                    else if (_timestamp < stu.departure_time)
-                    {
-                        // mutate to Y, then departure
-                        std::cout << " - Dep2 d=" << _delta << "\n";
-                        if (_delta > 0)
-                        {
-                            mutate2 (rng);
-                        }
-                        _delta = stu.departure_time - _timestamp;
-                        _previous_ts = _timestamp;
-                        _timestamp = stu.departure_time;
-                        mutate2 (rng);
-                        _delta = 0;
-                    }
-                    else
-                    {
-                        auto ts = _timestamp;
-                        _delta = stu.departure_time - _previous_ts;
-                        _timestamp = stu.departure_time;
-                        std::cout << " - Dep3 d=" << _delta << "\n";
-                        mutate2 (rng);
-                        _timestamp = ts;
-                        _delta = _timestamp - stu.departure_time;
-                        _previous_ts = stu.departure_time;
-                        mutate2 (rng);
-                        _delta = 0;
-                    }
-                    stu.used_departure = true;
-                }
+                std::cout << "position update {" <<
+                    e.position.latitude << ", " << e.position.longitude << "}";
             }
+            else
+            {
+                std::cout << (e.type == EventType::arrival ? "arrived" : "departed")
+                    << " stop " << e.stop_index;
+            }
+            std::cout << "\n";
+
+            current_event_index++;
         }
 
-        // ok, there was no arrival stuff 
-        if (!_skip_observation) 
-        {
-            std::cout << " - Obs d=" << _delta << "\n";
-            mutate2 (rng);
-        }
 
-        _skip_observation = false;
+        return;
+        // // are there any stop updates that need accounting for?
+        // if (_stop_time_updates.size () > 0 && 
+        //     _last_stop_update_index >= 0 && 
+        //     _last_stop_update_index < _stop_time_updates.size ())
+        // {
+        //     STU& stu = _stop_time_updates.at (_last_stop_update_index);
+        //     if (stu.timestamp > 0)
+        //     {
+        //         // most recent update (and maybe others!!) needs to be incorporated into the likelihood
+        //         // BUT--- for now, just using a DIFFERENT likelihood for these
+        //         if (!stu.used_arrival && stu.arrival_time > 0)
+        //         {
+        //             _skip_observation = true;
+        //             if (_timestamp == stu.arrival_time)
+        //             {
+        //                 // Y is from arrival, so forget it  - timestamp and delta are correct
+        //                 std::cout << " - Arr1 d=" << _delta << "\n";
+        //                 mutate2 (rng);
+        //                 _delta = 0;
+        //             }
+        //             else if (_timestamp < stu.arrival_time)
+        //             {
+        //                 std::cout << " - Arr2 d=" << _delta << "\n";
+        //                 // mutate to Y, then arrival
+        //                 mutate2 (rng);
+        //                 _delta = stu.arrival_time - _timestamp;
+        //                 _previous_ts = _timestamp;
+        //                 _timestamp = stu.arrival_time;
+        //                 mutate2 (rng);
+        //                 _delta = 0;
+        //             }
+        //             else
+        //             {
+        //                 // mutate to arrival, then Y
+        //                 auto ts = _timestamp;
+        //                 _delta = stu.arrival_time - _previous_ts;
+        //                 _timestamp = stu.arrival_time;
+        //                 std::cout << " - Arr3 d=" << _delta << "\n";
+        //                 mutate2 (rng);
+        //                 _timestamp = ts;
+        //                 _delta = _timestamp - stu.arrival_time;
+        //                 _previous_ts = stu.arrival_time;
+        //                 mutate2 (rng);
+        //                 _delta = 0;
+        //             }
+        //             stu.used_arrival = true;
+        //         }
+
+        //         if (!stu.used_departure && stu.departure_time > 0)
+        //         {
+        //             _skip_observation = true;
+        //             if (_timestamp == stu.departure_time)
+        //             {
+        //                 std::cout << " - Dep1 d=" << _delta << "\n";
+        //                 // Y is from departure, so forget it - timestamp and delta are correct
+        //                 mutate2 (rng);
+        //             }
+        //             else if (_timestamp < stu.departure_time)
+        //             {
+        //                 // mutate to Y, then departure
+        //                 std::cout << " - Dep2 d=" << _delta << "\n";
+        //                 if (_delta > 0)
+        //                 {
+        //                     mutate2 (rng);
+        //                 }
+        //                 _delta = stu.departure_time - _timestamp;
+        //                 _previous_ts = _timestamp;
+        //                 _timestamp = stu.departure_time;
+        //                 mutate2 (rng);
+        //                 _delta = 0;
+        //             }
+        //             else
+        //             {
+        //                 auto ts = _timestamp;
+        //                 _delta = stu.departure_time - _previous_ts;
+        //                 _timestamp = stu.departure_time;
+        //                 std::cout << " - Dep3 d=" << _delta << "\n";
+        //                 mutate2 (rng);
+        //                 _timestamp = ts;
+        //                 _delta = _timestamp - stu.departure_time;
+        //                 _previous_ts = stu.departure_time;
+        //                 mutate2 (rng);
+        //                 _delta = 0;
+        //             }
+        //             stu.used_departure = true;
+        //         }
+        //     }
+        // }
+
+        // // ok, there was no arrival stuff 
+        // if (!_skip_observation) 
+        // {
+        //     std::cout << " - Obs d=" << _delta << "\n";
+        //     mutate2 (rng);
+        // }
+
+        // _skip_observation = false;
     }
 
     void Vehicle::mutate2 (RNG& rng)

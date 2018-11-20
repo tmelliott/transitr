@@ -497,6 +497,7 @@ namespace Gtfs
 
             std::vector<Event> new_events;  /** these get sorted and moved to time_events */
             std::vector<Event> time_events;
+            unsigned current_event_index = 0; // almost makes `Event.used` redundant
 
 
             bool _newtrip = true;
