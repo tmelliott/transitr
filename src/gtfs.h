@@ -424,6 +424,8 @@ namespace Gtfs
         time_t _startdate;
         sqlite3* _connection = nullptr;
 
+        std::mutex con_lock;
+
         std::unordered_map<std::string, Agency> _agencies;
         std::unordered_map<std::string, Route> _routes;
         std::unordered_map<std::string, Trip> _trips;
@@ -641,10 +643,13 @@ namespace Gtfs
         void travel (unsigned delta, RNG& rng);
         void predict_etas (RNG& rng);
         
-        void calculate_likelihood (latlng& y, std::vector<ShapePt>* path, double sigma);
+        void calculate_likelihood (latlng& y, std::vector<ShapePt>& path, double sigma);
+        void calculate_likelihood (Event& e, double error);
+        void set_weight (double w);
+
+        // deprecated
         void calculate_arrival_likelihood (int index, uint64_t time, double error);
         void calculate_departure_likelihood (int index, uint64_t time, double error);
-        void set_weight (double w);
     };
 
 }; // namespace Gtfs

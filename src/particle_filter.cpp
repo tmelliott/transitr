@@ -9,6 +9,7 @@ namespace Gtfs {
     void Vehicle::initialize (Event& e, RNG& rng)
     {
         initialize (rng);
+        _timestamp = e.timestamp;
 
         // initialize based on the event
         double dmax, dist;
@@ -242,251 +243,288 @@ namespace Gtfs {
         }
 
         _delta = e.timestamp - _timestamp;
-        std::cout << "\n     + " << _delta << " seconds";
         _timestamp = e.timestamp;
+
+        // move the particles
+        if (_complete || !valid () || _delta == 0) return;
+        std::cout << "\n     + " << _delta << " seconds";
+
+        bool all_complete = true;
+        for (auto& p : _state)
+        {
+            std::cout << "\n      ["
+                << p.get_distance () << ", " << p.get_speed () << "]";
+            p.travel (_delta, rng);
+            if (p.is_complete ()) 
+            {
+                std::cout << " -> complete";
+                continue;
+            }
+            // if any aren't complete, prevent vehicle from finishing trip
+            all_complete = false;
+            std::cout << " -> [" 
+                << p.get_distance () << ", " << p.get_speed () <<"]";
+
+            // calculate particle likelihood
+            switch (e.type)
+            {
+                case EventType::gps :
+                    p.calculate_likelihood (e.position, _trip->shape ()->path (), _gpserror);
+                    break;
+                case EventType::arrival :
+                    p.calculate_likelihood (e, _arrival_error);
+                    break;
+                case EventType::departure :
+                    p.calculate_likelihood (e, _departure_error);
+                    break;
+            }
+
+            std::cout << " => l(Y|Xi) = " << exp (p.get_ll ());
+        }
+
     }
 
     void Vehicle::mutate2 (RNG& rng)
     {
-        if (_newtrip)
-        {
-            initialize (rng);
-            return;
-        }
+//         if (_newtrip)
+//         {
+//             initialize (rng);
+//             return;
+//         }
 
-        if (_complete || !valid () || _delta == 0) return;
+//         if (_complete || !valid () || _delta == 0) return;
 
-        // There probably need to be a bunch of checks here ...
+//         // There probably need to be a bunch of checks here ...
 
-        // std::cout << "\n v" << _vehicle_id 
-        //     << " - M = " << _trip->stops ().size ()
-        //     << "; L = " << _trip->shape ()->segments ().size ();
+//         // std::cout << "\n v" << _vehicle_id 
+//         //     << " - M = " << _trip->stops ().size ()
+//         //     << "; L = " << _trip->shape ()->segments ().size ();
         
-        // do the transition ("mutation")
-        int ncomplete = 0;
-        // std::cout << " -> travel ... \n";
-        for (auto p = _state.begin (); p != _state.end (); ++p)
-        {
-            if (p->is_complete ())
-            {
-                ncomplete++;
-            }
-            else
-            {
-                // std::cout << "\r";
-                p->travel (_delta, rng);
-            }
-        }
-        // std::cout << "ok";
+//         // do the transition ("mutation")
+//         int ncomplete = 0;
+//         // std::cout << " -> travel ... \n";
+//         for (auto p = _state.begin (); p != _state.end (); ++p)
+//         {
+//             if (p->is_complete ())
+//             {
+//                 ncomplete++;
+//             }
+//             else
+//             {
+//                 // std::cout << "\r";
+//                 p->travel (_delta, rng);
+//             }
+//         }
+//         // std::cout << "ok";
 
 
-        if (ncomplete == _state.size ())
-        {
-            _complete = true;
-            return;
-        }
+//         if (ncomplete == _state.size ())
+//         {
+//             _complete = true;
+//             return;
+//         }
 
-#if WRITE_PARTICLES
-        std::vector<ShapePt>* path = &(_trip->shape ()->path ());
-        for (auto p = _state.begin (); p != _state.end (); ++p)
-        {
-            p->calculate_likelihood (_position, path, _gpserror);
-            std::ostringstream fname;
-            fname << "history/vehicle_" << _vehicle_id << "_proposals.csv";
-            std::ofstream fout;
-            fout.open (fname.str ().c_str (), std::ofstream::app);
-            double d (p->get_distance ());
-            latlng ppos (_trip->shape ()->coordinates_of (d));
-            fout << _timestamp << ","
-                << _trip->trip_id () << ","
-                << p->get_distance () << ","
-                << p->get_speed () << ","
-                << p->get_acceleration () << ","
-                << std::setprecision(15)
-                << p->get_ll () << ","
-                << ppos.latitude << "," << ppos.longitude << "\n";
-            fout.close ();
-        }
-#endif
+// // #if WRITE_PARTICLES
+// //         std::vector<ShapePt>* path = &(_trip->shape ()->path ());
+// //         for (auto p = _state.begin (); p != _state.end (); ++p)
+// //         {
+// //             p->calculate_likelihood (_position, path, _gpserror);
+// //             std::ostringstream fname;
+// //             fname << "history/vehicle_" << _vehicle_id << "_proposals.csv";
+// //             std::ofstream fout;
+// //             fout.open (fname.str ().c_str (), std::ofstream::app);
+// //             double d (p->get_distance ());
+// //             latlng ppos (_trip->shape ()->coordinates_of (d));
+// //             fout << _timestamp << ","
+// //                 << _trip->trip_id () << ","
+// //                 << p->get_distance () << ","
+// //                 << p->get_speed () << ","
+// //                 << p->get_acceleration () << ","
+// //                 << std::setprecision(15)
+// //                 << p->get_ll () << ","
+// //                 << ppos.latitude << "," << ppos.longitude << "\n";
+// //             fout.close ();
+// //         }
+// // #endif
 
-#if SIMULATION
-        // PRIOR model eval stuff
-        double prior_mse = 0.0; // = SUM [W * d(h(X), Y)^2]
-        double dxy;
-        latlng hx;
-        for (auto p = _state.begin (); p != _state.end (); ++p)
-        {
-            dxy = p->get_distance ();
-            hx = _trip->shape ()->coordinates_of (dxy);
-            prior_mse += p->get_weight () * 
-                pow(distanceEarth (_position, hx), 2);
-        }
+// #if SIMULATION
+//         // PRIOR model eval stuff
+//         double prior_mse = 0.0; // = SUM [W * d(h(X), Y)^2]
+//         double dxy;
+//         latlng hx;
+//         for (auto p = _state.begin (); p != _state.end (); ++p)
+//         {
+//             dxy = p->get_distance ();
+//             hx = _trip->shape ()->coordinates_of (dxy);
+//             prior_mse += p->get_weight () * 
+//                 pow(distanceEarth (_position, hx), 2);
+//         }
 
-        // prior speed variance
-        double prior_speed = speed ();
-        double prior_speed_var;
-        prior_speed_var = std::accumulate (_state.begin (), _state.end (), 0.0, 
-                                          [&prior_speed](double a, Particle& p) {
-                                            return a + p.get_weight () * pow(p.get_speed () - prior_speed, 2);
-                                          });
-#endif
-        // update
-        // std::cout << " -> select ... ";
-        select (rng);
-        // std::cout << "ok";
+//         // prior speed variance
+//         double prior_speed = speed ();
+//         double prior_speed_var;
+//         prior_speed_var = std::accumulate (_state.begin (), _state.end (), 0.0, 
+//                                           [&prior_speed](double a, Particle& p) {
+//                                             return a + p.get_weight () * pow(p.get_speed () - prior_speed, 2);
+//                                           });
+// #endif
+//         // update
+//         // std::cout << " -> select ... ";
+//         select (rng);
+//         // std::cout << "ok";
 
-        // (re)initialize if the particle sample is bad
-        bool isbad = bad_sample;
-        if (bad_sample)
-        {
-            initialize (rng);
-        }
-        else
-        {
-            // NETWORK STUFF
-            double dmin = _trip->shape ()->path ().back ().distance;
-            for (auto p = _state.begin (); p != _state.end (); ++p)
-            {
-                if (p->get_distance () < dmin)
-                {
-                    dmin = p->get_distance ();
-                }
-            }
-            std::vector<ShapeSegment>& segs = _trip->shape ()->segments ();
-            int m = find_stop_index (dmin, &(_trip->stops ()));
-            int l = find_segment_index (dmin, &segs);
+//         // (re)initialize if the particle sample is bad
+//         bool isbad = bad_sample;
+//         if (bad_sample)
+//         {
+//             initialize (rng);
+//         }
+//         else
+//         {
+//             // NETWORK STUFF
+//             double dmin = _trip->shape ()->path ().back ().distance;
+//             for (auto p = _state.begin (); p != _state.end (); ++p)
+//             {
+//                 if (p->get_distance () < dmin)
+//                 {
+//                     dmin = p->get_distance ();
+//                 }
+//             }
+//             std::vector<ShapeSegment>& segs = _trip->shape ()->segments ();
+//             int m = find_stop_index (dmin, &(_trip->stops ()));
+//             int l = find_segment_index (dmin, &segs);
 
 
-            // update segment travel times for intermediate ones ...
-            double tt, ttp, err;
-            int n;
-            while (_current_segment < m)
-            {
-                // get the average travel time for particles along that segment
-                tt = 0.0;
-                n = 0;
-                for (auto p = _state.begin (); p != _state.end (); ++p)
-                {
-                    ttp = p->get_travel_time (_current_segment) * p->get_weight ();
-                    if (ttp > 0)
-                    {
-                        tt += ttp;
-                        n++;
-                    }
-                }
-                if (n < _N)
-                {
-                    _current_segment++;
-                    continue;
-                }
+//             // update segment travel times for intermediate ones ...
+//             double tt, ttp, err;
+//             int n;
+//             while (_current_segment < m)
+//             {
+//                 // get the average travel time for particles along that segment
+//                 tt = 0.0;
+//                 n = 0;
+//                 for (auto p = _state.begin (); p != _state.end (); ++p)
+//                 {
+//                     ttp = p->get_travel_time (_current_segment) * p->get_weight ();
+//                     if (ttp > 0)
+//                     {
+//                         tt += ttp;
+//                         n++;
+//                     }
+//                 }
+//                 if (n < _N)
+//                 {
+//                     _current_segment++;
+//                     continue;
+//                 }
 
-                err = std::accumulate (_state.begin (), _state.end (), 0.0,
-                                       [=](double a, Particle& p) {
-                                            return a + p.get_weight () * pow(p.get_travel_time (_current_segment) - tt, 2);
-                                       });
+//                 err = std::accumulate (_state.begin (), _state.end (), 0.0,
+//                                        [=](double a, Particle& p) {
+//                                             return a + p.get_weight () * pow(p.get_travel_time (_current_segment) - tt, 2);
+//                                        });
 
-                // if the error is effectively 0 ...
-                if (err < 0.001) err = 10.0;
+//                 // if the error is effectively 0 ...
+//                 if (err < 0.001) err = 10.0;
 
-                _segment_travel_times.at (_current_segment) = round (tt);
-                segs.at (_current_segment).segment->push_data (tt, err, _timestamp);
-                _current_segment++;
-            }
+//                 _segment_travel_times.at (_current_segment) = round (tt);
+//                 segs.at (_current_segment).segment->push_data (tt, err, _timestamp);
+//                 _current_segment++;
+//             }
             
-            // NOTE: need to ignore segment if previous segment travel time is 0
-            // (i.e., can't be sure that the current segment travel time is complete)
+//             // NOTE: need to ignore segment if previous segment travel time is 0
+//             // (i.e., can't be sure that the current segment travel time is complete)
             
             
-        }
-        // std::cout << " -> nw";
+//         }
+//         // std::cout << " -> nw";
 
-#if SIMULATION
-        // POSTERIOR model eval stuff
-        double posterior_mse = 0.0; // = SUM [W * d(h(X), Y)^2]
-        for (auto p = _state.begin (); p != _state.end (); ++p)
-        {
-            dxy = p->get_distance ();
-            hx = _trip->shape ()->coordinates_of (dxy);
-            posterior_mse += p->get_weight () * 
-                pow(distanceEarth (_position, hx), 2);
-        }
+// #if SIMULATION
+//         // POSTERIOR model eval stuff
+//         double posterior_mse = 0.0; // = SUM [W * d(h(X), Y)^2]
+//         for (auto p = _state.begin (); p != _state.end (); ++p)
+//         {
+//             dxy = p->get_distance ();
+//             hx = _trip->shape ()->coordinates_of (dxy);
+//             posterior_mse += p->get_weight () * 
+//                 pow(distanceEarth (_position, hx), 2);
+//         }
 
-        // posterior speed variance
-        double post_speed = speed ();
-        double post_speed_var;
-        post_speed_var = std::accumulate (_state.begin (), _state.end (), 0.0, 
-                                          [&post_speed](double a, Particle& p) {
-                                            return a + p.get_weight () * pow(p.get_speed () - post_speed, 2);
-                                          });
+//         // posterior speed variance
+//         double post_speed = speed ();
+//         double post_speed_var;
+//         post_speed_var = std::accumulate (_state.begin (), _state.end (), 0.0, 
+//                                           [&post_speed](double a, Particle& p) {
+//                                             return a + p.get_weight () * pow(p.get_speed () - post_speed, 2);
+//                                           });
 
-        std::ostringstream mename;
-        mename << "modeleval/vehicle_" << _vehicle_id << ".csv";
-        std::ofstream modeleval;
-        modeleval.open (mename.str ().c_str (), std::ofstream::app);
-        double atd = _trip->shape ()->distance_of (_position);
-        latlng closest_pt = _trip->shape ()->coordinates_of (atd);
-        double ctd = distanceEarth (_position, closest_pt);
-        double sumwt = std::accumulate (_state.begin (), _state.end (), 0.0, [](double a, Particle& p) {
-            return a + p.get_weight ();
-        });
-        double meanwt = sumwt / (double) _N;
-        double varwt = std::accumulate (_state.begin (), _state.end (), 0.0, [&meanwt](double a, Particle& p) {
-            return a + pow (p.get_weight () - meanwt, 2);
-        });
-        varwt /= _N;
-        modeleval << _vehicle_id 
-            << "," << _trip->trip_id ()
-            << "," << _timestamp
-            << "," << prior_mse 
-            << "," << posterior_mse
-            << "," << post_speed
-            << "," << prior_speed_var
-            << "," << post_speed_var
-            << "," << ctd
-            << "," << _Neff
-            << "," << (resample ? 1 : 0)
-            << "," << resample_count
-            << "," << isbad
-            << "\n";
-        modeleval.close ();
-#endif
+//         std::ostringstream mename;
+//         mename << "modeleval/vehicle_" << _vehicle_id << ".csv";
+//         std::ofstream modeleval;
+//         modeleval.open (mename.str ().c_str (), std::ofstream::app);
+//         double atd = _trip->shape ()->distance_of (_position);
+//         latlng closest_pt = _trip->shape ()->coordinates_of (atd);
+//         double ctd = distanceEarth (_position, closest_pt);
+//         double sumwt = std::accumulate (_state.begin (), _state.end (), 0.0, [](double a, Particle& p) {
+//             return a + p.get_weight ();
+//         });
+//         double meanwt = sumwt / (double) _N;
+//         double varwt = std::accumulate (_state.begin (), _state.end (), 0.0, [&meanwt](double a, Particle& p) {
+//             return a + pow (p.get_weight () - meanwt, 2);
+//         });
+//         varwt /= _N;
+//         modeleval << _vehicle_id 
+//             << "," << _trip->trip_id ()
+//             << "," << _timestamp
+//             << "," << prior_mse 
+//             << "," << posterior_mse
+//             << "," << post_speed
+//             << "," << prior_speed_var
+//             << "," << post_speed_var
+//             << "," << ctd
+//             << "," << _Neff
+//             << "," << (resample ? 1 : 0)
+//             << "," << resample_count
+//             << "," << isbad
+//             << "\n";
+//         modeleval.close ();
+// #endif
 
 
-#if WRITE_PARTICLES
-        for (auto p = _state.begin (); p != _state.end (); ++p)
-        {
-            p->calculate_likelihood (_position, path, _gpserror);
-            std::ostringstream fname;
-            fname << "history/vehicle_" << _vehicle_id << ".csv";
-            std::ofstream fout;
-            fout.open (fname.str ().c_str (), std::ofstream::app);
-            double d (p->get_distance ());
-            latlng ppos (_trip->shape ()->coordinates_of (d));
-            fout << _timestamp << ","
-                << _trip->trip_id () << ","
-                << std::setprecision(15)
-                << _position.latitude << "," << _position.longitude << ","
-                << std::setprecision(6)
-                << p->get_distance () << ","
-                << p->get_speed () << ","
-                << p->get_acceleration () << ","
-                << std::setprecision(15)
-                << p->get_ll () << ","
-                << ppos.latitude << "," << ppos.longitude << "\n";
-            fout.close ();
+// // #if WRITE_PARTICLES
+// //         for (auto p = _state.begin (); p != _state.end (); ++p)
+// //         {
+// //             p->calculate_likelihood (_position, path, _gpserror);
+// //             std::ostringstream fname;
+// //             fname << "history/vehicle_" << _vehicle_id << ".csv";
+// //             std::ofstream fout;
+// //             fout.open (fname.str ().c_str (), std::ofstream::app);
+// //             double d (p->get_distance ());
+// //             latlng ppos (_trip->shape ()->coordinates_of (d));
+// //             fout << _timestamp << ","
+// //                 << _trip->trip_id () << ","
+// //                 << std::setprecision(15)
+// //                 << _position.latitude << "," << _position.longitude << ","
+// //                 << std::setprecision(6)
+// //                 << p->get_distance () << ","
+// //                 << p->get_speed () << ","
+// //                 << p->get_acceleration () << ","
+// //                 << std::setprecision(15)
+// //                 << p->get_ll () << ","
+// //                 << ppos.latitude << "," << ppos.longitude << "\n";
+// //             fout.close ();
 
-            std::ostringstream fname2;
-            fname2 << "history/vehicle_" << _vehicle_id << "_particles.csv";
-            fout.open (fname2.str ().c_str (), std::ofstream::app);
-            fout << _timestamp;
-            for (auto ati = p->get_arrival_times ().begin (); ati != p->get_arrival_times ().end (); ++ati)
-            {
-                fout << "," << *ati;
-            }
-            fout << "\n";
-            fout.close ();
-        }
-#endif
+// //             std::ostringstream fname2;
+// //             fname2 << "history/vehicle_" << _vehicle_id << "_particles.csv";
+// //             fout.open (fname2.str ().c_str (), std::ofstream::app);
+// //             fout << _timestamp;
+// //             for (auto ati = p->get_arrival_times ().begin (); ati != p->get_arrival_times ().end (); ++ati)
+// //             {
+// //                 fout << "," << *ati;
+// //             }
+// //             fout << "\n";
+// //             fout.close ();
+// //         }
+// // #endif
 
 
     }
@@ -541,24 +579,24 @@ namespace Gtfs {
             }
         }
 
-        if (!calculated)
-        {
-            // threshold of 100m
-            double threshold = log (0.5) - 0.5 * exp (2.0 * (log (100.0) - log (_gpserror)));
-            double maxlh = threshold;
-            std::vector<ShapePt>* path = &(_trip->shape ()->path ());
-            for (auto p = _state.begin (); p != _state.end (); ++p)
-            {
-                p->calculate_likelihood (_position, path, _gpserror);
-                plh = p->get_ll ();
-                sumlh += exp (plh);
-                if (plh > maxlh) maxlh = plh;
+        // if (!calculated)
+        // {
+        //     // threshold of 100m
+        //     double threshold = log (0.5) - 0.5 * exp (2.0 * (log (100.0) - log (_gpserror)));
+        //     double maxlh = threshold;
+        //     std::vector<ShapePt>* path = &(_trip->shape ()->path ());
+        //     for (auto p = _state.begin (); p != _state.end (); ++p)
+        //     {
+        //         p->calculate_likelihood (_position, path, _gpserror);
+        //         plh = p->get_ll ();
+        //         sumlh += exp (plh);
+        //         if (plh > maxlh) maxlh = plh;
 
-                p->set_weight (p->get_weight () * exp (plh));
-                sumwt += p->get_weight ();
-            }
-            std::cout << " - vehicle " << _vehicle_id << " -> calculated likelihood using vehicle position\n";
-        }
+        //         p->set_weight (p->get_weight () * exp (plh));
+        //         sumwt += p->get_weight ();
+        //     }
+        //     std::cout << " - vehicle " << _vehicle_id << " -> calculated likelihood using vehicle position\n";
+        // }
 
         // if (maxlh < threshold) return;
         
@@ -743,7 +781,9 @@ namespace Gtfs {
 
     void Particle::travel (unsigned delta, RNG& rng)
     {
-        if (!vehicle || !vehicle->trip () || !vehicle->trip ()->shape ()) return;
+        if (complete || !vehicle || !vehicle->trip () || 
+            !vehicle->trip ()->shape ()) return;
+
         // do the particle physics
         double Dmax = vehicle->trip ()->shape ()->path ().back ().distance;
         if (distance >= Dmax) 
@@ -817,14 +857,14 @@ namespace Gtfs {
 
         double speed_mean = 10.0;
         double speed_sd = 100.0;
-        if (segments->at (l).segment->travel_time () > 0 &&
-            segments->at (l).segment->uncertainty () > 0) 
-        {
-            speed_mean = segments->at (l).segment->get_speed ();
-            speed_sd = - segments->at (l).segment->length () / pow (speed_mean, 2) *
-                segments->at (l).segment->uncertainty ();
-            speed_sd = pow(speed_sd, 0.5);
-        }
+        // if (segments->at (l).segment->travel_time () > 0 &&
+        //     segments->at (l).segment->uncertainty () > 0) 
+        // {
+        //     speed_mean = segments->at (l).segment->get_speed ();
+        //     speed_sd = - segments->at (l).segment->length () / pow (speed_mean, 2) *
+        //         segments->at (l).segment->uncertainty ();
+        //     speed_sd = pow(speed_sd, 0.5);
+        // }
         double vmax = rng.runif () < 0.05 ? 30.0 : 15.0;
         while (distance < Dmax && delta > 0.0)
         {
@@ -875,19 +915,19 @@ namespace Gtfs {
                 tt.at (l) = 0;
                 next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
                 vmax = rng.runif () < 0.05 ? 30.0 : 15.0;
-                if (segments->at (l).segment->travel_time () > 0 &&
-                    segments->at (l).segment->uncertainty () > 0) 
-                {
-                    speed_mean = segments->at (l).segment->get_speed ();
-                    speed_sd = - segments->at (l).segment->length () / pow (speed_mean, 2) *
-                        segments->at (l).segment->uncertainty ();
-                    speed_sd = pow(speed_sd, 0.5);
-                }
-                else
-                {
+                // if (segments->at (l).segment->travel_time () > 0 &&
+                //     segments->at (l).segment->uncertainty () > 0) 
+                // {
+                //     speed_mean = segments->at (l).segment->get_speed ();
+                //     speed_sd = - segments->at (l).segment->length () / pow (speed_mean, 2) *
+                //         segments->at (l).segment->uncertainty ();
+                //     speed_sd = pow(speed_sd, 0.5);
+                // }
+                // else
+                // {
                     speed_mean = 10.0;
                     speed_sd = 100.0;
-                }
+                // }
             }
 
             if (distance >= next_stop_d)
@@ -1010,7 +1050,7 @@ namespace Gtfs {
 
     void
     Particle::calculate_likelihood (latlng& y, 
-                                    std::vector<ShapePt>* path, 
+                                    std::vector<ShapePt>& path, 
                                     double sigma)
     {
         latlng ppos = vehicle->trip ()->shape ()->coordinates_of (distance);
@@ -1020,6 +1060,23 @@ namespace Gtfs {
         double lX2 = 2 * (ld - log (sigma));
         // log pdf of lX2 ~ Exp(2)
         log_likelihood = log (0.5) - 0.5 * exp(lX2);
+    }
+
+    void Particle::calculate_likelihood (Event& e, double error)
+    {
+        uint64_t t = (e.type == EventType::arrival) ? 
+            get_arrival_time (e.stop_index) :
+            get_departure_time (e.stop_index);
+
+        if (t == 0) 
+        {
+            log_likelihood = 0.0;
+            return;
+        }
+
+        log_likelihood = - 0.5 * log (2 * M_PI) - log (error) - 
+            pow (e.timestamp - t, 2) / 2 / pow (error, 2);
+        
     }
 
     void Particle::calculate_arrival_likelihood (int index, uint64_t time, double error)

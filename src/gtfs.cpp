@@ -329,6 +329,8 @@ namespace Gtfs
 
     sqlite3* Gtfs::get_connection ()
     {
+        std::lock_guard<std::mutex> lk (con_lock);
+        
         if (_connection != nullptr)
         {
             return _connection;
