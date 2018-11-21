@@ -29,10 +29,12 @@ namespace Gtfs
         
         sqlite3_stmt* stmt;
         std::string qry;
+        const char* qrystr;
         // load AGENCIES
         {
             qry = "SELECT count(agency_id) FROM agency";
-            if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -44,7 +46,8 @@ namespace Gtfs
             sqlite3_finalize (stmt);
 
             qry = "SELECT agency_id FROM agency";
-            if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -66,7 +69,8 @@ namespace Gtfs
         // load ROUTES
         {
             qry = "SELECT count(route_id) FROM routes";
-            if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -78,7 +82,8 @@ namespace Gtfs
             sqlite3_finalize (stmt);
 
             qry = "SELECT route_id FROM routes";
-            if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -100,7 +105,8 @@ namespace Gtfs
         // load TRIPS
         {
             qry = "SELECT count(trip_id) FROM trips";
-            if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -112,7 +118,8 @@ namespace Gtfs
             sqlite3_finalize (stmt);
 
             qry = "SELECT trip_id FROM trips";
-            if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -134,7 +141,8 @@ namespace Gtfs
         // load SHAPES
         {
             qry = "SELECT count(distinct shape_id) FROM shapes";
-            if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -146,7 +154,8 @@ namespace Gtfs
             sqlite3_finalize (stmt);
 
             qry ="SELECT distinct shape_id FROM shapes";
-            if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -168,7 +177,8 @@ namespace Gtfs
         // load SEGMENTS
         {
             qry = "SELECT count(road_segment_id) FROM road_segments";
-            if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -180,7 +190,8 @@ namespace Gtfs
             sqlite3_finalize (stmt);
 
             qry ="SELECT road_segment_id FROM road_segments";
-            if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -202,7 +213,8 @@ namespace Gtfs
         // load INTERSECTIONS
         {
             qry = "SELECT count(intersection_id) FROM intersections";
-            if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -214,7 +226,8 @@ namespace Gtfs
             sqlite3_finalize (stmt);
 
             qry ="SELECT intersection_id FROM intersections";
-            if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -236,7 +249,8 @@ namespace Gtfs
         // load STOPS
         {
             qry = "SELECT count(distinct stop_id) FROM stops";
-            if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -248,7 +262,8 @@ namespace Gtfs
             sqlite3_finalize (stmt);
 
             qry = "SELECT distinct stop_id FROM stops";
-            if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -270,7 +285,8 @@ namespace Gtfs
         // load CALENDAR
         {
             qry = "SELECT count(service_id) FROM calendar";
-            if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -282,7 +298,8 @@ namespace Gtfs
             sqlite3_finalize (stmt);
 
             qry = "SELECT service_id FROM calendar";
-            if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -322,7 +339,8 @@ namespace Gtfs
         {
             if (_connection == nullptr)
             {
-                int r = sqlite3_open (_dbname.c_str (), &_connection);
+                const char* dbstr = _dbname.c_str ();
+                int r = sqlite3_open (dbstr, &_connection);
                 if (r == SQLITE_OK)
                 {
                     return _connection;
@@ -486,7 +504,8 @@ namespace Gtfs
 
         sqlite3_stmt* stmt;
         std::string qry = "SELECT agency_name, agency_url, agency_phone, agency_timezone, agency_lang FROM agency WHERE agency_id=?";
-        if (sqlite3_prepare_v2(db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+        const char* qrystr = qry.c_str ();    
+        if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                 << sqlite3_errmsg (db) << "\n";
@@ -494,8 +513,8 @@ namespace Gtfs
             gtfs->close_connection ();
             return;
         }
-        if (sqlite3_bind_text (stmt, 1, _agency_id.c_str (),
-                               -1, SQLITE_STATIC) != SQLITE_OK)
+        auto astr = _agency_id.c_str ();
+        if (sqlite3_bind_text (stmt, 1, astr, -1, SQLITE_STATIC) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't bind agency id to query\n  "
                 << sqlite3_errmsg (db) << "\n";
@@ -585,7 +604,8 @@ namespace Gtfs
 
         sqlite3_stmt* stmt;
         std::string qry = "SELECT route_short_name, route_long_name, route_type, agency_id, version FROM routes WHERE route_id=?";
-        if (sqlite3_prepare_v2(db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+        const char* qrystr = qry.c_str ();
+        if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                 << sqlite3_errmsg (db) << "\n";
@@ -593,8 +613,8 @@ namespace Gtfs
             gtfs->close_connection ();
             return;
         }
-        if (sqlite3_bind_text (stmt, 1, _route_id.c_str (),
-                               -1, SQLITE_STATIC) != SQLITE_OK)
+        const char* rstr = _route_id.c_str ();
+        if (sqlite3_bind_text (stmt, 1, rstr, -1, SQLITE_STATIC) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't bind route id to query\n  "
                 << sqlite3_errmsg (db) << "\n";
@@ -683,7 +703,8 @@ namespace Gtfs
 
         sqlite3_stmt* stmt;
         std::string qry = "SELECT route_id, shape_id, service_id, block_id, direction_id, trip_headsign, version FROM trips WHERE trip_id=?";
-        if (sqlite3_prepare_v2(db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+        const char* qrystr = qry.c_str ();
+        if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                 << sqlite3_errmsg (db) << "\n";
@@ -691,8 +712,8 @@ namespace Gtfs
             gtfs->close_connection ();
             return;
         }
-        if (sqlite3_bind_text (stmt, 1, _trip_id.c_str (),
-                               -1, SQLITE_STATIC) != SQLITE_OK)
+        const char* tstr = _trip_id.c_str ();
+        if (sqlite3_bind_text (stmt, 1, tstr, -1, SQLITE_STATIC) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't bind trip id to query\n  "
                 << sqlite3_errmsg (db) << "\n";
@@ -734,8 +755,11 @@ namespace Gtfs
         // Load stops
         { 
             sqlite3_stmt* stmt;
+            const char* qrystr;
+
             qry = "SELECT count(stop_id) FROM stop_times WHERE trip_id=?";
-            if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -743,8 +767,7 @@ namespace Gtfs
                 gtfs->close_connection ();
                 return;
             }
-            if (sqlite3_bind_text (stmt, 1, _trip_id.c_str (),
-                                   -1, SQLITE_STATIC) != SQLITE_OK)
+            if (sqlite3_bind_text (stmt, 1, tstr, -1, SQLITE_STATIC) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't bind stop id to query\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -764,7 +787,8 @@ namespace Gtfs
             sqlite3_finalize (stmt);
 
             qry = "SELECT stop_id, arrival_time, departure_time, stop_headsign, pickup_type, drop_off_type, shape_dist_traveled FROM stop_times WHERE trip_id=? ORDER BY stop_sequence";
-            if (sqlite3_prepare_v2(db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -772,8 +796,7 @@ namespace Gtfs
                 gtfs->close_connection ();
                 return;
             }
-            if (sqlite3_bind_text (stmt, 1, _trip_id.c_str (),
-                                   -1, SQLITE_STATIC) != SQLITE_OK)
+            if (sqlite3_bind_text (stmt, 1, tstr, -1, SQLITE_STATIC) != SQLITE_OK)
             {
                 Rcpp::Rcerr << " x Can't bind trip id to query\n  "
                     << sqlite3_errmsg (db) << "\n";
@@ -944,8 +967,11 @@ namespace Gtfs
         }
 
         sqlite3_stmt* stmt;
+        const char* qrystr;
+
         std::string qry = "SELECT count(shape_id) FROM shapes WHERE shape_id=?";
-        if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+        qrystr = qry.c_str ();
+        if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                 << sqlite3_errmsg (db) << "\n";
@@ -953,8 +979,8 @@ namespace Gtfs
             gtfs->close_connection ();
             return;
         }
-        if (sqlite3_bind_text (stmt, 1, _shape_id.c_str (),
-                               -1, SQLITE_STATIC) != SQLITE_OK)
+        const char* shstr = _shape_id.c_str ();
+        if (sqlite3_bind_text (stmt, 1, shstr, -1, SQLITE_STATIC) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't bind shape id to query\n  "
                 << sqlite3_errmsg (db) << "\n";
@@ -974,7 +1000,8 @@ namespace Gtfs
         sqlite3_finalize (stmt);
 
         qry = "SELECT shape_pt_lat, shape_pt_lon, shape_dist_traveled, version FROM shapes WHERE shape_id=? ORDER BY shape_pt_sequence";
-        if (sqlite3_prepare_v2(db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+        qrystr = qry.c_str ();
+        if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                 << sqlite3_errmsg (db) << "\n";
@@ -982,8 +1009,7 @@ namespace Gtfs
             gtfs->close_connection ();
             return;
         }
-        if (sqlite3_bind_text (stmt, 1, _shape_id.c_str (),
-                               -1, SQLITE_STATIC) != SQLITE_OK)
+        if (sqlite3_bind_text (stmt, 1, shstr, -1, SQLITE_STATIC) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't bind shape id to query\n  "
                 << sqlite3_errmsg (db) << "\n";
@@ -1008,7 +1034,8 @@ namespace Gtfs
 
         // and then load the shape segments 
         qry = "SELECT count(shape_id) FROM shape_segments WHERE shape_id=?";
-        if (sqlite3_prepare_v2 (db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+        qrystr = qry.c_str ();
+        if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                 << sqlite3_errmsg (db) << "\n";
@@ -1016,8 +1043,7 @@ namespace Gtfs
             gtfs->close_connection ();
             return;
         }
-        if (sqlite3_bind_text (stmt, 1, _shape_id.c_str (),
-                               -1, SQLITE_STATIC) != SQLITE_OK)
+        if (sqlite3_bind_text (stmt, 1, shstr, -1, SQLITE_STATIC) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't bind shape id to query\n  "
                 << sqlite3_errmsg (db) << "\n";
@@ -1037,7 +1063,8 @@ namespace Gtfs
         sqlite3_finalize (stmt);
 
         qry = "SELECT road_segment_id, distance_traveled FROM shape_segments WHERE shape_id=? ORDER BY shape_road_sequence";
-        if (sqlite3_prepare_v2(db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+        qrystr = qry.c_str ();
+        if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                 << sqlite3_errmsg (db) << "\n";
@@ -1045,8 +1072,7 @@ namespace Gtfs
             gtfs->close_connection ();
             return;
         }
-        if (sqlite3_bind_text (stmt, 1, _shape_id.c_str (),
-                               -1, SQLITE_STATIC) != SQLITE_OK)
+        if (sqlite3_bind_text (stmt, 1, shstr, -1, SQLITE_STATIC) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't bind shape id to query\n  "
                 << sqlite3_errmsg (db) << "\n";
@@ -1200,8 +1226,11 @@ namespace Gtfs
         }
 
         sqlite3_stmt* stmt;
+        const char* qrystr;
+
         std::string qry = "SELECT int_from, int_to, length FROM road_segments WHERE road_segment_id=?";
-        if (sqlite3_prepare_v2(db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+        qrystr = qry.c_str ();
+        if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                 << sqlite3_errmsg (db) << "\n";
@@ -1333,8 +1362,10 @@ namespace Gtfs
         }
 
         sqlite3_stmt* stmt;
+        const char* qrystr;
         std::string qry = "SELECT intersection_lat, intersection_lon FROM intersections WHERE intersection_id=?";
-        if (sqlite3_prepare_v2(db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+        qrystr = qry.c_str ();
+        if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                 << sqlite3_errmsg (db) << "\n";
@@ -1401,8 +1432,10 @@ namespace Gtfs
         }
 
         sqlite3_stmt* stmt;
+        const char* qrystr;
         std::string qry = "SELECT stop_lat, stop_lon, stop_code, stop_name, stop_desc, zone_id, parent_station, location_type, version FROM stops WHERE stop_id=?";
-        if (sqlite3_prepare_v2(db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+        qrystr = qry.c_str ();
+        if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                 << sqlite3_errmsg (db) << "\n";
@@ -1410,8 +1443,8 @@ namespace Gtfs
             gtfs->close_connection ();
             return;
         }
-        if (sqlite3_bind_text (stmt, 1, _stop_id.c_str (),
-                               -1, SQLITE_STATIC) != SQLITE_OK)
+        const char* ststr = _stop_id.c_str ();
+        if (sqlite3_bind_text (stmt, 1, ststr, -1, SQLITE_STATIC) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't bind stop id to query\n  "
                 << sqlite3_errmsg (db) << "\n";
@@ -1561,8 +1594,11 @@ namespace Gtfs
         }
 
         sqlite3_stmt* stmt;
+        const char* qrystr;
+        
         std::string qry = "SELECT monday, tuesday, wednesday, thursday, friday, saturday, sunday, start_date, end_date, version FROM calendar WHERE service_id=?";
-        if (sqlite3_prepare_v2(db, qry.c_str (), -1, &stmt, 0) != SQLITE_OK)
+        qrystr = qry.c_str ();
+        if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
                 << sqlite3_errmsg (db) << "\n";
@@ -1570,8 +1606,8 @@ namespace Gtfs
             gtfs->close_connection ();
             return;
         }
-        if (sqlite3_bind_text (stmt, 1, _service_id.c_str (),
-                               -1, SQLITE_STATIC) != SQLITE_OK)
+        const char* srstr = _service_id.c_str ();
+        if (sqlite3_bind_text (stmt, 1, srstr, -1, SQLITE_STATIC) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't bind service id to query\n  "
                 << sqlite3_errmsg (db) << "\n";

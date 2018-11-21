@@ -53,13 +53,15 @@ int RealtimeFeed::update ()
 
             for (auto header: _headers)
             {
-                chunk = curl_slist_append (chunk, header.c_str ());
+                const char* hstr = header.c_str ();
+                chunk = curl_slist_append (chunk, hstr);
             }
 
             res = curl_easy_setopt(curl, CURLOPT_HTTPHEADER, chunk);
             // curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
 
-            curl_easy_setopt (curl, CURLOPT_URL, url->c_str ());
+            const char* urlstr = url->c_str ();
+            curl_easy_setopt (curl, CURLOPT_URL, urlstr);
             curl_easy_setopt (curl, CURLOPT_WRITEFUNCTION, WriteCallback);
             curl_easy_setopt (curl, CURLOPT_WRITEDATA, &readBuffer);
             res = curl_easy_perform (curl);

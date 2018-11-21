@@ -83,7 +83,7 @@ void run_realtime_model (List nw)
     }
     int tries = 0;
     int iteration = 0;
-    while (ongoing && iteration < 10)
+    while (ongoing && iteration < 1)
     {
         Rcout << "\n --- Commence iteration ---\n";
 
@@ -163,61 +163,61 @@ void run_realtime_model (List nw)
         timer.report ("updating vehicle states");
 
         // Now update the network state
-        #pragma omp parallel for num_threads (1)
-        for (unsigned l=0; l<gtfs.segments ().bucket_count (); ++l)
-        {
-            for (auto sl = gtfs.segments ().begin (l); sl != gtfs.segments ().end (l); ++sl)
-            {
-                sl->second.update (rtfeed.feed()->header ().timestamp ());
-            }
-        }
-        timer.report ("updating network state");
+        // #pragma omp parallel for num_threads (1)
+        // for (unsigned l=0; l<gtfs.segments ().bucket_count (); ++l)
+        // {
+        //     for (auto sl = gtfs.segments ().begin (l); sl != gtfs.segments ().end (l); ++sl)
+        //     {
+        //         sl->second.update (rtfeed.feed()->header ().timestamp ());
+        //     }
+        // }
+        // timer.report ("updating network state");
 
-#if SIMULATION
-        {
-            std::ofstream fout;
-            fout.open ("segment_states.csv", std::ofstream::app);
-            // fout << "segment_id,timestamp,travel_time,uncertainty\n";
-            for (auto sl = gtfs.segments ().begin (); sl != gtfs.segments ().end (); ++sl)
-            {
-                if (sl->second.uncertainty () > 0)
-                {
-                    fout << sl->second.segment_id () << ","
-                        << sl->second.timestamp () << ","
-                        << sl->second.travel_time () << "," 
-                        << sl->second.uncertainty () << "\n";
-                }
-            }
-            fout.close ();
-        }
-#endif
+// #if SIMULATION
+//         {
+//             std::ofstream fout;
+//             fout.open ("segment_states.csv", std::ofstream::app);
+//             // fout << "segment_id,timestamp,travel_time,uncertainty\n";
+//             for (auto sl = gtfs.segments ().begin (); sl != gtfs.segments ().end (); ++sl)
+//             {
+//                 if (sl->second.uncertainty () > 0)
+//                 {
+//                     fout << sl->second.segment_id () << ","
+//                         << sl->second.timestamp () << ","
+//                         << sl->second.travel_time () << "," 
+//                         << sl->second.uncertainty () << "\n";
+//                 }
+//             }
+//             fout.close ();
+//         }
+// #endif
         
         // Predict ETAs
-        #pragma omp parallel for num_threads(params.n_core)
-        for (unsigned i=0; i<vehicles.bucket_count (); ++i)
-        {
-            for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
-            {
-                v->second.predict_etas (rngs.at (omp_get_thread_num ()));
-            }
-        }
-        timer.report ("predicting ETAs");
+        // #pragma omp parallel for num_threads(params.n_core)
+        // for (unsigned i=0; i<vehicles.bucket_count (); ++i)
+        // {
+        //     for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
+        //     {
+        //         v->second.predict_etas (rngs.at (omp_get_thread_num ()));
+        //     }
+        // }
+        // timer.report ("predicting ETAs");
 
         // Write vehicles to (new) feed
-#if SIMULATION
-        std::ostringstream outputname_t;
-        outputname_t << "etas/etas";
-        if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ()) 
-        {
-            outputname_t << "_" << rtfeed.feed ()->header ().timestamp ();
-        }
-        outputname_t << ".pb";
-        std::string oname (outputname_t.str ());
-        write_vehicles (&vehicles, oname);
-#endif
-        write_vehicles (&vehicles, outputname);
+// #if SIMULATION
+//         std::ostringstream outputname_t;
+//         outputname_t << "etas/etas";
+//         if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ()) 
+//         {
+//             outputname_t << "_" << rtfeed.feed ()->header ().timestamp ();
+//         }
+//         outputname_t << ".pb";
+//         std::string oname (outputname_t.str ());
+//         write_vehicles (&vehicles, oname);
+// #endif
+//         write_vehicles (&vehicles, outputname);
 
-        timer.report ("writing ETAs to protobuf feed");
+//         timer.report ("writing ETAs to protobuf feed");
 
         gtfs.close_connection (true);
         timer.end ();
