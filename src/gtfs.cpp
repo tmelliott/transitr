@@ -492,6 +492,7 @@ namespace Gtfs
 
     void Agency::load ()
     {
+        std::lock_guard<std::mutex> lk (load_mutex);
         if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
@@ -592,6 +593,7 @@ namespace Gtfs
 
     void Route::load ()
     {
+        std::lock_guard<std::mutex> lk (load_mutex);
         if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
@@ -691,6 +693,7 @@ namespace Gtfs
 
     void Trip::load ()
     {
+        std::lock_guard<std::mutex> lk (load_mutex);
         if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
@@ -956,6 +959,7 @@ namespace Gtfs
 
     void Shape::load ()
     {
+        std::lock_guard<std::mutex> lk (load_mutex);
         if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
@@ -1215,6 +1219,7 @@ namespace Gtfs
 
     void Segment::load ()
     {
+        std::lock_guard<std::mutex> lk (load_mutex);
         if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
@@ -1351,6 +1356,7 @@ namespace Gtfs
 
     void Intersection::load ()
     {
+        std::lock_guard<std::mutex> lk (load_mutex);
         if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
@@ -1421,6 +1427,7 @@ namespace Gtfs
 
     void Stop::load ()
     {
+        std::lock_guard<std::mutex> lk (load_mutex);
         if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
@@ -1583,6 +1590,7 @@ namespace Gtfs
 
     void Calendar::load ()
     {
+        std::lock_guard<std::mutex> lk (load_mutex);
         if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
@@ -2050,9 +2058,8 @@ namespace Gtfs
 
     bool Vehicle::valid ()
     {
-        return (_position.latitude != 0.0 || 
-                _position.longitude != 0.0) &&
-            _trip != nullptr && _timestamp != 0;
+        return (_position.latitude != 0.0 || _position.longitude != 0.0) &&
+                _trip != nullptr && _timestamp != 0;
     }
 
     bool Vehicle::complete ()

@@ -130,6 +130,8 @@ namespace Gtfs
         std::string _agency_timezone;
         std::string _agency_lang;
 
+        std::mutex load_mutex;
+
         bool loaded = false;    // we'll only load when requested for the first time
         bool completed = false; // set to `true` once the trip has been completed
 
@@ -158,6 +160,8 @@ namespace Gtfs
         unsigned short int _route_type; // [0 tram, 1 subway/metro, 2 rail, 3 bus, 4 ferry, 5 cablecar, 6 gondola, 7 funicular]
         Agency* _agency;
         float _version;
+
+        std::mutex load_mutex;
 
         bool loaded = false;
         bool completed = false;
@@ -190,6 +194,8 @@ namespace Gtfs
         bool _direction_id; // 0 or 1
         std::string _trip_headsign;
         float _version;
+
+        std::mutex load_mutex;
 
         Vehicle* _vehicle = nullptr;
 
@@ -227,6 +233,8 @@ namespace Gtfs
         std::vector<ShapeSegment> _segments;
         float _version;
 
+        std::mutex load_mutex;
+
         bool loaded = false;
         bool completed = false;
 
@@ -254,6 +262,8 @@ namespace Gtfs
         Intersection* _from;
         Intersection* _to;
         double _length;
+
+        std::mutex load_mutex;
 
         bool loaded = false;
 
@@ -304,6 +314,8 @@ namespace Gtfs
         int _intersection_id;
         latlng _position;
 
+        std::mutex load_mutex;
+
         bool loaded = false;
 
     public:
@@ -331,6 +343,8 @@ namespace Gtfs
         int _location_type;
         std::vector<Trip*> _trips;
         float _version;
+
+        std::mutex load_mutex;
 
         bool loaded = false;
         bool completed = false;
@@ -373,6 +387,8 @@ namespace Gtfs
         std::string _end_date;
         float _version;
         std::vector<CalendarDate*> _exceptions;
+
+        std::mutex load_mutex;
 
         bool loaded = false;
         bool completed = false;
