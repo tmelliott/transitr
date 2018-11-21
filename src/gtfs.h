@@ -613,6 +613,7 @@ namespace Gtfs
         double speed = 0.0;
         double acceleration = 0.0;
         int accelerating = 0.0;
+        unsigned int stop_index = 0;
         std::vector<int> tt; // segment travel times
         std::vector<uint64_t> at; // stop arrival times
         std::vector<uint64_t> dt; // stop departure times
@@ -631,6 +632,7 @@ namespace Gtfs
         double get_distance ();
         double get_speed ();
         double get_acceleration ();
+        unsigned int get_stop_index ();
         double get_ll ();
         double get_weight ();
         std::vector<uint64_t>& get_arrival_times ();

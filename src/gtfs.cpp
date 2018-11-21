@@ -330,7 +330,7 @@ namespace Gtfs
     sqlite3* Gtfs::get_connection ()
     {
         std::lock_guard<std::mutex> lk (con_lock);
-        
+
         if (_connection != nullptr)
         {
             return _connection;
@@ -2172,6 +2172,11 @@ namespace Gtfs
     double Particle::get_acceleration ()
     {
         return acceleration;
+    }
+
+    unsigned int Particle::get_stop_index ()
+    {
+        return stop_index;
     }
 
     double Particle::get_ll ()

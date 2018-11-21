@@ -83,7 +83,7 @@ void run_realtime_model (List nw)
     }
     int tries = 0;
     int iteration = 0;
-    while (ongoing && iteration < 2)
+    while (ongoing && iteration < 10)
     {
         Rcout << "\n --- Commence iteration ---\n";
 

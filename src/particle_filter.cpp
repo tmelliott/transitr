@@ -122,12 +122,12 @@ namespace Gtfs {
                 _stop_index = e.stop_index;
             }
 
-            mutate_to (e, rng);
-            
             std::cout << "\n    [" << e.timestamp << "] "
                 << _trip->route ()->route_short_name ()
                 << " (" << _trip->stops ().at (0).departure_time << "): ";
             e.print ();
+
+            mutate_to (e, rng);
 
             current_event_index++;
         }
@@ -234,7 +234,7 @@ namespace Gtfs {
 
     void Vehicle::mutate_to (Event& e, RNG& rng)
     {
-        if (_newtrip)
+        if (_newtrip || bad_sample)
         {
             _delta = 0;
             std::cout << "\n    -> initializing";
@@ -281,6 +281,45 @@ namespace Gtfs {
 
             std::cout << " => l(Y|Xi) = " << exp (p.get_ll ());
         }
+
+        bad_sample = true;
+        _Neff = 0;
+        double sumlh = std::accumulate (_state.begin (), _state.end (), 0.0,
+                                        [](double a, Particle& p) {
+                                            return a + p.get_weight () * exp (p.get_ll ());
+                                        });
+
+        std::cout << "\n   -> sum(l(y|x)) = " << sumlh;
+        // if no likelihoods are that big, give up
+        if (sumlh < 1e-10) return;
+
+        // normalize weights
+        std::vector<double> wt;
+        wt.reserve (_state.size ());
+        for (auto& p : _state)
+        {
+            p.set_weight (p.get_weight () * exp (p.get_ll ()) / sumlh);
+            wt.push_back (p.get_weight ());
+        }
+        double sumwt = std::accumulate (wt.begin (), wt.end (), 0.0);
+
+        // sum(wt) in (0.999, 1.0001)
+        std::cout << "\n   -> sum(wt) = " << sumwt;
+        if (fabs (1 - sumwt) > 1e-4) return;
+        bad_sample = false;
+
+        // calcualte Neff.
+        double sumwt2 = std::accumulate(wt.begin (), wt.end (), 0.0,
+                                        [](double a, double b) {
+                                            return a + pow(b, 2);
+                                        });
+
+        _Neff = pow (sumwt2, -1);
+        std::cout << "\n   -> Neff = " << _Neff;
+        if (_Neff >= (_N / 4)) return;
+
+        std::cout << " -> resampling";
+        select (rng);
 
     }
 
@@ -531,103 +570,14 @@ namespace Gtfs {
 
     void Vehicle::select (RNG& rng)
     {
-        // this will be made better to use alternative likelihood at some point ...
-        bad_sample = true;
-        resample = false;
-
-        double calculated = false;
-        double sumlh = 0.0;
-        double sumwt = 0.0;
-        double plh;
-
-        // calculate loglikelihood of particles
-        if (_stop_time_updates.size () > 0 && 
-            _last_stop_update_index >= 0 && 
-            _last_stop_update_index < _stop_time_updates.size ())
-        {
-            STU& stu = _stop_time_updates.at (_last_stop_update_index);
-            if (stu.timestamp > 0)
-            {
-                if (!stu.used_arrival && stu.arrival_time > 0 && _timestamp == stu.arrival_time)
-                {
-                    // calculate likelihood based on arrival time
-                    for (auto p = _state.begin (); p != _state.end (); ++p)
-                    {
-                        p->calculate_arrival_likelihood (_last_stop_update_index, stu.arrival_time, _arrival_error);
-                        plh = p->get_ll ();
-                        sumlh += exp (plh);
-                        p->set_weight (p->get_weight () * exp (plh));
-                        sumwt += p->get_weight ();
-                    }
-                    std::cout << " - vehicle " << _vehicle_id << " -> calculated likelihood using arrival time\n";
-                    calculated = true;
-                }
-                if (!stu.used_departure && stu.departure_time > 0 && _timestamp == stu.departure_time)
-                {
-                    // calculate likelihood based on departure time
-                    for (auto p = _state.begin (); p != _state.end (); ++p)
-                    {
-                        p->calculate_departure_likelihood (_last_stop_update_index, stu.departure_time, _departure_error);
-                        plh = p->get_ll ();
-                        sumlh += exp (plh);
-                        p->set_weight (p->get_weight () * exp (plh));
-                        sumwt += p->get_weight ();
-                    }
-                    std::cout << " - vehicle " << _vehicle_id << " -> calculated likelihood using departure time\n";
-                    calculated = true;
-                }
-            }
-        }
-
-        // if (!calculated)
-        // {
-        //     // threshold of 100m
-        //     double threshold = log (0.5) - 0.5 * exp (2.0 * (log (100.0) - log (_gpserror)));
-        //     double maxlh = threshold;
-        //     std::vector<ShapePt>* path = &(_trip->shape ()->path ());
-        //     for (auto p = _state.begin (); p != _state.end (); ++p)
-        //     {
-        //         p->calculate_likelihood (_position, path, _gpserror);
-        //         plh = p->get_ll ();
-        //         sumlh += exp (plh);
-        //         if (plh > maxlh) maxlh = plh;
-
-        //         p->set_weight (p->get_weight () * exp (plh));
-        //         sumwt += p->get_weight ();
-        //     }
-        //     std::cout << " - vehicle " << _vehicle_id << " -> calculated likelihood using vehicle position\n";
-        // }
-
-        // if (maxlh < threshold) return;
-        
-        _Neff = 0;
-        if (sumwt == 0) return;
-
-        // normalize weights
         std::vector<double> wt;
-        wt.reserve (_N);
+        wt.reserve (_state.size ());
+        double sumwt = 0.0;
         for (auto p = _state.begin (); p != _state.end (); ++p)
         {
-            p->set_weight (p->get_weight () / sumwt);
             wt.push_back (p->get_weight ());
+            sumwt += p->get_weight ();
         }
-
-
-        // some condition for resampling (1/wt^2 < N? or something ...)
-        sumwt = std::accumulate (wt.begin (), wt.end (), 0.0);
-        if (sumwt - 1.0 > 0.01) return;
-
-        double sumwt2 = std::accumulate(wt.begin (), wt.end (), 0.0,
-                                        [](double a, double b) {
-                                            return a + pow(b, 2);
-                                        });
-        _Neff = pow (sumwt2, -1);
-        // std::cout << "\n sumwt2 = " << sumwt2 <<", Neff = " << _Neff;
-
-        bad_sample = false;
-        
-        if (_Neff >= 1000) return;
-        resample = true;
 
         // resample u \in [0, 1)
         double u;
@@ -639,27 +589,21 @@ namespace Gtfs {
             u = rng.runif () * sumwt;
             for (j=0; j<_N; ++j)
             {
-                if (u < wt[j])
+                if (u < wt.at (j))
                 {
-                    _newstate.emplace_back (_state[j]);
+                    _newstate.emplace_back (_state.at (j));
                     break;
                 }
                 // if not less, subtract wt from u
-                u -= wt[j];
+                u -= wt.at (j);
             }
         }
 
-        // std::cout << "\n + vehicle " << _vehicle_id << ":\n";
-        // for (auto p = _state.begin (); p != _state.end (); ++p)
-        //     std::cout << "[" << p->get_distance () << ", " << p->get_speed () << "] ; ";
         _state.clear ();
         _state = std::move(_newstate);
-        // std::cout << "\n";
-        // for (auto p = _state.begin (); p != _state.end (); ++p)
-        //     std::cout << "[" << p->get_distance () << ", " << p->get_speed () << "] ; ";
 
         double initwt = pow(_N, -1);
-        for (auto p = _state.begin (); p != _state.end (); ++p) p->set_weight (initwt);
+        for (auto& p : _state) p.set_weight (initwt);
         resample_count++;
     }
 
@@ -983,9 +927,9 @@ namespace Gtfs {
         if (M == 0) return;
         at.clear ();
         at.resize (M, 0);
-        unsigned int m (find_stop_index (distance, stops));
+        stop_index = find_stop_index (distance, stops);
         // std::cout << " @" << m << " > ";
-        if (m == M-1) 
+        if (stop_index == M-1) 
         {
             return;
         }
@@ -1011,10 +955,10 @@ namespace Gtfs {
         {
             vel = rng.rnorm () * 8.0 + 15.0;
         }
-        while (m < M-1)
+        while (stop_index < M-1)
         {
-            m++; // `next` stop index
-            dnext = stops->at (m).distance;
+            stop_index++; // `next` stop index
+            dnext = stops->at (stop_index).distance;
             etat = 0;
             // std::cout << " [";
             while (next_segment_d < dnext && l < L-1)
@@ -1036,10 +980,10 @@ namespace Gtfs {
             // std::cout << "] ";
             etat += (dnext - dcur) / vel;
             tt_total += (dnext - dcur) / vel;
-            at.at (m) = t0 + etat; // makes no sense because speeds are noise
+            at.at (stop_index) = t0 + etat; // makes no sense because speeds are noise
             dcur = dnext;
             // and add some dwell time
-            t0 = at.at (m);
+            t0 = at.at (stop_index);
             if (rng.runif () < vehicle->dwell_time ())
             {
                 t0 += vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
@@ -1060,6 +1004,8 @@ namespace Gtfs {
         double lX2 = 2 * (ld - log (sigma));
         // log pdf of lX2 ~ Exp(2)
         log_likelihood = log (0.5) - 0.5 * exp(lX2);
+
+        std::cout << " => d(h(x), y) = " << exp (ld) << "m";
     }
 
     void Particle::calculate_likelihood (Event& e, double error)
@@ -1070,9 +1016,16 @@ namespace Gtfs {
 
         if (t == 0) 
         {
-            log_likelihood = 0.0;
+            std::cout << " => hasn't "
+                << (e.type == EventType::arrival ? "arrived" : "departed");
+            // log_likelihood = 0.0;
             return;
         }
+
+        std::cout << " => "
+            << (e.type == EventType::arrival ? "arrived" : "departed")
+            << " at " << t
+            << " (diff: " << (e.timestamp - t) << "s)";
 
         log_likelihood = - 0.5 * log (2 * M_PI) - log (error) - 
             pow (e.timestamp - t, 2) / 2 / pow (error, 2);
