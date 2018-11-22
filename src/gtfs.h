@@ -496,19 +496,7 @@ namespace Gtfs
             return (timestamp < e.timestamp);
         }
 
-        void print ()
-        {
-            if (type == EventType::gps)
-            {
-                std::cout << "position update {" <<
-                    position.latitude << ", " << position.longitude << "}";
-            }
-            else
-            {
-                std::cout << (type == EventType::arrival ? "arrived" : "departed")
-                    << " stop " << (stop_index + 1);
-            }
-        }
+        void print ();
     };
 
     class Vehicle {

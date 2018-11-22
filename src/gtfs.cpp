@@ -1787,6 +1787,20 @@ namespace Gtfs
     {
     }
 
+    void Event::print ()
+    {
+        if (type == EventType::gps)
+        {
+            std::cout << "position update {" <<
+                position.latitude << ", " << position.longitude << "}";
+        }
+        else
+        {
+            std::cout << (type == EventType::arrival ? "arrived" : "departed")
+                << " stop " << (stop_index + 1);
+        }
+    }
+
     /***************************************************** Vehicle */
     Vehicle::Vehicle (std::string& id, par* params) : 
     _vehicle_id (id)

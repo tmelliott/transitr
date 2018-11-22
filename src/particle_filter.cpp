@@ -127,6 +127,12 @@ namespace Gtfs {
                 << " (" << _trip->stops ().at (0).departure_time << "): ";
             e.print ();
 
+            if (e.type != EventType::gps)
+            {
+                std::cout << " (d = " 
+                    << _trip->stops ().at (_stop_index).distance << "m)";
+            }
+
             mutate_to (e, rng);
 
             current_event_index++;
