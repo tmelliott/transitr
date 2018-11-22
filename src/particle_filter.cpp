@@ -17,6 +17,11 @@ namespace Gtfs {
         {
             dmax = _trip->shape ()->path ().back ().distance;
             dist = _trip->shape ()->distance_of (_position);
+            auto pt = _trip->shape ()->coordinates_of (dist);
+            if (distanceEarth (pt, _position) > 50)
+            {
+                dist = 0.0;
+            }
         }
         else
         {
@@ -29,18 +34,16 @@ namespace Gtfs {
             switch (e.type)
             {
                 case EventType::gps :
-                    // initialize each particle within 300m of obs
-                    _state.emplace_back (fmin(dmax, rng.runif () * 600 + dist / 2.0),
-                                         rng.runif () * 30.0, 
-                                         rng.rnorm () * _systemnoise,
-                                         this);
+                    // initialize each particle within 100m of obs
+                    double d, u;
+                    u = rng.runif ();
+                    d = (dist == 0 ? u * dmax : fmin(dmax, u * 200 + dist / 2.0));
+                    _state.emplace_back (d, rng.runif () * 30.0, rng.rnorm () * _systemnoise, this);
                     break;
                 case EventType::arrival :
                 case EventType::departure :
                     // initialize points at the stop, I guess ...
-                    _state.emplace_back (dist, rng.runif () * 30,
-                                         rng.rnorm () * _systemnoise,
-                                         this);
+                    _state.emplace_back (dist, rng.runif () * 30, rng.rnorm () * _systemnoise, this);
                     break;
             }
         }
@@ -258,8 +261,10 @@ namespace Gtfs {
         bool all_complete = true;
         for (auto& p : _state)
         {
-            std::cout << "\n      ["
-                << p.get_distance () << ", " << p.get_speed () << "]";
+            std::cout << "\n      [" << p.get_distance () 
+                << ", " << p.get_speed () 
+                << ", " << p.get_stop_index ()
+                << "]";
             p.travel (_delta, rng);
             if (p.is_complete ()) 
             {
@@ -268,8 +273,10 @@ namespace Gtfs {
             }
             // if any aren't complete, prevent vehicle from finishing trip
             all_complete = false;
-            std::cout << " -> [" 
-                << p.get_distance () << ", " << p.get_speed () <<"]";
+            std::cout << " -> [" << p.get_distance () 
+                << ", " << p.get_speed () 
+                << ", " << p.get_stop_index ()
+                << "]";
 
             // calculate particle likelihood
             switch (e.type)
