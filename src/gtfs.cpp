@@ -2159,6 +2159,7 @@ namespace Gtfs
         tt = p.tt;
         at = p.at;
         dt = p.dt;
+        delta_ahead = 0;
         complete = p.complete;
         log_likelihood = p.log_likelihood;
         weight = 0.0;

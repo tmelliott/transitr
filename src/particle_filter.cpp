@@ -264,43 +264,72 @@ namespace Gtfs {
         std::cout << "\n     + " << _delta << " seconds";
 
         bool all_complete = true;
+        double dbar = 0.0, vbar = 0.0, 
+            dbar2 = 0.0, vbar2 = 0.0, ddbar = 0.0;
+        int dtbar = 0;
         for (auto& p : _state)
         {
-            std::cout << "\n      [" << p.get_distance () 
-                << ", " << p.get_speed () 
-                << ", " << (p.get_stop_index () + 1)
-                << "]";
-
+            if (_N < 20)
+                std::cout << "\n      [" << p.get_distance () 
+                    << ", " << p.get_speed () 
+                    << ", " << (p.get_stop_index () + 1)
+                    << "]";
+            dbar += p.get_distance ();
+            vbar += p.get_speed ();
 
             p.travel (_delta, e, rng);
 
             if (p.is_complete ()) 
             {
-                std::cout << " -> complete";
+                if (_N < 20) std::cout << " -> complete";
                 continue;
             }
             // if any aren't complete, prevent vehicle from finishing trip
             all_complete = false;
-            std::cout << " -> [" << p.get_distance () 
-                << ", " << p.get_speed () 
-                << ", " << (p.get_stop_index () + 1)
-                << "]";
+            if (_N < 20)
+                std::cout << " -> [" << p.get_distance () 
+                    << ", " << p.get_speed () 
+                    << ", " << (p.get_stop_index () + 1)
+                    << "]";
+            
+            dbar2 += p.get_distance ();
+            vbar2 += p.get_speed ();
 
             // calculate particle likelihood
             switch (e.type)
             {
                 case EventType::gps :
-                    p.calculate_likelihood (e.position, _trip->shape ()->path (), _gpserror);
-                    break;
+                    {
+                        p.calculate_likelihood (e.position, _trip->shape ()->path (), _gpserror);
+                        double d = p.get_distance ();
+                        auto pos = _trip->shape ()->coordinates_of (d);
+                        ddbar += distanceEarth (e.position, pos);
+                        break;
+                    }
                 case EventType::arrival :
                     p.calculate_likelihood (e, _arrival_error);
+                    dtbar += (int)(p.get_arrival_time (e.stop_index) - e.timestamp);
                     break;
                 case EventType::departure :
                     p.calculate_likelihood (e, _departure_error);
+                    dtbar += (int)(p.get_departure_time (e.stop_index) - e.timestamp);
                     break;
             }
 
-            std::cout << " => l(Y|Xi) = " << exp (p.get_ll ());
+            if (_N < 20)
+                std::cout << " => l(Y|Xi) = " << exp (p.get_ll ());
+        }
+        std::cout << "\n    =========================================================================\n"
+            << "      [" << (dbar / _N) << ", " << (vbar / _N) << "] -> "
+            << "[" << (dbar2 / _N) << ", " << (vbar2 / _N) << "] => ";
+        switch (e.type)
+        {
+            case EventType::gps :
+                std::cout << "d(h(X), y) = " << (ddbar / (double)_N);
+                break;
+            default :
+                std::cout << (e.type == EventType::arrival ? "arrival" : "departure")
+                    << " diff " << ((double)dtbar / (double)_N) << "s";
         }
 
         _Neff = 0;
@@ -311,7 +340,7 @@ namespace Gtfs {
 
         std::cout << "\n   -> sum(l(y|x)) = " << sumlh;
         // if no likelihoods are that big, give up
-        if (sumlh < 1e-10) return;
+        // if (sumlh < 1e-10) return;
 
         // normalize weights
         std::vector<double> wt;
@@ -832,10 +861,8 @@ namespace Gtfs {
         double vmax = rng.runif () < 0.5 ? 30.0 : 15.0;
 
         // while (distance < Dmax && delta > 0.0)
-        std::cout << " " << delta;
         while (behind_event (e, delta))
         {
-            // std::cout << ", " << (delta-1);
             // add system noise to acceleration to ensure speed remains in [0, vmax]
             double accel_prop (-100.0);
             double n = 0;
@@ -946,7 +973,6 @@ namespace Gtfs {
         if (delta > 0) return true;
         if (complete)
         {
-            std::cout << "C";
             return false;
         }
 
@@ -955,17 +981,14 @@ namespace Gtfs {
             case EventType::arrival :
                 if (e.stop_index >= at.size ()) return false;
                 if (e.stop_index < stop_index) return false;
-                if (at.at (e.stop_index) > 0) std::cout << "A";
                 return at.at (e.stop_index) == 0;
 
             case EventType::departure :
                 if (e.stop_index >= dt.size ()) return false;
                 if (e.stop_index < stop_index) return false;
-                if (dt.at (e.stop_index) > 0) std::cout << "D";
                 return dt.at (e.stop_index) == 0;
 
             default:
-                std::cout << "T";
                 return false;
         }
     }
@@ -1062,7 +1085,7 @@ namespace Gtfs {
         // log pdf of lX2 ~ Exp(2)
         log_likelihood = log (0.5) - 0.5 * exp(lX2);
 
-        std::cout << " => d(h(x), y) = " << exp (ld) << "m";
+        if (vehicle->get_n () < 20) std::cout << " => d(h(x), y) = " << exp (ld) << "m";
     }
 
     void Particle::calculate_likelihood (Event& e, double error)
@@ -1073,17 +1096,19 @@ namespace Gtfs {
 
         if (t == 0) 
         {
-            std::cout << " => hasn't "
-                << (e.type == EventType::arrival ? "arrived" : "departed");
+            if (vehicle->get_n () < 20)
+                std::cout << " => hasn't "
+                    << (e.type == EventType::arrival ? "arrived" : "departed");
             // log_likelihood = 0.0;
             return;
         }
 
         int tdiff = t - e.timestamp;
-        std::cout << " => "
-            << (e.type == EventType::arrival ? "arrived" : "departed")
-            << " at " << t
-            << " (diff: " << (tdiff) << "s)";
+        if (vehicle->get_n () < 20)
+            std::cout << " => "
+                << (e.type == EventType::arrival ? "arrived" : "departed")
+                << " at " << t
+                << " (diff: " << (tdiff) << "s)";
 
         log_likelihood = - 0.5 * log (2 * M_PI) - log (error) - 
             pow (tdiff, 2) / 2 / pow (error, 2);

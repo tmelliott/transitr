@@ -552,6 +552,8 @@ namespace Gtfs
             uint64_t timestamp ();
             unsigned delta ();
 
+            int get_n () const { return _N; };
+
             void add_event (Event event);
             std::vector<Event>& get_events () { return time_events; }
 
