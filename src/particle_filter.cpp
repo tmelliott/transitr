@@ -8,8 +8,10 @@ namespace Gtfs {
 
     void Vehicle::initialize (Event& e, RNG& rng)
     {
+        std::cout << "\n    -> initializing";
         initialize (rng);
         _timestamp = e.timestamp;
+        _delta = 0;
 
         // initialize based on the event
         double dmax, dist;
@@ -20,7 +22,7 @@ namespace Gtfs {
             auto pt = _trip->shape ()->coordinates_of (dist);
             if (distanceEarth (pt, _position) > 50)
             {
-                dist = 0.0;
+                dist = -1.0;
             }
         }
         else
@@ -37,7 +39,7 @@ namespace Gtfs {
                     // initialize each particle within 100m of obs
                     double d, u;
                     u = rng.runif ();
-                    d = (dist == 0 ? u * dmax : fmin(dmax, u * 200 + dist / 2.0));
+                    d = (dist < 0 ? u * dmax : fmin(dmax, u * 200 + dist / 2.0));
                     _state.emplace_back (d, rng.runif () * 30.0, rng.rnorm () * _systemnoise, this);
                     break;
                 case EventType::arrival :
@@ -137,6 +139,9 @@ namespace Gtfs {
             }
 
             mutate_to (e, rng);
+
+            // if the current iteration fails, start again from here
+            if (bad_sample) initialize (e, rng);
 
             current_event_index++;
         }
@@ -245,11 +250,11 @@ namespace Gtfs {
     {
         if (_newtrip || bad_sample)
         {
-            _delta = 0;
-            std::cout << "\n    -> initializing";
             initialize (e, rng);
             return;
         }
+
+        bad_sample = true;
 
         _delta = e.timestamp - _timestamp;
         _timestamp = e.timestamp;
@@ -263,7 +268,7 @@ namespace Gtfs {
         {
             std::cout << "\n      [" << p.get_distance () 
                 << ", " << p.get_speed () 
-                << ", " << p.get_stop_index ()
+                << ", " << (p.get_stop_index () + 1)
                 << "]";
             p.travel (_delta, rng);
             if (p.is_complete ()) 
@@ -275,7 +280,7 @@ namespace Gtfs {
             all_complete = false;
             std::cout << " -> [" << p.get_distance () 
                 << ", " << p.get_speed () 
-                << ", " << p.get_stop_index ()
+                << ", " << (p.get_stop_index () + 1)
                 << "]";
 
             // calculate particle likelihood
@@ -295,7 +300,6 @@ namespace Gtfs {
             std::cout << " => l(Y|Xi) = " << exp (p.get_ll ());
         }
 
-        bad_sample = true;
         _Neff = 0;
         double sumlh = std::accumulate (_state.begin (), _state.end (), 0.0,
                                         [](double a, Particle& p) {
@@ -754,16 +758,16 @@ namespace Gtfs {
         std::vector<StopTime>* stops;
         stops = &(vehicle->trip ()->stops ());
         int M (stops->size ());
-        unsigned int m (find_stop_index (distance, stops));
+        // if (stop_index == 0) stop_index = find_stop_index (distance, stops);
         // std::cout << " [M=" << M << ",m=" << m << "], ";
-        if (m == M-1) 
+        if (stop_index == M-1) 
         {
             distance = Dmax;
             complete = true;
             return;
         }
 
-        double next_stop_d = stops->at (m+1).distance;
+        double next_stop_d = stops->at (stop_index + 1).distance;
         
         // get SEGMENTS
         std::vector<ShapeSegment>* segments;
@@ -778,7 +782,7 @@ namespace Gtfs {
             // << ", at.size = " << at.size ();
         
         // allow vehicle to remain stationary if at a stop:
-        if (distance == stops->at (m).distance)
+        if (distance == stops->at (stop_index).distance)
         {
             if (rng.runif () < 0.05)
             {
@@ -822,7 +826,7 @@ namespace Gtfs {
         //         segments->at (l).segment->uncertainty ();
         //     speed_sd = pow(speed_sd, 0.5);
         // }
-        double vmax = rng.runif () < 0.05 ? 30.0 : 15.0;
+        double vmax = rng.runif () < 0.5 ? 30.0 : 15.0;
         while (distance < Dmax && delta > 0.0)
         {
             // add system noise to acceleration to ensure speed remains in [0, vmax]
@@ -890,9 +894,9 @@ namespace Gtfs {
             if (distance >= next_stop_d)
             {
                 // about to reach a stop ... slow? stop? just drive past?
-                m++; // the stop we are about to reach
-                at.at (m) = vehicle->timestamp () - delta;
-                if (m >= M-1)
+                stop_index++; // the stop we are about to reach
+                at.at (stop_index) = vehicle->timestamp () - delta;
+                if (stop_index >= M-1)
                 {
                     distance = next_stop_d;
                     break;
@@ -907,21 +911,21 @@ namespace Gtfs {
                     // accelerating = 5.0 + rng.runif () * 10.0;
                     // acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
                 }
-                next_stop_d = stops->at (m+1).distance;
+                next_stop_d = stops->at (stop_index + 1).distance;
                 continue;
             }
         }
 
         // almost at next stop ...
-        if (m < M-1 &&
+        if (stop_index < M-1 &&
             next_stop_d - distance < 20)
         {
             distance = next_stop_d;
-            m++;
-            at.at (m) = vehicle->timestamp ();
-            if (m < M-1)
+            stop_index++;
+            at.at (stop_index) = vehicle->timestamp ();
+            if (stop_index < M - 1)
             {
-                next_stop_d = stops->at (m+1).distance;
+                next_stop_d = stops->at (stop_index + 1).distance;
             }
         }
     }

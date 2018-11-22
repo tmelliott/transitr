@@ -2139,6 +2139,7 @@ namespace Gtfs
         distance = d;
         speed = s;
         acceleration = a;
+        stop_index = find_stop_index (d, &(v->trip ()->stops ()));
         // initialize travel times to -1 and set to 0 when starting segment
         tt.resize (vehicle->trip ()->shape ()->segments ().size () + 1, -1);
         at.resize (vehicle->trip ()->stops ().size ());
@@ -2154,6 +2155,7 @@ namespace Gtfs
         speed = p.speed;
         acceleration = p.acceleration;
         accelerating = p.accelerating;
+        stop_index = p.stop_index;
         tt = p.tt;
         at = p.at;
         dt = p.dt;
