@@ -606,6 +606,8 @@ namespace Gtfs
         std::vector<uint64_t> at; // stop arrival times
         std::vector<uint64_t> dt; // stop departure times
 
+        int delta_ahead = 0; // seconds AHEAD of vehicle's timestamp
+
         bool complete = false;
 
         double log_likelihood = -1e6;
@@ -630,7 +632,8 @@ namespace Gtfs
         std::vector<int>& get_travel_times ();
         int get_travel_time (int i);
 
-        void travel (unsigned delta, RNG& rng);
+        void travel (int delta, Event& e, RNG& rng);
+        bool behind_event (Event& e, double delta);
         void predict_etas (RNG& rng);
         
         void calculate_likelihood (latlng& y, std::vector<ShapePt>& path, double sigma);

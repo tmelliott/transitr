@@ -270,7 +270,10 @@ namespace Gtfs {
                 << ", " << p.get_speed () 
                 << ", " << (p.get_stop_index () + 1)
                 << "]";
-            p.travel (_delta, rng);
+
+
+            p.travel (_delta, e, rng);
+
             if (p.is_complete ()) 
             {
                 std::cout << " -> complete";
@@ -740,7 +743,7 @@ namespace Gtfs {
 
 
 
-    void Particle::travel (unsigned delta, RNG& rng)
+    void Particle::travel (int delta, Event& e, RNG& rng)
     {
         if (complete || !vehicle || !vehicle->trip () || 
             !vehicle->trip ()->shape ()) return;
@@ -782,15 +785,15 @@ namespace Gtfs {
             // << ", at.size = " << at.size ();
         
         // allow vehicle to remain stationary if at a stop:
-        if (distance == stops->at (stop_index).distance)
-        {
-            if (rng.runif () < 0.05)
-            {
-                double w = vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
-                delta = fmax (0, delta - round (w));
-                // we don't want this to affect the speed
-            }
-        }
+        // if (distance == stops->at (stop_index).distance)
+        // {
+        //     if (rng.runif () < 0.05)
+        //     {
+        //         double w = vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
+        //         delta = fmax (0, delta - round (w));
+        //         // we don't want this to affect the speed
+        //     }
+        // }
         // else if (distance == segments->at (l).distance &&
         //          rng.runif () < 0.05)
         // {
@@ -799,21 +802,21 @@ namespace Gtfs {
         //     if (tt.at (l) >= 0)
         //         tt.at (l) = tt.at (l) + 1;
         // }
-        else if (rng.runif () < 0.01)
-        {
-            // a very small chance for particles to remain stationary
-            if (tt.at (l) >= 0)
-                tt.at (l) = tt.at (l) + delta;
-            delta = 0;
+        // else if (rng.runif () < 0.01)
+        // {
+        //     // a very small chance for particles to remain stationary
+        //     if (tt.at (l) >= 0)
+        //         tt.at (l) = tt.at (l) + delta;
+        //     delta = 0;
 
-            // speed = 0.0;
-            // when /not/ at a bus stop, set speed to 0 and wait
-            // double w = - log (rng.runif ()) * delta;
-            // delta = fmax (0.0, delta - round (w));
-            // then the bus needs to accelerate back up to speed ... for how many seconds?
-            // accelerating = 5.0 + rng.runif () * 10.0;
-            // acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
-        }
+        //     // speed = 0.0;
+        //     // when /not/ at a bus stop, set speed to 0 and wait
+        //     // double w = - log (rng.runif ()) * delta;
+        //     // delta = fmax (0.0, delta - round (w));
+        //     // then the bus needs to accelerate back up to speed ... for how many seconds?
+        //     // accelerating = 5.0 + rng.runif () * 10.0;
+        //     // acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
+        // }
 
 
         double speed_mean = 10.0;
@@ -827,8 +830,12 @@ namespace Gtfs {
         //     speed_sd = pow(speed_sd, 0.5);
         // }
         double vmax = rng.runif () < 0.5 ? 30.0 : 15.0;
-        while (distance < Dmax && delta > 0.0)
+
+        // while (distance < Dmax && delta > 0.0)
+        std::cout << " " << delta;
+        while (behind_event (e, delta))
         {
+            // std::cout << ", " << (delta-1);
             // add system noise to acceleration to ensure speed remains in [0, vmax]
             double accel_prop (-100.0);
             double n = 0;
@@ -865,7 +872,9 @@ namespace Gtfs {
 
             speed += accel_prop;
             distance += speed;
+            if (distance >= Dmax) complete = true;
             delta--;
+
             if (tt.at (l) >= 0)
                 tt.at (l) = tt.at (l) + 1;
             
@@ -896,6 +905,7 @@ namespace Gtfs {
                 // about to reach a stop ... slow? stop? just drive past?
                 stop_index++; // the stop we are about to reach
                 at.at (stop_index) = vehicle->timestamp () - delta;
+                dt.at (stop_index) = at.at (stop_index);
                 if (stop_index >= M-1)
                 {
                     distance = next_stop_d;
@@ -905,7 +915,8 @@ namespace Gtfs {
                 {
                     // stop dwell time ~ Exp(tau = 10)
                     double dwell = vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
-                    delta = fmax(0, delta - dwell);
+                    dt.at (stop_index) += dwell;
+                    delta = delta - dwell;
                     distance = next_stop_d;
                     // speed = 0.0;
                     // accelerating = 5.0 + rng.runif () * 10.0;
@@ -927,6 +938,35 @@ namespace Gtfs {
             {
                 next_stop_d = stops->at (stop_index + 1).distance;
             }
+        }
+    }
+
+    bool Particle::behind_event (Event& e, double delta)
+    {
+        if (delta > 0) return true;
+        if (complete)
+        {
+            std::cout << "C";
+            return false;
+        }
+
+        switch (e.type)
+        {
+            case EventType::arrival :
+                if (e.stop_index >= at.size ()) return false;
+                if (e.stop_index < stop_index) return false;
+                if (at.at (e.stop_index) > 0) std::cout << "A";
+                return at.at (e.stop_index) == 0;
+
+            case EventType::departure :
+                if (e.stop_index >= dt.size ()) return false;
+                if (e.stop_index < stop_index) return false;
+                if (dt.at (e.stop_index) > 0) std::cout << "D";
+                return dt.at (e.stop_index) == 0;
+
+            default:
+                std::cout << "T";
+                return false;
         }
     }
 
@@ -1039,13 +1079,14 @@ namespace Gtfs {
             return;
         }
 
+        int tdiff = t - e.timestamp;
         std::cout << " => "
             << (e.type == EventType::arrival ? "arrived" : "departed")
             << " at " << t
-            << " (diff: " << (e.timestamp - t) << "s)";
+            << " (diff: " << (tdiff) << "s)";
 
         log_likelihood = - 0.5 * log (2 * M_PI) - log (error) - 
-            pow (e.timestamp - t, 2) / 2 / pow (error, 2);
+            pow (tdiff, 2) / 2 / pow (error, 2);
         
     }
 
