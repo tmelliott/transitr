@@ -2105,6 +2105,14 @@ namespace Gtfs
     {
         return _gamma;
     }
+    double Vehicle::arrival_error ()
+    {
+        return _arrival_error;
+    }
+    double Vehicle::departure_error ()
+    {
+        return _departure_error;
+    }
 
     std::vector<unsigned int>& Vehicle::segment_travel_times ()
     {
@@ -2142,8 +2150,8 @@ namespace Gtfs
         stop_index = find_stop_index (d, &(v->trip ()->stops ()));
         // initialize travel times to -1 and set to 0 when starting segment
         tt.resize (vehicle->trip ()->shape ()->segments ().size () + 1, -1);
-        at.resize (vehicle->trip ()->stops ().size ());
-        dt.resize (vehicle->trip ()->stops ().size ());
+        at.resize (vehicle->trip ()->stops ().size (), 0);
+        dt.resize (vehicle->trip ()->stops ().size (), 0);
         // weights initialized to ZERO
         weight = 0.0;
     }
@@ -2159,7 +2167,7 @@ namespace Gtfs
         tt = p.tt;
         at = p.at;
         dt = p.dt;
-        delta_ahead = 0;
+        delta_ahead = p.delta_ahead;
         complete = p.complete;
         log_likelihood = p.log_likelihood;
         weight = 0.0;
@@ -2217,6 +2225,12 @@ namespace Gtfs
         return at.at (i);
     }
 
+    void Particle::set_arrival_time (int i, uint64_t t)
+    {
+        if (i >= at.size ()) return;
+        at.at (i) = t;
+    }
+
     std::vector<uint64_t>& Particle::get_departure_times ()
     {
         return dt;
@@ -2226,6 +2240,12 @@ namespace Gtfs
     {
         if (i >= dt.size ()) return 0;
         return dt.at (i);
+    }
+
+    void Particle::set_departure_time (int i, uint64_t t)
+    {
+        if (i >= dt.size ()) return;
+        dt.at (i) = t;
     }
 
     std::vector<int>& Particle::get_travel_times ()

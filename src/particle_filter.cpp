@@ -15,6 +15,7 @@ namespace Gtfs {
 
         // initialize based on the event
         double dmax, dist;
+        int x, dr;
         if (e.type == EventType::gps)
         {
             dmax = _trip->shape ()->path ().back ().distance;
@@ -31,22 +32,33 @@ namespace Gtfs {
             dist = _trip->stops ().at (_stop_index).distance;
         }
         
+        double d, u;
+        Particle* p;
         for (int i=0; i<_N; ++i)
         {
-            switch (e.type)
+            if (e.type == EventType::gps)
             {
-                case EventType::gps :
-                    // initialize each particle within 100m of obs
-                    double d, u;
-                    u = rng.runif ();
-                    d = (dist < 0 ? u * dmax : fmin(dmax, u * 200 + dist / 2.0));
-                    _state.emplace_back (d, rng.runif () * 30.0, rng.rnorm () * _systemnoise, this);
-                    break;
-                case EventType::arrival :
-                case EventType::departure :
-                    // initialize points at the stop, I guess ...
-                    _state.emplace_back (dist, rng.runif () * 30, rng.rnorm () * _systemnoise, this);
-                    break;
+                // initialize each particle within 100m of obs
+                u = rng.runif ();
+                d = (dist < 0 ? u * dmax : fmin(dmax, u * 200 + dist / 2.0));
+                _state.emplace_back (d, rng.runif () * 30.0, rng.rnorm () * _systemnoise, this);
+            }
+            else
+            {
+                // stick the bus AT the stop
+                _state.emplace_back (dist, rng.runif () * 30, rng.rnorm () * _systemnoise, this);
+
+                // point to the particle
+                p = &(_state.back ());
+                p->bus_stop (e.timestamp, rng);
+                if (e.type == EventType::departure)
+                {
+                    // shift at <- dt
+                    int dwell (p->get_departure_time (e.stop_index) - p->get_arrival_time (e.stop_index));
+                    p->set_arrival_time (e.stop_index, p->get_arrival_time (e.stop_index) - dwell);
+                    p->set_departure_time (e.stop_index, p->get_departure_time (e.stop_index) - dwell);
+                }
+                
             }
         }
 
@@ -265,8 +277,8 @@ namespace Gtfs {
 
         bool all_complete = true;
         double dbar = 0.0, vbar = 0.0, 
-            dbar2 = 0.0, vbar2 = 0.0, ddbar = 0.0;
-        int dtbar = 0;
+            dbar2 = 0.0, vbar2 = 0.0, ddbar = 0.0,
+            dtbar = 0;
         for (auto& p : _state)
         {
             if (_N < 20)
@@ -274,8 +286,8 @@ namespace Gtfs {
                     << ", " << p.get_speed () 
                     << ", " << (p.get_stop_index () + 1)
                     << "]";
-            dbar += p.get_distance ();
-            vbar += p.get_speed ();
+            dbar += p.get_distance () * p.get_weight ();
+            vbar += p.get_speed () * p.get_weight ();
 
             p.travel (_delta, e, rng);
 
@@ -292,8 +304,8 @@ namespace Gtfs {
                     << ", " << (p.get_stop_index () + 1)
                     << "]";
             
-            dbar2 += p.get_distance ();
-            vbar2 += p.get_speed ();
+            dbar2 += p.get_distance () * p.get_weight ();
+            vbar2 += p.get_speed () * p.get_weight ();
 
             // calculate particle likelihood
             switch (e.type)
@@ -303,16 +315,16 @@ namespace Gtfs {
                         p.calculate_likelihood (e.position, _trip->shape ()->path (), _gpserror);
                         double d = p.get_distance ();
                         auto pos = _trip->shape ()->coordinates_of (d);
-                        ddbar += distanceEarth (e.position, pos);
+                        ddbar += distanceEarth (e.position, pos) * p.get_weight ();
                         break;
                     }
                 case EventType::arrival :
                     p.calculate_likelihood (e, _arrival_error);
-                    dtbar += (int)(p.get_arrival_time (e.stop_index) - e.timestamp);
+                    dtbar += (int)(p.get_arrival_time (e.stop_index) - e.timestamp) * p.get_weight ();
                     break;
                 case EventType::departure :
                     p.calculate_likelihood (e, _departure_error);
-                    dtbar += (int)(p.get_departure_time (e.stop_index) - e.timestamp);
+                    dtbar += (int)(p.get_departure_time (e.stop_index) - e.timestamp) * p.get_weight ();
                     break;
             }
 
@@ -320,16 +332,16 @@ namespace Gtfs {
                 std::cout << " => l(Y|Xi) = " << exp (p.get_ll ());
         }
         std::cout << "\n    =========================================================================\n"
-            << "      [" << (dbar / _N) << ", " << (vbar / _N) << "] -> "
-            << "[" << (dbar2 / _N) << ", " << (vbar2 / _N) << "] => ";
+            << "      [" << dbar << ", " << vbar << "] -> "
+            << "[" << dbar2 << ", " << vbar2<< "] => ";
         switch (e.type)
         {
             case EventType::gps :
-                std::cout << "d(h(X), y) = " << (ddbar / (double)_N);
+                std::cout << "d(h(X), y) = " << ddbar;
                 break;
             default :
                 std::cout << (e.type == EventType::arrival ? "arrival" : "departure")
-                    << " diff " << ((double)dtbar / (double)_N) << "s";
+                    << " diff " << dtbar << "s";
         }
 
         _Neff = 0;
@@ -340,7 +352,20 @@ namespace Gtfs {
 
         std::cout << "\n   -> sum(l(y|x)) = " << sumlh;
         // if no likelihoods are that big, give up
-        // if (sumlh < 1e-10) return;
+        if (sumlh < 1e-16)
+        {
+            if (n_bad < 2)
+            {
+                // we effectively want to ignore that observation
+                bad_sample = false;
+                n_bad++;   
+            }
+            return;
+        }
+        else
+        {
+            n_bad = 0;
+        }
 
         // normalize weights
         std::vector<double> wt;
@@ -846,6 +871,42 @@ namespace Gtfs {
         //     // accelerating = 5.0 + rng.runif () * 10.0;
         //     // acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
         // }
+         
+        // adjust "delta" if arrival/departure already set
+        uint64_t tx = vehicle->timestamp () - delta;
+        if (dt.at (stop_index) > tx)
+        {
+            // particle is AT the stop, not yet departed (it's just about to...)
+            if (e.type == EventType::departure && stop_index == e.stop_index)
+            {
+                uint64_t newtime = rng.rnorm () * vehicle->departure_error () + e.timestamp + 0.5;
+                // departure time has to be >= arrival time
+                dt.at (stop_index) = fmax (newtime, at.at (stop_index));
+                delta = (int)(vehicle->timestamp () - dt.at (stop_index));
+            }
+            // can't fudge arrival time (in case its based on speed!!!)
+        }
+        else if (at.at (stop_index) > tx)
+        {
+            // particle has not yet ARRIVED at the stop
+            if (e.type == EventType::departure && stop_index == e.stop_index)
+            {
+                // let's fudge 
+                uint64_t newtime = rng.rnorm () * vehicle->departure_error () + e.timestamp + 0.5;
+                dt.at (stop_index) = fmax (newtime, at.at (stop_index));
+                delta = (int)(vehicle->timestamp () - dt.at (stop_index));
+            }
+            else if (e.type == EventType::arrival && stop_index == e.stop_index)
+            {
+                // resample dwell time (to allow variation)
+                bus_stop (at.at (stop_index), rng);
+                delta = (int)(vehicle->timestamp () - dt.at (stop_index));
+            }
+            else
+            {
+                delta = (int)(vehicle->timestamp () - at.at (stop_index));
+            }
+        }
 
 
         double speed_mean = 10.0;
@@ -929,27 +990,15 @@ namespace Gtfs {
 
             if (distance >= next_stop_d)
             {
-                // about to reach a stop ... slow? stop? just drive past?
-                stop_index++; // the stop we are about to reach
-                at.at (stop_index) = vehicle->timestamp () - delta;
-                dt.at (stop_index) = at.at (stop_index);
-                if (stop_index >= M-1)
-                {
+                stop_index++;
+                // bus arrives at stop - either stops at stop, of drives past
+                if (bus_stop (vehicle->timestamp () - delta, rng)) 
                     distance = next_stop_d;
-                    break;
-                }
-                if (rng.runif () < vehicle->pr_stop ())
-                {
-                    // stop dwell time ~ Exp(tau = 10)
-                    double dwell = vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
-                    dt.at (stop_index) += dwell;
-                    delta = delta - dwell;
-                    distance = next_stop_d;
-                    // speed = 0.0;
-                    // accelerating = 5.0 + rng.runif () * 10.0;
-                    // acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
-                }
+                // end of route? end.
+                if (stop_index >= M-1) break;
+                // else update next stop and delta
                 next_stop_d = stops->at (stop_index + 1).distance;
+                delta -= (int)(dt.at (stop_index) - at.at (stop_index));
                 continue;
             }
         }
@@ -958,13 +1007,40 @@ namespace Gtfs {
         if (stop_index < M-1 &&
             next_stop_d - distance < 20)
         {
-            distance = next_stop_d;
             stop_index++;
-            at.at (stop_index) = vehicle->timestamp ();
-            if (stop_index < M - 1)
-            {
+            bus_stop (vehicle->timestamp () - delta, rng);
+            distance = next_stop_d;
+            if (stop_index < M - 1) 
                 next_stop_d = stops->at (stop_index + 1).distance;
-            }
+        }
+    }
+
+    /**
+     * Simulate the behaviour of a bus when it reaches a bus stop (at time t)
+     * @param stop_index the 0-based index of the stop
+     * @param time       the UNIX time the particle arrives
+     * @param rng        RNG
+     */
+    bool Particle::bus_stop (uint64_t time, RNG& rng)
+    {
+        if (stop_index >= at.size ()) return true;
+
+        // bus is arriving
+        at.at (stop_index) = time;
+
+        double u (rng.runif ());
+        if (u < vehicle->pr_stop ())
+        {
+            // bus stops
+            double dwell = vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
+            dt.at (stop_index) = time + round (dwell);
+            return true;
+        }
+        else
+        {
+            // bus doesn't stop
+            dt.at (stop_index) = time;
+            return false;
         }
     }
 
@@ -1123,8 +1199,8 @@ namespace Gtfs {
     }
     void Particle::calculate_departure_likelihood (int index, uint64_t time, double error)
     {
-        log_likelihood = 0;
-        // return - 0.5 * log (2 * pi) - log (error) - pow ()
+        if (get_departure_time (index) == 0) log_likelihood = 0;
+        log_likelihood = - 0.5 * log (2 * M_PI) - log (error) - pow (get_departure_time (index) - time, 2) / 2 / pow (error, 2);
     }
 
     void Particle::set_weight (double w)

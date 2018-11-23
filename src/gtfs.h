@@ -525,6 +525,7 @@ namespace Gtfs
             bool _complete = false;
             int _N;
             double _Neff;
+            int n_bad = 2;
             std::vector<Particle> _state;
             std::vector<Particle> _previous_state;
             uint64_t _previous_ts = 0;
@@ -587,6 +588,8 @@ namespace Gtfs
             float pr_stop ();
             float dwell_time ();
             float gamma ();
+            double arrival_error ();
+            double departure_error ();
 
             std::vector<unsigned int>& segment_travel_times ();
             unsigned int segment_travel_time (int l);
@@ -629,12 +632,15 @@ namespace Gtfs
         double get_weight ();
         std::vector<uint64_t>& get_arrival_times ();
         uint64_t get_arrival_time (int i);
+        void set_arrival_time (int i, uint64_t t);
         std::vector<uint64_t>& get_departure_times ();
         uint64_t get_departure_time (int i);
         std::vector<int>& get_travel_times ();
+        void set_departure_time (int i, uint64_t t);
         int get_travel_time (int i);
 
         void travel (int delta, Event& e, RNG& rng);
+        bool bus_stop (uint64_t time, RNG& rng);
         bool behind_event (Event& e, double delta);
         void predict_etas (RNG& rng);
         
