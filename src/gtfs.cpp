@@ -1150,7 +1150,7 @@ namespace Gtfs
             }
         }
         
-        if (dmin < 1)
+        if (dmin < 0.0001)
         {
             return _path[closest].distance;
         }
@@ -1203,7 +1203,7 @@ namespace Gtfs
         }
 
         double dd = d - _path[i].distance;
-        if (dd < 0.01)
+        if (dd < 1)
         {
             return _path[i].pt;
         }

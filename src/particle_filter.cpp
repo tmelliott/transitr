@@ -129,6 +129,41 @@ namespace Gtfs {
                 throw std::runtime_error ("Trip not found");
             }
 
+            std::cout << "\n    [" << e.timestamp << "] "
+                << _trip->route ()->route_short_name ()
+                << " (" << _trip->stops ().at (0).departure_time << "): ";
+            e.print ();
+
+            // is the event "bad"?
+            dist_to_route = 0.0;
+            switch(e.type)
+            {
+                case EventType::gps :
+                    {
+                        // if the distance to the route > 50m, it's bad (skip it)
+                        double dist = _trip->shape ()->distance_of (e.position);
+                        latlng coord = _trip->shape ()->coordinates_of (dist);
+                        dist_to_route = distanceEarth (e.position, coord);
+                        std::cout << " -> distance to route = " << dist_to_route << "m";
+                        if (dist_to_route > 50)
+                        {
+                            current_event_index++;
+                            return;
+                        }
+                        break;
+                    }
+                case EventType::arrival :
+                    {
+                        // this is tricky ...
+                    }
+                case EventType::departure :
+                    {
+                        // no checks
+                        break;
+                    }
+            }
+
+
             // pass the event data
             if (e.type == EventType::gps)
             {
@@ -139,10 +174,6 @@ namespace Gtfs {
                 _stop_index = e.stop_index;
             }
 
-            std::cout << "\n    [" << e.timestamp << "] "
-                << _trip->route ()->route_short_name ()
-                << " (" << _trip->stops ().at (0).departure_time << "): ";
-            e.print ();
 
             if (e.type != EventType::gps)
             {
@@ -312,7 +343,8 @@ namespace Gtfs {
             {
                 case EventType::gps :
                     {
-                        p.calculate_likelihood (e.position, _trip->shape ()->path (), _gpserror);
+                        double err = fmax (_gpserror, dist_to_route);
+                        p.calculate_likelihood (e.position, _trip->shape ()->path (), err);
                         double d = p.get_distance ();
                         auto pos = _trip->shape ()->coordinates_of (d);
                         ddbar += distanceEarth (e.position, pos) * p.get_weight ();
@@ -337,8 +369,12 @@ namespace Gtfs {
         switch (e.type)
         {
             case EventType::gps :
-                std::cout << "d(h(X), y) = " << ddbar;
-                break;
+                {
+                    latlng px = _trip->shape ()->coordinates_of (dbar2);
+                    std::cout << "d(h(X), y) = " << ddbar 
+                        << " [" << px.latitude << ", " << px.longitude << "]";
+                    break;
+                }
             default :
                 std::cout << (e.type == EventType::arrival ? "arrival" : "departure")
                     << " diff " << dtbar << "s";
@@ -376,6 +412,48 @@ namespace Gtfs {
             wt.push_back (p.get_weight ());
         }
         double sumwt = std::accumulate (wt.begin (), wt.end (), 0.0);
+
+        // print posterior values
+        dbar = 0.0;
+        vbar = 0.0;
+        ddbar = 0.0;
+        dtbar = 0;
+        for (auto& p : _state)
+        {
+            dbar += p.get_distance () * p.get_weight ();
+            vbar += p.get_speed () * p.get_weight ();
+            switch (e.type)
+            {
+                case EventType::gps :
+                    {
+                        double d = p.get_distance ();
+                        auto pos = _trip->shape ()->coordinates_of (d);
+                        ddbar += distanceEarth (e.position, pos) * p.get_weight ();
+                        break;
+                    }
+                case EventType::arrival :
+                    dtbar += (int)(p.get_arrival_time (e.stop_index) - e.timestamp) * p.get_weight ();
+                    break;
+                case EventType::departure :
+                    dtbar += (int)(p.get_departure_time (e.stop_index) - e.timestamp) * p.get_weight ();
+                    break;
+            }
+        }
+        std::cout << "\n         => Posterior: ["
+            << dbar << ", " << vbar << "] => ";
+        switch (e.type)
+        {
+            case EventType::gps :
+                {
+                    latlng px = _trip->shape ()->coordinates_of (dbar);
+                    std::cout << "d(h(X), y) = " << ddbar 
+                        << " [" << px.latitude << ", " << px.longitude << "]";
+                    break;
+                }
+            default :
+                std::cout << (e.type == EventType::arrival ? "arrival" : "departure")
+                    << " diff " << dtbar << "s";
+        }
 
         // sum(wt) in (0.999, 1.0001)
         std::cout << "\n   -> sum(wt) = " << sumwt;
@@ -856,21 +934,7 @@ namespace Gtfs {
         //     if (tt.at (l) >= 0)
         //         tt.at (l) = tt.at (l) + 1;
         // }
-        // else if (rng.runif () < 0.01)
-        // {
-        //     // a very small chance for particles to remain stationary
-        //     if (tt.at (l) >= 0)
-        //         tt.at (l) = tt.at (l) + delta;
-        //     delta = 0;
 
-        //     // speed = 0.0;
-        //     // when /not/ at a bus stop, set speed to 0 and wait
-        //     // double w = - log (rng.runif ()) * delta;
-        //     // delta = fmax (0.0, delta - round (w));
-        //     // then the bus needs to accelerate back up to speed ... for how many seconds?
-        //     // accelerating = 5.0 + rng.runif () * 10.0;
-        //     // acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
-        // }
          
         // adjust "delta" if arrival/departure already set
         uint64_t tx = vehicle->timestamp () - delta;
@@ -906,6 +970,23 @@ namespace Gtfs {
             {
                 delta = (int)(vehicle->timestamp () - at.at (stop_index));
             }
+        }
+
+        if (distance > stops->at (stop_index).distance && rng.runif () < 0.01)
+        {
+            // a very small chance for particles to remain stationary
+            int tr = rng.runif () * delta + 0.5;
+            if (tt.at (l) >= 0)
+                tt.at (l) = tt.at (l) + tr;
+            delta -= tr;
+
+            // speed = 0.0;
+            // when /not/ at a bus stop, set speed to 0 and wait
+            // double w = - log (rng.runif ()) * delta;
+            // delta = fmax (0.0, delta - round (w));
+            // then the bus needs to accelerate back up to speed ... for how many seconds?
+            // accelerating = 5.0 + rng.runif () * 10.0;
+            // acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
         }
 
 

@@ -535,6 +535,7 @@ namespace Gtfs
             bool _skip_observation = false;
             
             double estimated_dist = 0.0;
+            double dist_to_route = 0.0;
             bool bad_sample;
             bool resample;
             int resample_count = 0;

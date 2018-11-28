@@ -138,3 +138,42 @@ ggplot(segd, aes(timestamp, speed / 1000 * 60 * 60)) +
         size = 0.2
         ) +
     facet_wrap(~paste0(segment_id, " [", round(length), "m]"))
+
+
+
+
+
+
+
+
+
+
+
+
+
+###############################
+library(tidyverse)
+library(RSQLite)
+library(dbplyr)
+
+getshape <- function(route) {
+    con <- dbConnect(SQLite(), "fulldata.db")
+    rid <- con %>% tbl("routes") %>% filter(route_short_name == route) %>% select(route_id) %>% head(1) %>% collect %>% pluck("route_id")
+    sid <- con %>% tbl("trips") %>% filter(route_id == rid) %>% select(shape_id) %>% head(1) %>% collect %>% pluck("shape_id")
+    shape <- con %>% tbl("shapes") %>% filter(shape_id == sid) %>% arrange(shape_pt_sequence) %>% collect
+    dbDisconnect(con)
+    shape
+}
+
+shape <- getshape("133")
+ggplot(shape[1:100,], aes(shape_pt_lon, shape_pt_lat)) +
+    geom_path() +
+    geom_point(shape = 4, data = shape %>% filter(shape_pt_sequence == 1)) +
+    geom_point(aes(174.635, -36.8782), data = tibble(), color = 'gray') +
+    geom_point(aes(174.635, -36.8797), data = tibble()) +
+    geom_point(aes(174.636, -36.88), data = NULL, color = "red") +
+    geom_point(aes(174.635, -36.8796), data = NULL, color = "orangered")
+    
+    # geom_point(aes(174.664, -36.8621), data = NULL) +
+    # geom_point(aes(174.668, -36.8669), data = NULL, color = "blue") +
+    # geom_point(aes(174.646, -36.8706), data = NULL, color = "red")
