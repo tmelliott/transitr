@@ -65,6 +65,40 @@ namespace Gtfs {
         double initwt = 1.0 / (double) _N;
         for (auto p = _state.begin (); p != _state.end (); ++p) p->set_weight (initwt);
 
+#if SIMULATION
+        {
+            double dbar = 0.0, vbar = 0.0;
+            for (auto& p : _state)
+            {
+                dbar += p.get_weight () * p.get_distance ();
+                vbar += p.get_weight () * p.get_speed ();
+            }
+
+            latlng px = _trip->shape ()->coordinates_of (dbar);
+
+            std::ostringstream fname;
+            fname << "history/v" << _vehicle_id << "_mutate.csv";
+            std::ofstream fout;
+            fout.open (fname.str ().c_str (), std::ofstream::app);
+            fout << _timestamp
+                << "," << _trip->trip_id ()
+                << "," << "initialize"
+                << "," << (e.type == EventType::gps ? std::to_string (e.position.latitude) : "")
+                << "," << (e.type == EventType::gps ? std::to_string (e.position.longitude) : "")
+                << "," << (e.type == EventType::gps ? "" : std::to_string (e.stop_index))
+                << "," << dist_to_route
+                << "," << _delta
+                << "," << dbar
+                << "," << vbar
+                << "," << (e.type == EventType::gps ? std::to_string (px.latitude) : "")
+                << "," << (e.type == EventType::gps ? std::to_string (px.longitude) : "")
+                << "," << (e.type == EventType::gps ? std::to_string (distanceEarth (px, _position)) : "")
+                << "," << "" // no likelihood
+                << "\n";
+            fout.close ();
+        }
+#endif
+
     }
 
     void Vehicle::initialize (RNG& rng)
@@ -366,11 +400,12 @@ namespace Gtfs {
         std::cout << "\n    =========================================================================\n"
             << "      [" << dbar << ", " << vbar << "] -> "
             << "[" << dbar2 << ", " << vbar2<< "] => ";
+        latlng px = latlng ();
         switch (e.type)
         {
             case EventType::gps :
                 {
-                    latlng px = _trip->shape ()->coordinates_of (dbar2);
+                    px = _trip->shape ()->coordinates_of (dbar2);
                     std::cout << "d(h(X), y) = " << ddbar 
                         << " [" << px.latitude << ", " << px.longitude << "]";
                     break;
@@ -385,6 +420,31 @@ namespace Gtfs {
                                         [](double a, Particle& p) {
                                             return a + p.get_weight () * exp (p.get_ll ());
                                         });
+
+#if SIMULATION
+        {
+            std::ostringstream fname;
+            fname << "history/v" << _vehicle_id << "_mutate.csv";
+            std::ofstream fout;
+            fout.open (fname.str ().c_str (), std::ofstream::app);
+            fout << _timestamp
+                << "," << _trip->trip_id ()
+                << "," << e.type_name ()
+                << "," << (e.type == EventType::gps ? std::to_string (e.position.latitude) : "")
+                << "," << (e.type == EventType::gps ? std::to_string (e.position.longitude) : "")
+                << "," << (e.type == EventType::gps ? "" : std::to_string (e.stop_index))
+                << "," << dist_to_route
+                << "," << _delta
+                << "," << dbar2
+                << "," << vbar2
+                << "," << (e.type == EventType::gps ? std::to_string (px.latitude) : "")
+                << "," << (e.type == EventType::gps ? std::to_string (px.longitude) : "")
+                << "," << (e.type == EventType::gps ? std::to_string (distanceEarth (px, _position)) : "")
+                << "," << sumlh
+                << "\n";
+            fout.close ();
+        }
+#endif
 
         std::cout << "\n   -> sum(l(y|x)) = " << sumlh;
         // if no likelihoods are that big, give up
@@ -445,7 +505,7 @@ namespace Gtfs {
         {
             case EventType::gps :
                 {
-                    latlng px = _trip->shape ()->coordinates_of (dbar);
+                    px = _trip->shape ()->coordinates_of (dbar);
                     std::cout << "d(h(X), y) = " << ddbar 
                         << " [" << px.latitude << ", " << px.longitude << "]";
                     break;
@@ -468,6 +528,29 @@ namespace Gtfs {
 
         _Neff = pow (sumwt2, -1);
         std::cout << "\n   -> Neff = " << _Neff;
+
+#if SIMULATION
+        {
+            std::ostringstream fname;
+            fname << "history/v" << _vehicle_id << "_update.csv";
+            std::ofstream fout;
+            fout.open (fname.str ().c_str (), std::ofstream::app);
+            fout << _timestamp
+                << "," << _trip->trip_id ()
+                << "," << e.type_name ()
+                << "," << dbar
+                << "," << vbar
+                << "," << (e.type == EventType::gps ? std::to_string (px.latitude) : "")
+                << "," << (e.type == EventType::gps ? std::to_string (px.longitude) : "")
+                << "," << (e.type == EventType::gps ? std::to_string (distanceEarth (px, _position)) : "")
+                << "," << _Neff
+                << "," << (_Neff >= (_N / 4) ? 0 : 1)
+                << "\n";
+            fout.close ();
+        }
+#endif
+
+
         if (_Neff >= (_N / 4)) return;
 
         std::cout << " -> resampling";

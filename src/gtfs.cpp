@@ -1800,6 +1800,18 @@ namespace Gtfs
                 << " stop " << (stop_index + 1);
         }
     }
+    std::string Event::type_name ()
+    {
+        switch(type)
+        {
+            case EventType::gps :
+                return "gps";
+            case EventType::arrival :
+                return "arrival";
+            case EventType::departure :
+                return "departure";
+        }
+    }
 
     /***************************************************** Vehicle */
     Vehicle::Vehicle (std::string& id, par* params) : 

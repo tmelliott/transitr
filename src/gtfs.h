@@ -497,6 +497,7 @@ namespace Gtfs
         }
 
         void print ();
+        std::string type_name ();
     };
 
     class Vehicle {
