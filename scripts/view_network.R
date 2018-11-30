@@ -115,18 +115,6 @@ segd <- segdata %>% filter(segment_id %in% segids) %>%
     left_join(seglens, by = c("segment_id" = "road_segment_id")) %>%
     mutate(speed = length / travel_time)
 
-# ggplot(segd) +
-#     # geom_smooth(aes(timestamp, travel_time), formula = y ~ 1, method = "lm") +
-#     # geom_smooth(aes(timestamp, travel_time)) +
-#     geom_hline(aes(yintercept = length / (100 * 1000 / 60 / 60)), color = "orangered") +
-#     geom_hline(aes(yintercept = length / (50 * 1000 / 60 / 60)), color = "orangered", lty = 2) +
-#     geom_hline(aes(yintercept = length / (30 * 1000 / 60 / 60)), color = "orangered", lty = 3) +
-#     geom_hline(aes(yintercept = length / (10 * 1000 / 60 / 60)), color = "orangered", lty = 4) +
-#     geom_pointrange(
-#         aes(timestamp, travel_time, ymin = pmax(0, travel_time - error), ymax = travel_time + pmin(error, 30)),
-#         size = 0.2
-#         ) +
-#     facet_wrap(~segment_id, scales = "free_y")
 
 ggplot(segd, aes(timestamp, speed / 1000 * 60 * 60)) +
     # geom_smooth(formula = y ~ 1, method = "lm") +
@@ -141,6 +129,18 @@ ggplot(segd, aes(timestamp, speed / 1000 * 60 * 60)) +
 
 
 
+ggplot(segd) +
+    # geom_smooth(aes(timestamp, travel_time), formula = y ~ 1, method = "lm") +
+    # geom_smooth(aes(timestamp, travel_time)) +
+    geom_hline(aes(yintercept = length / (100 * 1000 / 60 / 60)), color = "orangered") +
+    geom_hline(aes(yintercept = length / (50 * 1000 / 60 / 60)), color = "orangered", lty = 2) +
+    geom_hline(aes(yintercept = length / (30 * 1000 / 60 / 60)), color = "orangered", lty = 3) +
+    geom_hline(aes(yintercept = length / (10 * 1000 / 60 / 60)), color = "orangered", lty = 4) +
+    geom_pointrange(
+        aes(timestamp, travel_time, ymin = pmax(0, travel_time - error), ymax = travel_time + pmin(error, 30)),
+        size = 0.2
+        ) +
+    facet_wrap(~segment_id, scales = "free_y")
 
 
 
