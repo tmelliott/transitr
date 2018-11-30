@@ -220,6 +220,63 @@ namespace Gtfs {
             // if the current iteration fails, start again from here
             if (bad_sample) initialize (e, rng);
 
+            {
+                // NETWORK STUFF
+                double dmin = _trip->shape ()->path ().back ().distance;
+                for (auto p = _state.begin (); p != _state.end (); ++p)
+                {
+                    if (p->get_distance () < dmin)
+                    {
+                        dmin = p->get_distance ();
+                    }
+                }
+                std::vector<ShapeSegment>& segs = _trip->shape ()->segments ();
+                int m = find_stop_index (dmin, &(_trip->stops ()));
+                int l = find_segment_index (dmin, &segs);
+
+
+                // update segment travel times for intermediate ones ...
+                double tt, ttp, err;
+                int n;
+                while (_current_segment < m)
+                {
+                    // get the average travel time for particles along that segment
+                    tt = 0.0;
+                    n = 0;
+                    for (auto p = _state.begin (); p != _state.end (); ++p)
+                    {
+                        ttp = p->get_travel_time (_current_segment) * p->get_weight ();
+                        if (ttp > 0)
+                        {
+                            tt += ttp;
+                            n++;
+                        }
+                    }
+                    if (n < _N)
+                    {
+                        _current_segment++;
+                        continue;
+                    }
+
+                    err = std::accumulate (_state.begin (), _state.end (), 0.0,
+                                           [=](double a, Particle& p) {
+                                                return a + p.get_weight () * pow(p.get_travel_time (_current_segment) - tt, 2);
+                                           });
+
+                    // if the error is effectively 0 ...
+                    if (err < 0.001) err = 10.0;
+
+                    _segment_travel_times.at (_current_segment) = round (tt);
+                    segs.at (_current_segment).segment->push_data (tt, err, _timestamp);
+                    _current_segment++;
+                }
+                
+                // NOTE: need to ignore segment if previous segment travel time is 0
+                // (i.e., can't be sure that the current segment travel time is complete)
+                
+                
+            }
+
             current_event_index++;
         }
 
@@ -1083,7 +1140,7 @@ namespace Gtfs {
         //         segments->at (l).segment->uncertainty ();
         //     speed_sd = pow(speed_sd, 0.5);
         // }
-        double vmax = rng.runif () < 0.5 ? 30.0 : 15.0;
+        double vmax = 30; //rng.runif () < 0.5 ? 30.0 : 15.0;
 
         // while (distance < Dmax && delta > 0.0)
         while (behind_event (e, delta))
@@ -1136,7 +1193,7 @@ namespace Gtfs {
                 l++;
                 tt.at (l) = 0;
                 next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
-                vmax = rng.runif () < 0.05 ? 30.0 : 15.0;
+                // vmax = rng.runif () < 0.5 ? 30.0 : 15.0;
                 // if (segments->at (l).segment->travel_time () > 0 &&
                 //     segments->at (l).segment->uncertainty () > 0) 
                 // {

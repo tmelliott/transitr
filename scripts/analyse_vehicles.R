@@ -33,6 +33,14 @@ vdata <-
 ggplot(vdata, aes(timestamp, event_type)) +
     geom_point()
 
+ggplot(vdata, aes(dist_to_route, dist_between_posterior)) +
+    geom_point() +
+    geom_abline()
+
+ggplot(vdata, aes(distance_posterior/1000, velocity_posterior/1000*60*60)) +
+    geom_point() +
+    xlab("Distance (km)") + ylab("Speed (km/h)")
+
 ggplot(vdata %>% filter(event_type == "gps"), aes(timestamp, distance_prior)) +
     geom_path() +
     geom_path(aes(y = distance_posterior), color = "orangered")
@@ -45,9 +53,13 @@ shape <- getshape(trip = vdata$trip_id[1])
 
 vdatagps <- vdata %>% filter(event_type == "gps")
 
-ggplot(shape, aes(shape_pt_lon, shape_pt_lat)) +
-    geom_path() +
-    geom_point(aes(event_lon, event_lat), data = vdatagps) +
-    # geom_point(aes(lon_prior, lat_prior), data = vdatagps, color = "orangered") +
-    geom_point(aes(lon_posterior, lat_posterior), data = vdatagps, color = "orangered") +
-    facet_wrap(~timestamp)
+for (t in vdatagps$timestamp %>% unique) {
+    p <- ggplot(shape, aes(shape_pt_lon, shape_pt_lat)) +
+        geom_path() +
+        geom_point(aes(event_lon, event_lat), data = vdatagps %>% filter(timestamp == t)) +
+        # geom_point(aes(lon_prior, lat_prior), data = vdatagps, color = "orangered") +
+        geom_point(aes(lon_posterior, lat_posterior), data = vdatagps %>% filter(timestamp == t), 
+            color = "orangered")
+    print(p)
+    grid::grid.locator()
+}
