@@ -4,7 +4,8 @@
 \alias{realtime_feed}
 \title{Connect to GTFS feed}
 \usage{
-realtime_feed(nw, url, headers = NULL, response = c("json", "protobuf"))
+realtime_feed(nw, url, headers = NULL, response = c("json",
+  "protobuf"))
 }
 \arguments{
 \item{nw}{a \code{trgtfs} object}

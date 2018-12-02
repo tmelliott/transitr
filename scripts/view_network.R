@@ -21,7 +21,7 @@ get_segment_data <- function() {
 }
 
 view_segment_states <- function(f = "segment_states.csv", segment, n = 12, speed = FALSE) {
-    data <- get_segments(f)
+    data <- get_segments(f) %>% filter(timestamp > 0)
     if (missing(segment)) {
         segment <- data %>% distinct %>% pluck("segment_id") %>% 
             table %>% sort %>% tail(n) %>% names
@@ -106,14 +106,28 @@ seglens <- con %>% tbl("road_segments") %>% select(road_segment_id, length) %>% 
     mutate(road_segment_id = as.character(road_segment_id))
 dbDisconnect(con)
 
-# segdata <- read_segment_data("sim000")
-segdata <- read_segment_data("sim002")
+segdata <- read_segment_data("sim000")
+# segdata <- read_segment_data("sim002")
 segids <- table(segdata$segment_id) %>% sort %>% tail(100) %>% names %>% sample(20)
 
 # segids <- table(segdata$segment_id) %>% names %>% sample(20)
 segd <- segdata %>% filter(segment_id %in% segids) %>% 
     left_join(seglens, by = c("segment_id" = "road_segment_id")) %>%
     mutate(speed = length / travel_time)
+
+
+ggplot(segd, aes(timestamp, speed / 1000 * 60 * 60)) +
+    # geom_smooth(formula = y ~ 1, method = "lm") +
+    # geom_smooth(aes(timestamp, travel_time)) +
+    geom_hline(aes(yintercept = 10 / 1000 * 60 * 60), color = "orangered") +
+    geom_pointrange(
+        aes(ymin = pmax(0, length / (travel_time + error) / 1000 * 60 * 60), 
+            ymax = pmin(100, length / pmax(1, travel_time - error) / 1000 * 60 * 60)),
+        size = 0.2
+        ) +
+    facet_wrap(~paste0(segment_id, " [", round(length), "m]"))
+
+
 
 ggplot(segd) +
     # geom_smooth(aes(timestamp, travel_time), formula = y ~ 1, method = "lm") +
@@ -128,13 +142,34 @@ ggplot(segd) +
         ) +
     facet_wrap(~segment_id, scales = "free_y")
 
-ggplot(segd, aes(timestamp, speed / 1000 * 60 * 60)) +
-    # geom_smooth(formula = y ~ 1, method = "lm") +
-    # geom_smooth(aes(timestamp, travel_time)) +
-    geom_hline(aes(yintercept = 10 / 1000 * 60 * 60), color = "orangered") +
-    geom_pointrange(
-        aes(ymin = pmax(0, length / (travel_time + error) / 1000 * 60 * 60), 
-            ymax = pmin(100, length / pmax(1, travel_time - error) / 1000 * 60 * 60)),
-        size = 0.2
-        ) +
-    facet_wrap(~paste0(segment_id, " [", round(length), "m]"))
+
+
+
+
+
+
+
+
+
+###############################
+library(tidyverse)
+library(RSQLite)
+library(dbplyr)
+
+
+shape <- getshape("133")
+ggplot(shape[1:100,], aes(shape_pt_lon, shape_pt_lat)) +
+    geom_path() +
+    geom_point(shape = 4, data = shape %>% filter(shape_pt_sequence == 1)) +
+    geom_point(aes(174.635, -36.8782), data = tibble(), color = 'gray') +
+    geom_point(aes(174.635, -36.8797), data = tibble()) +
+    geom_point(aes(174.636, -36.88), data = NULL, color = "red") +
+    geom_point(aes(174.635, -36.8796), data = NULL, color = "orangered")
+    
+    # geom_point(aes(174.664, -36.8621), data = NULL) +
+    # geom_point(aes(174.668, -36.8669), data = NULL, color = "blue") +
+    # geom_point(aes(174.646, -36.8706), data = NULL, color = "red")
+
+
+
+

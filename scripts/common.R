@@ -75,3 +75,19 @@ get_schedule <- function(trip) {
     con %>% tbl("stop_times") %>% filter(trip_id == trip) %>% arrange(stop_sequence) %>%
         select(trip_id, stop_sequence, arrival_time, departure_time) %>% collect
 }
+
+getshape <- function(route, trip) {
+    con <- dbConnect(SQLite(), "fulldata.db")
+    if (!missing(route)) {
+        rid <- con %>% tbl("routes") %>% filter(route_short_name == route) %>% 
+            select(route_id) %>% head(1) %>% collect %>% pluck("route_id")
+        sid <- con %>% tbl("trips") %>% filter(route_id == rid) %>% 
+            select(shape_id) %>% head(1) %>% collect %>% pluck("shape_id")
+    } else if (!missing(trip)) {
+        sid <- con %>% tbl("trips") %>% filter(trip_id == trip) %>%
+            select(shape_id) %>% head(1) %>% collect %>% pluck("shape_id")
+    }
+    shape <- con %>% tbl("shapes") %>% filter(shape_id == sid) %>% arrange(shape_pt_sequence) %>% collect
+    dbDisconnect(con)
+    shape
+}

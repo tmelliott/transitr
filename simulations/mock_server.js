@@ -11,6 +11,7 @@ const fs = require('fs')
 const path = require('path')
 var all_files = fs.readdirSync('archive')
 const files = all_files.filter(file => file.match('^vehicle'))
+const files2 = all_files.filter(file => file.match('^trip'))
 
 var pids = [] // {"pid001": 1}
 
@@ -44,6 +45,17 @@ app.use('/:pid/vehicle_positions', (req, res) => {
 
     // console.log(pids)
 })
+
+app.use('/:pid/trip_updates', (req, res) => {
+    const pid = req.params.pid
+    if (!(pid in pids)) pids[pid] = 1
+    if (pids[pid] - 1 >= files.length) {
+        res.send('simulation complete')
+        return
+    }
+    res.download(path.join(__dirname, 'archive/' + files2[pids[pid]-1]));
+})
+
 app.use('/:pid/reset', (req, res) => {
     const pid = req.params.pid
     if (pid in pids) pids[pid] = 0

@@ -48,10 +48,16 @@ void run_realtime_model (List nw)
     // Construct the realtime feed object
     List apis = nw["apis"];
     List rt = apis["realtime"];
-    String url_raw = rt["url"];
-    std::string url (url_raw);
+    CharacterVector url_raw = rt["url"];
+    int Nurl = url_raw.size ();
+    std::vector<std::string> urls;
+    for (int i=0; i<Nurl; i++)
+    {   
+        String url (url_raw[i]);
+        urls.push_back (url);
+    }
     List headers = rt["headers"];
-    RealtimeFeed rtfeed (url, headers);
+    RealtimeFeed rtfeed (urls, headers);
 
     // Connect GTFS database
     Gtfs::Gtfs gtfs (dbname);
@@ -79,6 +85,8 @@ void run_realtime_model (List nw)
     int iteration = 0;
     while (ongoing)
     {
+        Rcout << "\n --- Commence iteration ---\n";
+
         timer.reset ();
         
         // call the feed once and check the result is reasonable
@@ -86,7 +94,6 @@ void run_realtime_model (List nw)
         // 5 => "simulations completed"
         if (ures == 5) break;
         
-        Rcout << "\n --- Commence iteration ---\n";
         if (ures != 0 && tries < 10)
         {
             Rcout << "\n x Unable to fetch URL. Trying again ...\n";
@@ -96,8 +103,8 @@ void run_realtime_model (List nw)
         }
         tries = 0;
         Rcout << "\n + loaded " 
-            << rtfeed.feed ()->entity_size () 
-            << " vehicle positions.\n";
+            << rtfeed.n_vehicles () << " vehicle positions and "
+            << rtfeed.n_trip_updates () << " trip updates.\n";
 
         {
             std::ostringstream tinfo;
@@ -116,15 +123,43 @@ void run_realtime_model (List nw)
         load_vehicles (&vehicles, rtfeed.feed (), &gtfs, &params);
         timer.report ("updating vehicle information");
 
+        // *** Some debugging code **********************************************
+        Rcout << vehicles.size () << " vehicles\n";
+        // for (auto v = vehicles.begin (); v != vehicles.end (); ++v)
+        // {       
+        //     Rcout << "+ vehicle " << v->second.vehicle_id () << "\n";
+        //         // << "  - trip id: " << v->second.trip ()->trip_id () << "\n";
+
+        //     for (auto e : v->second.get_events ())
+        //     {
+        //         Rcout << "   [" << e.timestamp << "] trip " << e.trip_id << ": ";
+        //         if (e.type == Gtfs::EventType::gps)
+        //         {
+        //             Rcout << "position update {" <<
+        //                 e.position.latitude << ", " << e.position.longitude << "}";
+        //         }
+        //         else
+        //         {
+        //             Rcout << (e.type == Gtfs::EventType::arrival ? "arrived" : "departed")
+        //                 << " stop " << e.stop_index;
+        //         }
+        //         Rcout << "\n";
+        //     }
+        // }
+        // ongoing = 0;
+        // *** end debugging code ***********************************************
+
         // Update vehicle states
+        Rcout << "\n\n >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Mutations\n";
         #pragma omp parallel for num_threads(params.n_core)
         for (unsigned i=0; i<vehicles.bucket_count (); ++i)
         {       
             for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
             {
-                v->second.mutate (rngs.at (omp_get_thread_num ()));
+                v->second.mutate (rngs.at (omp_get_thread_num ()), &gtfs);
             }
         }
+        Rcout << "\n\n";
         timer.report ("updating vehicle states");
 
         // Now update the network state
@@ -158,31 +193,31 @@ void run_realtime_model (List nw)
 #endif
         
         // Predict ETAs
-        #pragma omp parallel for num_threads(params.n_core)
-        for (unsigned i=0; i<vehicles.bucket_count (); ++i)
-        {
-            for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
-            {
-                v->second.predict_etas (rngs.at (omp_get_thread_num ()));
-            }
-        }
-        timer.report ("predicting ETAs");
+        // #pragma omp parallel for num_threads(params.n_core)
+        // for (unsigned i=0; i<vehicles.bucket_count (); ++i)
+        // {
+        //     for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
+        //     {
+        //         v->second.predict_etas (rngs.at (omp_get_thread_num ()));
+        //     }
+        // }
+        // timer.report ("predicting ETAs");
 
         // Write vehicles to (new) feed
-#if SIMULATION
-        std::ostringstream outputname_t;
-        outputname_t << "etas/etas";
-        if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ()) 
-        {
-            outputname_t << "_" << rtfeed.feed ()->header ().timestamp ();
-        }
-        outputname_t << ".pb";
-        std::string oname (outputname_t.str ());
-        write_vehicles (&vehicles, oname);
-#endif
-        write_vehicles (&vehicles, outputname);
+// #if SIMULATION
+//         std::ostringstream outputname_t;
+//         outputname_t << "etas/etas";
+//         if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ()) 
+//         {
+//             outputname_t << "_" << rtfeed.feed ()->header ().timestamp ();
+//         }
+//         outputname_t << ".pb";
+//         std::string oname (outputname_t.str ());
+//         write_vehicles (&vehicles, oname);
+// #endif
+//         write_vehicles (&vehicles, outputname);
 
-        timer.report ("writing ETAs to protobuf feed");
+//         timer.report ("writing ETAs to protobuf feed");
 
         gtfs.close_connection (true);
         timer.end ();

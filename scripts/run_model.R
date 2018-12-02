@@ -31,8 +31,10 @@ if (!file.exists("fulldata.db")) {
 }
 
 nw <- nw %>%
-    realtime_feed("https://dl.dropboxusercontent.com/s/1fvto9ex649mkri/vehicle_locations.pb?dl=1", 
-                  response = "protobuf")
+    realtime_feed(
+        c("https://dl.dropboxusercontent.com/s/1fvto9ex649mkri/vehicle_locations.pb?dl=1",
+          "https://dl.dropboxusercontent.com/s/v680zazqjgm3whs/trip_updates.pb?dl=1"),
+        response = "protobuf")
 
 if (file.exists("config.json")) {
     config <- jsonlite::read_json("config.json")
