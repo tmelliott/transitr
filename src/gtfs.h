@@ -576,7 +576,6 @@ namespace Gtfs
             void initialize (Event& e, RNG& rng);
             void mutate (RNG& rng, Gtfs* gtfs); // mutate state
             void mutate_to (Event& e, RNG& rng); // mutate state
-            void mutate2 (RNG& rng); // mutate state
             void select (RNG& rng); // select state (given data)
             void predict_etas (RNG& rng);
             etavector get_etas ();

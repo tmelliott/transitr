@@ -30,6 +30,9 @@ vdata <-
         event_type = factor(event_type, levels = c("initialize", "gps", "arrival", "departure"))
     )
 
+## compute dwell times
+
+
 ggplot(vdata, aes(timestamp, event_type)) +
     geom_point()
 
