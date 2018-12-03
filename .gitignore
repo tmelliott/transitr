@@ -8,6 +8,7 @@ fulldata.db
 *.csv
 .gtfs_date
 *.pb
+*.rda
 
 ./config.json
 
