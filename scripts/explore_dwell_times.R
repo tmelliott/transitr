@@ -33,10 +33,35 @@ if (!file.exists("tripupdates.rda")) {
     load("tripupdates.rda")
 }
 
+## load vehilce positions
+if (!file.exists("vehiclepositions.rda")) {
+    vpfiles <- list.files(file.path("simulations", "archive"), 
+        pattern = "vehicle_locations*", full.name = TRUE)
+    vp <- pbapply::pblapply(vpfiles, function(f) {
+        feed <- read(transit_realtime.FeedMessage, f)
+        if (length(feed$entity) == 0) return(NULL)
+        lapply(feed$entity, function(e) {
+            if (!e$has('vehicle')) return(NULL)
+            if (!e$vehicle$has('position')) return(NULL)
+            xdf <- tibble(
+                vehicle_id = e$vehicle$vehicle$id,
+                trip_id = e$vehicle$trip$trip_id,
+                route_id = e$vehicle$trip$route_id,
+                timestamp = as.POSIXct(e$vehicle$timestamp, origin = "1970-01-01"),
+                position_latitude = e$vehicle$position$latitude,
+                position_longitude = e$vehicle$position$longitude
+            )
+        }) %>% bind_rows
+    }) %>% bind_rows
+    save(vp, file = "vehiclepositions.rda")
+} else {
+    load("vehiclepositions.rda")
+}
+
 dt <- tu %>%
     filter(type == "arrival") %>%
     mutate(arrival = time) %>%
-    select(vehicle_id, trip_id, stop_sequence, arrival) %>%
+    select(vehicle_id, trip_id, timestamp, stop_sequence, arrival) %>%
     distinct() %>% 
     full_join(
         tu %>% filter(type == "departure") %>% mutate(departure = time) %>%
@@ -46,8 +71,8 @@ dt <- tu %>%
     ) %>%
     arrange(vehicle_id, trip_id, stop_sequence) %>%
     mutate(dwell = departure - arrival) %>% filter(!is.na(dwell)) %>%
-    ## only include dwell times [0, 10min]
-    filter(dwell >= 0 & dwell < 1*60)
+    ## only include dwell times [0, 1min]
+    filter(dwell >= 0 & dwell <= 1*60)
 
 hp <- ggplot(dt, aes(dwell)) + 
     geom_histogram(binwidth = 1) + 
@@ -58,6 +83,61 @@ hp + geom_vline(aes(xintercept = x),
 
 hp + geom_vline(aes(xintercept = x), 
     data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) 
+
+
+## how about the rate of vehicle updates?
+dv <- vp %>% group_by(vehicle_id) %>% distinct() %>%
+    do((.) %>% arrange(timestamp) %>% mutate(dt = c(-1, diff(timestamp)))) %>%
+    filter(dt >= 0 & dt <= 1*60)
+
+dp <- ggplot(dv, aes(dt)) +
+    geom_histogram(binwidth = 1) +
+    xlab("Time between updates (sec)") + ylab("Number of updates")
+
+dp + geom_vline(aes(xintercept = x), 
+    data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) 
+
+dt2 <- tu %>% group_by(vehicle_id) %>% distinct() %>%
+    do((.) %>% arrange(timestamp) %>% mutate(dt = c(-1, diff(timestamp)))) %>%
+    filter(dt >= 0 & dt <= 1*60)
+
+hp2 <- ggplot(dt2, aes(dt)) +
+    geom_histogram(binwidth = 1) +
+    xlab("Time between updates (sec)") + ylab("Number of updates")
+
+hp2 + geom_vline(aes(xintercept = x), 
+    data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) 
+
+
+## join
+dd <- dv %>% full_join(dt, by = c("vehicle_id", "timestamp")) %>%
+    distinct() %>%
+    do((.) %>% arrange(timestamp) %>% mutate(dt = c(-1, diff(timestamp)))) %>%
+    filter(dt >= 0 & dt <= 1*60)
+
+dp2 <- ggplot(dd %>% filter(dt < 1*60), aes(dt)) +
+    geom_histogram(binwidth = 1) +
+    xlab("Time between updates (sec)") + ylab("Number of updates")
+
+dp2 + geom_vline(aes(xintercept = x), 
+    data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) 
+
+gridExtra::grid.arrange(
+    hp + geom_vline(aes(xintercept = x), 
+        data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) +
+        ggtitle("Dwell times"),
+    hp2 + geom_vline(aes(xintercept = x), 
+        data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) +
+        ggtitle("Trip updates only"),
+    dp + geom_vline(aes(xintercept = x), 
+        data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) +
+        ggtitle("Vehicle positions only"),
+    dp2 + geom_vline(aes(xintercept = x), 
+        data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) +
+        ggtitle("Combined"),
+    nrow = 4)
+
+
 
 ## find the stop
 library(RSQLite)
