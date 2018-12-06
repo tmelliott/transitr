@@ -2291,13 +2291,15 @@ namespace Gtfs
     {
         /**
          * Return the index of the segment at which the particle is now in.
-         * Segments are different ... (don't start at 0)
          */
-        unsigned int j = 0;
-        if (segments->size () == 1) return 0;
-        if (distance >= segments->back ().distance) return segments->size () - 1;
+        if (segments->back ().distance == 0) return 0;
 
-        while (segments->at (j+1).distance > distance) j++;
+        unsigned j;
+        for (j = 0; j < segments->size () - 1; j++)
+        {
+            if (segments->at (j+1).distance > distance) break;
+        }
+
         return j;
     }
 

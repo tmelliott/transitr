@@ -143,6 +143,8 @@ namespace Gtfs {
         // repeat until there are no more events
         while (current_event_index < time_events.size ())
         {
+            // std::cout << std::endl << " ++++ there are " << time_events.size () 
+            //     << " events; requesting index " << current_event_index << std::endl;
             auto e = time_events.at (current_event_index);
 
             if (_trip == nullptr || _trip->trip_id () != e.trip_id)
@@ -163,7 +165,7 @@ namespace Gtfs {
                 throw std::runtime_error ("Trip not found");
             }
 
-            std::cout << "\n    [" << e.timestamp << "] "
+            std::cout << std::endl << "    [" << e.timestamp << "] "
                 << _trip->route ()->route_short_name ()
                 << " (" << _trip->stops ().at (0).departure_time << "): ";
             e.print ();
@@ -207,7 +209,8 @@ namespace Gtfs {
             {
                 _stop_index = e.stop_index;
                 // ----------------------------------- CHECK STOP INDEX
-                std::cout << " (d = " 
+                std::cout << " - there are " << _trip->stops ().size () 
+                    << " stops " << " (d = " 
                     << _trip->stops ().at (_stop_index).distance << "m)";
             }
 
@@ -217,8 +220,7 @@ namespace Gtfs {
             if (bad_sample) initialize (e, rng);
 
             {
-                std::cout << std::endl << "    ** estimating travel times";
-                std::cout.flush ();
+                std::cout << "\n    ** estimating travel times";
                 // NETWORK STUFF
                 double dmin = _trip->shape ()->path ().back ().distance;
                 for (auto p = _state.begin (); p != _state.end (); ++p)
@@ -305,7 +307,7 @@ namespace Gtfs {
 
         // move the particles
         if (_complete || !valid () || _delta == 0) return;
-        std::cout << std::endl << "     + " << _delta << " seconds";
+        std::cout << "\n     + " << _delta << " seconds";
 
         bool all_complete = true;
         double dbar = 0.0, vbar = 0.0, 
@@ -314,8 +316,8 @@ namespace Gtfs {
         for (auto& p : _state)
         {
             if (_N < 20)
-                std::cout << std::endl << "      [" << p.get_distance () 
-                    << ", " << p.get_speed () 
+                std::cout << "\n      [" << p.get_distance () 
+                    << ", " << p.get_speed ()
                     << ", " << (p.get_stop_index () + 1)
                     << "]";
             dbar += p.get_distance () * p.get_weight ();
@@ -364,7 +366,7 @@ namespace Gtfs {
             if (_N < 20)
                 std::cout << " => l(Y|Xi) = " << exp (p.get_ll ());
         }
-        std::cout << std::endl << "    =========================================================================\n"
+        std::cout << "\n    =========================================================================\n"
             << "      [" << dbar << ", " << vbar << "] -> "
             << "[" << dbar2 << ", " << vbar2<< "] => ";
         latlng px = latlng ();
@@ -413,7 +415,7 @@ namespace Gtfs {
         }
 #endif
 
-        std::cout << std::endl << "   -> sum(l(y|x)) = " << sumlh;
+        std::cout << "\n   -> sum(l(y|x)) = " << sumlh;
         // if no likelihoods are that big, give up
         if (sumlh < 1e-16)
         {
@@ -466,7 +468,7 @@ namespace Gtfs {
                     break;
             }
         }
-        std::cout << std::endl << "         => Posterior: ["
+        std::cout << "\n         => Posterior: ["
             << dbar << ", " << vbar << "] => ";
         switch (e.type)
         {
@@ -475,7 +477,6 @@ namespace Gtfs {
                     std::cout << "(getpx_len="
                         << _trip->shape ()->path ().size () << ")";
                     px = _trip->shape ()->coordinates_of (dbar);
-                    std::cout.flush ();
                     std::cout << "d(h(X), y) = " << ddbar 
                         << " [" << px.latitude << ", " << px.longitude << "]";
                     break;
@@ -486,7 +487,7 @@ namespace Gtfs {
         }
 
         // sum(wt) in (0.999, 1.0001)
-        std::cout << std::endl << "   -> sum(wt) = " << sumwt;
+        std::cout << "\n   -> sum(wt) = " << sumwt;
         if (fabs (1 - sumwt) > 1e-4) return;
         bad_sample = false;
 
@@ -497,8 +498,7 @@ namespace Gtfs {
                                         });
 
         _Neff = pow (sumwt2, -1);
-        std::cout << std::endl << "   -> Neff = " << _Neff;
-        std::cout.flush ();
+        std::cout << "\n   -> Neff = " << _Neff;
 
 #if SIMULATION
         {
@@ -525,7 +525,6 @@ namespace Gtfs {
         if (_Neff >= (_N / 4)) return;
 
         std::cout << " -> resampling";
-        std::cout.flush ();
         select (rng);
 
     }
@@ -704,7 +703,8 @@ namespace Gtfs {
         stops = &(vehicle->trip ()->stops ());
         int M (stops->size ());
         // if (stop_index == 0) stop_index = find_stop_index (distance, stops);
-        // std::cout << " [M=" << M << ",m=" << m << "], ";
+        std::cout << " [M=" << M << ",m=" << stop_index << "], ";
+        std::cout.flush ();
         if (stop_index == M-1) 
         {
             distance = Dmax;
@@ -713,18 +713,25 @@ namespace Gtfs {
         }
 
         double next_stop_d = stops->at (stop_index + 1).distance;
+        std::cout << " next_dist = " << next_stop_d;
+        std::cout.flush ();
         
         // get SEGMENTS
         std::vector<ShapeSegment>* segments;
         segments = &(vehicle->trip ()->shape ()->segments ());
         int L (segments->size ());
+        std::cout << " [L=" << L;
+        std::cout.flush ();
         unsigned int l (find_segment_index (distance, segments));
-        // std::cout << " [L=" << L << ",l=" << l << "], ";
+        std::cout << ",l=" << l << "], ";
+        std::cout.flush ();
         double next_segment_d;
         next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
 
-        // std::cout << " tt.size = " << tt.size ()
-            // << ", at.size = " << at.size ();
+        std::cout.flush ();
+        std::cout << " tt.size = " << tt.size ()
+            << ", at.size = " << at.size ();
+        std::cout.flush ();
         
         // allow vehicle to remain stationary if at a stop:
         // if (distance == stops->at (stop_index).distance)
