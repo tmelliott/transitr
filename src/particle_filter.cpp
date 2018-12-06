@@ -703,8 +703,7 @@ namespace Gtfs {
         stops = &(vehicle->trip ()->stops ());
         int M (stops->size ());
         // if (stop_index == 0) stop_index = find_stop_index (distance, stops);
-        std::cout << " [M=" << M << ",m=" << stop_index << "], ";
-        std::cout.flush ();
+        // std::cout << " [M=" << M << ",m=" << stop_index << "], ";
         if (stop_index == M-1) 
         {
             distance = Dmax;
@@ -713,24 +712,20 @@ namespace Gtfs {
         }
 
         double next_stop_d = stops->at (stop_index + 1).distance;
-        std::cout << " next_dist = " << next_stop_d;
-        std::cout.flush ();
         
         // get SEGMENTS
         std::vector<ShapeSegment>* segments;
         segments = &(vehicle->trip ()->shape ()->segments ());
         int L (segments->size ());
-        std::cout << " [L=" << L;
-        std::cout.flush ();
+        // std::cout << " [L=" << L;
         unsigned int l (find_segment_index (distance, segments));
-        std::cout << ",l=" << l << "], ";
-        std::cout.flush ();
+        // std::cout << ",l=" << l << "], ";
         double next_segment_d;
         next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
 
         std::cout.flush ();
-        std::cout << " tt.size = " << tt.size ()
-            << ", at.size = " << at.size ();
+        // std::cout << " tt.size = " << tt.size ()
+        //     << ", at.size = " << at.size ();
         std::cout.flush ();
         
         // allow vehicle to remain stationary if at a stop:
