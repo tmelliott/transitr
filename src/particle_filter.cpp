@@ -255,7 +255,7 @@ namespace Gtfs {
                     }
                     if (n < _N)
                     {
-                        // _current_segment++;
+                        _current_segment++;
                         continue;
                     }
 
