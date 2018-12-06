@@ -217,6 +217,8 @@ namespace Gtfs {
             if (bad_sample) initialize (e, rng);
 
             {
+                std::cout << std::endl << "    ** estimating travel times";
+                std::cout.flush ();
                 // NETWORK STUFF
                 double dmin = _trip->shape ()->path ().back ().distance;
                 for (auto p = _state.begin (); p != _state.end (); ++p)
@@ -230,6 +232,9 @@ namespace Gtfs {
                 int m = find_stop_index (dmin, &(_trip->stops ()));
                 int l = find_segment_index (dmin, &segs);
 
+                std::cout << " -> from segment " << _current_segment
+                    << " to segment " << m;
+                std::cout.flush ();
 
                 // update segment travel times for intermediate ones ...
                 double tt, ttp, err;
@@ -250,7 +255,7 @@ namespace Gtfs {
                     }
                     if (n < _N)
                     {
-                        _current_segment++;
+                        // _current_segment++;
                         continue;
                     }
 
