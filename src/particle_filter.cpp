@@ -233,9 +233,12 @@ namespace Gtfs {
                     << _current_segment << " to stop ";
                 std::cout.flush ();
                 int m = find_stop_index (dmin, &(_trip->stops ()));
-                std::cout << m;
+                std::cout << m << "; of "
+                    << segs.size () << " segments, on segment ";
                 std::cout.flush (); 
+
                 int l = find_segment_index (dmin, &segs);
+                std::cout << l;
                 std::cout.flush ();
 
                 // update segment travel times for intermediate ones ...
