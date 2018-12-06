@@ -294,7 +294,7 @@ namespace Gtfs {
 
         // move the particles
         if (_complete || !valid () || _delta == 0) return;
-        std::cout << "\n     + " << _delta << " seconds";
+        std::cout << std::endl << "     + " << _delta << " seconds";
 
         bool all_complete = true;
         double dbar = 0.0, vbar = 0.0, 
@@ -303,7 +303,7 @@ namespace Gtfs {
         for (auto& p : _state)
         {
             if (_N < 20)
-                std::cout << "\n      [" << p.get_distance () 
+                std::cout << std::endl << "      [" << p.get_distance () 
                     << ", " << p.get_speed () 
                     << ", " << (p.get_stop_index () + 1)
                     << "]";
@@ -353,7 +353,7 @@ namespace Gtfs {
             if (_N < 20)
                 std::cout << " => l(Y|Xi) = " << exp (p.get_ll ());
         }
-        std::cout << "\n    =========================================================================\n"
+        std::cout << std::endl << "    =========================================================================\n"
             << "      [" << dbar << ", " << vbar << "] -> "
             << "[" << dbar2 << ", " << vbar2<< "] => ";
         latlng px = latlng ();
@@ -402,7 +402,7 @@ namespace Gtfs {
         }
 #endif
 
-        std::cout << "\n   -> sum(l(y|x)) = " << sumlh;
+        std::cout << std::endl << "   -> sum(l(y|x)) = " << sumlh;
         // if no likelihoods are that big, give up
         if (sumlh < 1e-16)
         {
@@ -455,7 +455,7 @@ namespace Gtfs {
                     break;
             }
         }
-        std::cout << "\n         => Posterior: ["
+        std::cout << std::endl << "         => Posterior: ["
             << dbar << ", " << vbar << "] => ";
         switch (e.type)
         {
@@ -464,7 +464,6 @@ namespace Gtfs {
                     std::cout << "(getpx_len="
                         << _trip->shape ()->path ().size () << ")";
                     px = _trip->shape ()->coordinates_of (dbar);
-                    std::cout << "got";
                     std::cout.flush ();
                     std::cout << "d(h(X), y) = " << ddbar 
                         << " [" << px.latitude << ", " << px.longitude << "]";
@@ -476,7 +475,7 @@ namespace Gtfs {
         }
 
         // sum(wt) in (0.999, 1.0001)
-        std::cout << "\n   -> sum(wt) = " << sumwt;
+        std::cout << std::endl << "   -> sum(wt) = " << sumwt;
         if (fabs (1 - sumwt) > 1e-4) return;
         bad_sample = false;
 
@@ -487,7 +486,7 @@ namespace Gtfs {
                                         });
 
         _Neff = pow (sumwt2, -1);
-        std::cout << "\n   -> Neff = " << _Neff;
+        std::cout << std::endl << "   -> Neff = " << _Neff;
 
 #if SIMULATION
         {
