@@ -461,7 +461,10 @@ namespace Gtfs {
         {
             case EventType::gps :
                 {
+                    std::cout << "(getpx)";
                     px = _trip->shape ()->coordinates_of (dbar);
+                    std::cout << "got";
+                    std::cout.flush ();
                     std::cout << "d(h(X), y) = " << ddbar 
                         << " [" << px.latitude << ", " << px.longitude << "]";
                     break;

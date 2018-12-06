@@ -1184,7 +1184,6 @@ namespace Gtfs
     latlng Shape::coordinates_of (double& d)
     {
         if (!loaded) load();
-        std::cout << "[pathsize=" << _path.size () << "]";
 
         if (d <= 0)
         {
