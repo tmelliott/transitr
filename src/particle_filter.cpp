@@ -131,7 +131,7 @@ namespace Gtfs {
         if (nnew == 0) return;
 
         std::cout << "\n    [";
-        if (_timestamp > 0) 
+        if (_timestamp > 0 && current_event_index > 0) 
         {
             std::cout << _timestamp << "] "
                 << _trip->route ()->route_short_name ()
@@ -206,11 +206,7 @@ namespace Gtfs {
             else
             {
                 _stop_index = e.stop_index;
-            }
-
-
-            if (e.type != EventType::gps)
-            {
+                // ----------------------------------- CHECK STOP INDEX
                 std::cout << " (d = " 
                     << _trip->stops ().at (_stop_index).distance << "m)";
             }
