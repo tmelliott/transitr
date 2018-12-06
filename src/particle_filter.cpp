@@ -229,13 +229,13 @@ namespace Gtfs {
                     }
                 }
                 std::vector<ShapeSegment>& segs = _trip->shape ()->segments ();
-                std::cout << " -> from segment ";
+                std::cout << " -> from stop ";
+                    << _current_segment << " to stop ";
                 std::cout.flush ();
                 int m = find_stop_index (dmin, &(_trip->stops ()));
-                std::cout << _current_segment << " to segment ";
-                std::cout.flush ();
-                int l = find_segment_index (dmin, &segs);
                 std::cout << m;
+                std::cout.flush (); 
+                int l = find_segment_index (dmin, &segs);
                 std::cout.flush ();
 
                 // update segment travel times for intermediate ones ...
