@@ -2297,7 +2297,7 @@ namespace Gtfs
         if (segments.size () == 1) return 0;
         if (distance >= segments->back ().distance) return segments->size () - 1;
 
-        while (segments->at (j+1) > distance) j++;
+        while (segments->at (j+1).distance > distance) j++;
         return j;
     }
 
