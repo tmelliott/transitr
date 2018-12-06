@@ -487,6 +487,7 @@ namespace Gtfs {
 
         _Neff = pow (sumwt2, -1);
         std::cout << std::endl << "   -> Neff = " << _Neff;
+        std::cout.flush ();
 
 #if SIMULATION
         {
@@ -513,6 +514,7 @@ namespace Gtfs {
         if (_Neff >= (_N / 4)) return;
 
         std::cout << " -> resampling";
+        std::cout.flush ();
         select (rng);
 
     }
