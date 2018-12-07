@@ -149,6 +149,9 @@ namespace Gtfs {
 
             if (_trip == nullptr || _trip->trip_id () != e.trip_id)
             {
+                // unload old trip
+                if (_trip != nullptr) _trip->unload (true);
+
                 // assign trip <--> vehicle
                 set_trip (gtfs->find_trip (e.trip_id));
                 _newtrip = _trip != nullptr;
@@ -158,6 +161,16 @@ namespace Gtfs {
                 _timestamp = 0;
                 _state.clear ();
                 estimated_dist = 0.0;
+
+                // reset events!!
+                new_events.clear ();
+                // move future events (including current) into new_events
+                for (int i=current_event_index; i<time_events.size (); i++) new_events.push_back (std::move (time_events.at (i)));
+                time_events.clear ();
+                // move back into events
+                for (int i=0; i<new_events.size (); i++) time_events.push_back (std::move (new_events.at (i)));
+                new_events.clear ();
+                current_event_index = 0;
             }
 
             if (_trip == nullptr)
@@ -289,6 +302,14 @@ namespace Gtfs {
             current_event_index++;
         }
 
+        // is the vehicle finished?
+        if (_complete)
+        {
+            // delete its particles, because we don't need them
+            _state.clear ();
+        }
+
+
         return;
     }
 
@@ -383,6 +404,8 @@ namespace Gtfs {
                 std::cout << (e.type == EventType::arrival ? "arrival" : "departure")
                     << " diff " << dtbar << "s";
         }
+
+        if (all_complete) _complete = true;
 
         _Neff = 0;
         double sumlh = std::accumulate (_state.begin (), _state.end (), 0.0,
@@ -522,7 +545,7 @@ namespace Gtfs {
 #endif
 
 
-        if (_Neff >= (_N / 4)) return;
+        if (_Neff >= (_N / 4) || _complete) return;
 
         std::cout << " -> resampling";
         select (rng);
