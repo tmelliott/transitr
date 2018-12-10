@@ -849,11 +849,14 @@ namespace Gtfs
 
     void Trip::unload (bool complete)
     {
+        std::lock_guard<std::mutex> lk (load_mutex);
+        
         completed = complete;
         loaded = false;
         _route = nullptr;
         _shape = nullptr;
         _calendar = nullptr;
+        _stops.clear ();
         _block_id = "";
         _trip_headsign = "";
         _vehicle = nullptr;
@@ -2162,7 +2165,7 @@ namespace Gtfs
         acceleration = a;
         stop_index = find_stop_index (d, &(v->trip ()->stops ()));
         // initialize travel times to -1 and set to 0 when starting segment
-        tt.resize (vehicle->trip ()->shape ()->segments ().size () + 1, -1);
+        tt.resize (vehicle->trip ()->shape ()->segments ().size (), -1);
         at.resize (vehicle->trip ()->stops ().size (), 0);
         dt.resize (vehicle->trip ()->stops ().size (), 0);
         // weights initialized to ZERO
@@ -2293,6 +2296,7 @@ namespace Gtfs
          * Return the index of the segment at which the particle is now in.
          */
         if (segments->back ().distance == 0) return 0;
+        if (segments->back ().distance < distance) return segments->size () - 1;
 
         unsigned j;
         for (j = 0; j < segments->size () - 1; j++)
