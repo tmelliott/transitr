@@ -745,11 +745,6 @@ namespace Gtfs {
         // std::cout << ",l=" << l << "], ";
         double next_segment_d;
         next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
-
-        std::cout.flush ();
-        // std::cout << " tt.size = " << tt.size ()
-        //     << ", at.size = " << at.size ();
-        std::cout.flush ();
         
         // allow vehicle to remain stationary if at a stop:
         // if (distance == stops->at (stop_index).distance)
@@ -911,7 +906,11 @@ namespace Gtfs {
                 if (bus_stop (vehicle->timestamp () - delta, rng)) 
                     distance = next_stop_d;
                 // end of route? end.
-                if (stop_index >= M-1) break;
+                if (stop_index >= M-1)
+                {
+                    complete = true;
+                    break;
+                }
                 // else update next stop and delta
                 next_stop_d = stops->at (stop_index + 1).distance;
                 delta -= (int)(dt.at (stop_index) - at.at (stop_index));
