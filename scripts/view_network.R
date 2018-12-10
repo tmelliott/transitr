@@ -102,7 +102,8 @@ read_segment_data <- function(sim) {
 
 ## segment lengths?
 con <- dbConnect(SQLite(), "fulldata.db")
-seglens <- con %>% tbl("road_segments") %>% select(road_segment_id, length) %>% collect %>%
+seglens <- con %>% tbl("road_segments") %>% 
+    select(road_segment_id, length, int_from, int_to) %>% collect %>%
     mutate(road_segment_id = as.character(road_segment_id))
 dbDisconnect(con)
 
@@ -144,10 +145,27 @@ ggplot(segd) +
 
 
 
+################ networkisation
+segnw <- seglens %>% filter(int_from < 10 | int_to < 10) %>%
+    mutate(from = int_from, to = int_to)
 
+segg <- segdata %>% filter(segment_id %in% segnw$road_segment_id) %>% 
+    left_join(segnw, by = c("segment_id" = "road_segment_id")) %>%
+    mutate(speed = length / travel_time) %>%
+    group_by(segment_id) %>% 
+        summarize(
+            speed = mean(speed) * 60 * 60 / 1000,
+            from = first(from), to = first(to)
+        ) %>%
+    as_tbl_graph()
 
-
-
+ggraph(segg, layout = 'kk') + 
+    geom_edge_fan(
+        aes(color = speed),
+        arrow = arrow(length = unit(2, 'mm')), 
+        start_cap = circle(2, 'mm'),
+        end_cap = circle(2, 'mm')) +
+    geom_node_point(shape = 21)
 
 
 
