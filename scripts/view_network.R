@@ -222,13 +222,50 @@ segg.hour <- seg.hour %>%
 #     geom_point() +
 #     facet_wrap(~segment_id)
 
+set.seed(1234)
+t <- unique(seg.hour$time)[1]
+g <- ggraph(segg.hour , layout = 'kk') 
+
+g + geom_edge_fan() + 
+    scale_edge_colour_gradientn(colours = viridis::viridis(256, option = "A"), limit = c(0, 100)) +
+    geom_node_point(shape = 19, size = 0.1) 
+
+## specify a x/y range for the cluster to look at
+lims <- list(x = c(50, 63), y = c(28, 45))
+
+ggplot(g$data, aes(x, y)) + geom_point() + xlim(lims$x) + ylim(lims$y)
+
+segs.keep <- g$data %>% 
+    filter(x > lims$x[1] & x < lims$x[2] & y > lims$y[1] & y < lims$y[2]) %>%
+    pluck("name") %>% as.character
+
+segs2 <- seg.hour %>% filter(segment_id %in% segs.keep)
+
 ## smooth them out
-segY <- seg.hour %>% spread(key = time, value = speed) %>% ungroup() %>%
-    mutate(segment_id = as.integer(segment_id)) %>% arrange(segment_id)
+segY <- segs2 %>% spread(key = time, value = speed) %>% ungroup() %>%
+    mutate(segment_id = as.character(segment_id)) %>% arrange(segment_id)
 Y <- segY %>% select(-from, -to, -segment_id) %>% as.matrix
 X <- Y * NA
 
-F <- Matrix(diag(nrow(X))) # transition matrix
+generate_matrix <- function(x) {
+    m <- diag(nrow(x))
+    x$id <- as.character(x$id)
+    rownames(m) <- x$id
+    colnames(m) <- x$id
+    for (i in seq_along(1:nrow(m))) {
+        toi <- x$id[x$to == x$from[i]]
+        fromi <- x$id[x$from == x$to[i]]
+        if (length(toi) > 0) {
+            m[i, toi] <- 1
+        }
+        if (length(fromi) > 0) {
+            m[i, fromi] <- 1
+        }
+    }
+    sweep(m, 1, rowSums(m), "/")
+}
+segm <- segY %>% mutate(id = segment_id) %>% select(id, from, to)
+F <- Matrix(generate_matrix(segm)) # transition matrix
 Q <- Matrix(diag(nrow(X))) * 10
 R <- Matrix(diag(nrow(X))) * 5
 I <- Matrix(diag(nrow(X)))
@@ -272,12 +309,11 @@ segg.hour <- seg.hour %>%
 # 
 set.seed(1234)
 t <- unique(seg.hour$time)[1]
-g <- ggraph(segg.hour %>% filter(time == t), layout = 'kk') 
+g <- ggraph(segg.hour, layout = 'kk') 
 
-g + geom_edge_fan(
-        aes(color = speed_kf)) + 
+g + geom_edge_fan() + 
     scale_edge_colour_gradientn(colours = viridis::viridis(256, option = "A"), limit = c(0, 100)) +
-    geom_node_point(shape = 19, size = 0.1) 
+    geom_node_point(shape = 19) 
 
 ## specify a x/y range for the cluster to look at
 lims <- list(x = c(50, 63), y = c(28, 45))
