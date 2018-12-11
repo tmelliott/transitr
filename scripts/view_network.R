@@ -7,16 +7,32 @@ get_segments <- function(f = "segment_states.csv") {
         col_types = "iinn")
 }
 
-get_segment_data <- function() {
+get_segment_data <- function(routes) {
     con <- dbConnect(SQLite(), "fulldata.db")
-    segments <- con %>% tbl("road_segments")
+    on.exit(dbDisconnect(con))
+    if (missing(routes)) {
+        segments <- con %>% tbl("road_segments")
+    } else {
+        rids <- con %>% tbl("routes") %>%
+            filter(route_short_name %in% routes &
+                (route_long_name %like% "%To City%" |
+                 route_long_name %like% "%To Britomart%")) %>%
+            collect %>% pluck("route_id") %>% unique
+        sids <- con %>% tbl("trips") %>%
+            filter(route_id %in% rids) %>%
+            collect %>% pluck("shape_id") %>% unique
+        segids <- con %>% tbl("shape_segments") %>% 
+            filter(shape_id %in% sids) %>%
+            collect %>% pluck("road_segment_id") %>% unique
+        segments <- con %>% tbl("road_segments") %>%
+            filter(road_segment_id %in% segids)
+    }
     intersections <- con %>% tbl("intersections")
     segments <- segments %>% 
         inner_join(intersections, by = c("int_from" = "intersection_id"), suffix = c("", "_start")) %>%
         inner_join(intersections, by = c("int_to" = "intersection_id"), suffix = c("", "_end")) %>%
         select(road_segment_id, length, intersection_lat, intersection_lon, intersection_lat_end, intersection_lon_end) %>%
         collect
-    dbDisconnect(con)
     segments
 }
 
@@ -109,7 +125,7 @@ dbDisconnect(con)
 
 segdata <- read_segment_data("sim000")
 # segdata <- read_segment_data("sim002")
-segids <- table(segdata$segment_id) %>% sort %>% tail(50) %>% names #%>% sample(20)
+segids <- table(segdata$segment_id) %>% sort %>% tail(50) %>% names
 
 # segids <- table(segdata$segment_id) %>% names %>% sample(20)
 segd <- segdata %>% filter(segment_id %in% segids) %>% 
@@ -157,13 +173,24 @@ ggplot(segdat, aes(intersection_lon, intersection_lat,
 ################ networkisation
 library(ggraph)
 library(tidygraph)
-library(gganimate)
+library(Matrix)
 
-segnw <- seglens %>% #filter(int_from < 150 | int_to < 150) %>% filter(int_from > 68 | int_to > 68) %>%
-    mutate(from = int_from, to = int_to)
+## just segments of these routes
+segdata <- get_segment_data(c("27W", "27H", "22N", "22R", "22A"))
+sids <- unique(segdata$road_segment_id)
 
-segg <- segdata %>% filter(segment_id %in% segnw$road_segment_id) %>% 
-    left_join(segnw, by = c("segment_id" = "road_segment_id")) %>%
+con <- dbConnect(SQLite(), "fulldata.db")
+seglens <- con %>% tbl("road_segments") %>% 
+    filter(road_segment_id %in% sids) %>%
+    select(road_segment_id, length, int_from, int_to) %>% collect %>%
+    mutate(road_segment_id = as.character(road_segment_id),
+           from = int_from, to = int_to)
+dbDisconnect(con)
+
+rawdata <- read_segment_data("sim000") %>% 
+    filter(segment_id %in% sids) %>%
+    left_join(seglens, by = c("segment_id" = "road_segment_id"))
+segg <- rawdata %>%
     mutate(speed = length / travel_time) %>%
     group_by(segment_id) %>% 
         summarize(
@@ -175,11 +202,11 @@ segg <- segdata %>% filter(segment_id %in% segnw$road_segment_id) %>%
 ggraph(segg, layout = 'kk') + 
     geom_edge_fan(
         aes(color = speed),
-        arrow = arrow(length = unit(2, 'mm')), 
-        start_cap = circle(2, 'mm'),
-        end_cap = circle(2, 'mm')) +
-    scale_edge_colour_gradientn(colours = viridis::viridis(256, option = "A")) +
-    geom_node_point(shape = 21)
+        arrow = arrow(length = unit(1, 'mm')), 
+        start_cap = circle(1, 'mm'),
+        end_cap = circle(1, 'mm')) +
+    scale_edge_colour_gradientn(colours = viridis::viridis(256, option = "A"), limits = c(0, 100)) +
+    geom_node_point(shape = 19, size = 0.5)
 
 ### by the hour (for now)
 discretise <- function(x, seconds = 3600) {
@@ -192,78 +219,42 @@ discretise <- function(x, seconds = 3600) {
     x
 }
 
-seg.hour <- segdata %>% filter(segment_id %in% segnw$road_segment_id) %>% discretise(60*60) %>%
-    left_join(segnw, by = c("segment_id" = "road_segment_id")) %>%
+seg.hour <- rawdata %>% discretise(60*15) %>%
     mutate(speed = length / travel_time) %>%
     group_by(segment_id, time) %>% 
         summarize(
             speed = mean(speed) * 60 * 60 / 1000,
             from = first(from), to = first(to)
         )
-segg.hour <- seg.hour %>%
-    as_tbl_graph() %>% activate(edges)
+segg.hour <- seg.hour %>% as_tbl_graph() %>% activate(edges)
 
-# for (t in unique(seg.hour$time)) {
-#     set.seed(1234)
-#     g <- ggraph(segg.hour %>% filter(time == t), layout = 'kk') + 
-#         geom_edge_fan(
-#             aes(color = speed),
-#             arrow = arrow(length = unit(1, 'mm')), 
-#             start_cap = circle(1, 'mm'),
-#             end_cap = circle(1, 'mm')) +
-#         scale_edge_colour_gradientn(colours = viridis::viridis(256, option = "A")) +
-#         geom_node_point(shape = 19, size = 0.5)
-#     dev.hold()
-#     print(g)
-#     dev.flush()
-# }
-
-# ggplot(seg.hour %>% ungroup, aes(time, speed)) +
-#     geom_point() +
-#     facet_wrap(~segment_id)
-
-set.seed(1234)
-t <- unique(seg.hour$time)[1]
-g <- ggraph(segg.hour , layout = 'kk') 
-
-g + geom_edge_fan() + 
-    scale_edge_colour_gradientn(colours = viridis::viridis(256, option = "A"), limit = c(0, 100)) +
-    geom_node_point(shape = 19, size = 0.1) 
-
-## specify a x/y range for the cluster to look at
-lims <- list(x = c(50, 63), y = c(28, 45))
-
-ggplot(g$data, aes(x, y)) + geom_point() + xlim(lims$x) + ylim(lims$y)
-
-segs.keep <- g$data %>% 
-    filter(x > lims$x[1] & x < lims$x[2] & y > lims$y[1] & y < lims$y[2]) %>%
-    pluck("name") %>% as.character
-
-segs2 <- seg.hour %>% filter(segment_id %in% segs.keep)
+ggraph(segg.hour, layout = 'kk') + 
+    geom_edge_fan(aes(color = speed)) +
+    scale_edge_colour_gradientn(colours = viridis::viridis(256, option = "A"), limits = c(0, 100)) +
+    facet_wrap(~time)
 
 ## smooth them out
-segY <- segs2 %>% spread(key = time, value = speed) %>% ungroup() %>%
+segY <- seg.hour %>% spread(key = time, value = speed) %>% ungroup() %>%
     mutate(segment_id = as.character(segment_id)) %>% arrange(segment_id)
 Y <- segY %>% select(-from, -to, -segment_id) %>% as.matrix
 X <- Y * NA
 
 generate_matrix <- function(x) {
-    m <- diag(nrow(x))
-    x$id <- as.character(x$id)
-    rownames(m) <- x$id
-    colnames(m) <- x$id
+    m <- Matrix(diag(nrow(x)), doDiag = FALSE)
+    ## convert id to factor
+    x$id <- as.integer(as.factor(x$id))
+    ids <- unique(c(x$from, x$to))
+    x$from <- as.integer(factor(x$from, levels = ids))
+    x$to <- as.integer(factor(x$to, levels = ids))
     for (i in seq_along(1:nrow(m))) {
         toi <- x$id[x$to == x$from[i]]
         fromi <- x$id[x$from == x$to[i]]
-        if (length(toi) > 0) {
-            m[i, toi] <- 1
-        }
-        if (length(fromi) > 0) {
-            m[i, fromi] <- 1
-        }
+        if (length(toi) > 0) m[i, toi] <- 1
+        if (length(fromi) > 0) m[i, fromi] <- 1
     }
     sweep(m, 1, rowSums(m), "/")
 }
+
 segm <- segY %>% mutate(id = segment_id) %>% select(id, from, to)
 F <- Matrix(generate_matrix(segm)) # transition matrix
 Q <- Matrix(diag(nrow(X))) * 10
@@ -296,47 +287,20 @@ segd.kf <- segY %>% select(segment_id) %>% bind_cols(as.tibble(X)) %>%
     gather(key = time, value = speed_kf, -1)
 
 seg.hour <- segd.orig %>% inner_join(segd.kf, by = c('segment_id', 'time'))
-# ggplot(seg.hour, aes(time, speed)) +
-#     geom_point(shape = 4) +
-#     geom_point(aes(y = speed_kf), color = 'orangered') +
-#     facet_wrap(~segment_id)
-
-segg.hour <- seg.hour %>%
-    as_tbl_graph() %>% activate(edges)
-
-# gs <- pbapply::pblapply(unique(seg.hour$time), function(t) {
-# })
-# 
-set.seed(1234)
-t <- unique(seg.hour$time)[1]
-g <- ggraph(segg.hour, layout = 'kk') 
-
-g + geom_edge_fan() + 
-    scale_edge_colour_gradientn(colours = viridis::viridis(256, option = "A"), limit = c(0, 100)) +
-    geom_node_point(shape = 19) 
-
-## specify a x/y range for the cluster to look at
-lims <- list(x = c(50, 63), y = c(28, 45))
-
-ggplot(g$data, aes(x, y)) + geom_point() + xlim(lims$x) + ylim(lims$y)
-
-segs.keep <- g$data %>% 
-    filter(x > lims$x[1] & x < lims$x[2] & y > lims$y[1] & y < lims$y[2]) %>%
-    pluck("name")
-
-segs.g <- seg.hour %>% filter(segment_id %in% segs.keep) %>% as_tbl_graph() %>% activate(edges)
+segg.hour <- seg.hour %>% as_tbl_graph() %>% activate(edges)
 
 set.seed(1234)
-t <- unique(seg.hour$time)[1]
 for (t in unique(seg.hour$time)) {
-    gt <- ggraph(segs.g %>% filter(time == t), layout = "kk") + 
+    gt <- ggraph(segg.hour %>% filter(time == t), layout = "kk") + 
         geom_edge_fan(
             aes(color = speed_kf),
-            arrow = arrow(length = unit(2, 'mm')),
+            # arrow = arrow(length = unit(1, 'mm')),
+            width = 2,
             start_cap = circle(1, 'mm'),
             end_cap = circle(1, 'mm')) +
         scale_edge_colour_gradientn(colours = viridis::viridis(256, option = "A"), limit = c(0, 100)) +
-        geom_node_point(shape = 19)
+        geom_node_point(shape = 19, size = 1) +
+        ggtitle(t)
     dev.hold()
     print(gt)
     dev.flush()
