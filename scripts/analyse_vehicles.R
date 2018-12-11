@@ -1,9 +1,8 @@
 source("scripts/common.R")
 
-vid <- "5FBE"
 
 ## load vehicle sim data
-vdata <- 
+get_vehicle_data <- function(vid) {
     read_csv(
         file.path("simulations", "sim000", "history", sprintf("v%s_mutate.csv", vid)),
         col_names = c(
@@ -29,6 +28,21 @@ vdata <-
         timestamp = as.POSIXct(timestamp, origin = "1970-01-01"),
         event_type = factor(event_type, levels = c("initialize", "gps", "arrival", "departure"))
     )
+}
+
+vehicles <- list.files(file.path("simulations", "sim000", "history"), pattern = "v*_mutate.csv")
+vehicles <- gsub("^v|\\_mutate.csv", "", vehicles)
+
+draw <- function() {
+    vdata <- get_vehicle_data(vid <- sample(vehicles, 1)) %>% 
+        filter(!is.na(event_lat)) %>% arrange(timestamp)
+    ggplot(vdata, aes(event_lon, event_lat, group = trip_id)) +
+        geom_path() +
+        coord_fixed(ratio = 1.2) +
+        ggtitle(sprintf("Vehicle %s from %s - %s (%s obs)", 
+            vid, format(min(vdata$timestamp), "%T"), format(max(vdata$timestamp), "%T"), nrow(vdata)))
+}
+draw()
 
 ## compute dwell times
 
