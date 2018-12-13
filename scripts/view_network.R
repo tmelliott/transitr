@@ -239,6 +239,8 @@ segY <- seg.hour %>% spread(key = time, value = speed) %>% ungroup() %>%
 Y <- segY %>% select(-from, -to, -segment_id) %>% as.matrix
 X <- Y * NA
 
+## should flip Y -> [time x segment]
+
 generate_matrix <- function(x) {
     m <- Matrix(diag(nrow(x)), doDiag = FALSE)
     ## convert id to factor
