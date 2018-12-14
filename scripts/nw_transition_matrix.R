@@ -3,6 +3,7 @@ library(tidyverse)
 library(ggraph)
 library(tidygraph)
 library(Matrix)
+library(rjags)
 
 # 1. create a toy network
 segments <- 
@@ -68,25 +69,33 @@ for (i in 2:nrow(Y)) {
     Y[i, ] <- rnorm(ncol(Y), Y[i-1,], 0.5)
 }
 plotspeedmatrix(Y)
-apply(Y, 1, function(x) {
-    dev.hold()
-    print(drawnw(nwgraph, x))
-    dev.flush(dev.flush())
-    # Sys.sleep(1)
-})
+# apply(Y, 1, function(x) {
+#     dev.hold()
+#     print(drawnw(nwgraph, x))
+#     dev.flush(dev.flush())
+#     # Sys.sleep(1)
+# })
 
 ## we want to estimate p(F | mu, sigma, X, Y), assuming mu(t) = mu for all t
 X <- Y * NA
+F <- generate_matrix(segments)
 
-jags.data <- list(M = ncol(Y), T = nrow(Y), Y = Y)
+jags.data <- list(
+    M = ncol(Y), 
+    T = nrow(Y), 
+    Y = Y
+    # Fx = attr(F, "x"),
+    # Fp = attr(F, "p"), # the row indexes
+    # Fi = attr(F, "i"), # the column indexes
+    # NNZ = length(attr(F, "x"))
+)
 
-jags.fit <- jags.model('scripts/nw_model.jags', jags.data, n.chains = 4)
-fsamps <- coda.samples(jags.fit, c('sigma'), n.iter = 10000, thin = 10)
+jags.fit <- jags.model('scripts/nw_model.jags', jags.data, n.chains = 2)
+fsamps <- coda.samples(jags.fit, c('sigma', 'summu'), n.iter = 10000, thin = 10)
 summary(fsamps)
 
 plot(fsamps)
 
-F <- generate_matrix(segments)
 Q <- Matrix(diag(ncol(X)) * 10)  ## system noise
 R <- Matrix(diag(ncol(X)) * 5)   ## measurement error
 I <- Matrix(diag(ncol(X)))       ## an identity matrix

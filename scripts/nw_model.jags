@@ -2,6 +2,7 @@ model {
     sigma2 ~ dunif(0, 100)
     sigma <- pow(sigma2, 0.5)
     tau <- 1/sigma2
+
     for (m in 1:M) {
         mu[1,m] ~ dnorm(10, 0.01)
         for (t in 2:T) {
