@@ -1,13 +1,29 @@
 model {
-    sigma2 ~ dunif(0, 100)
+    sigma2 ~ dunif(0, 1000)
     sigma <- pow(sigma2, 0.5)
     tau <- 1/sigma2
 
+    q2 ~ dunif(0, 1000)
+    q <- pow(q2, 0.5)
+    iq <- 1/q
+
     for (m in 1:M) {
-        mu[1,m] ~ dnorm(10, 0.01)
-        for (t in 2:T) {
-            mu[t,m] ~ dnorm(mu[t-1,m], tau)
-            Y[t,m] ~ dnorm(mu[t,m], 100)
+        mu[m, 1] ~ dnorm(10, 1e-6)
+        X[m, 1] ~ dnorm(mu[m, 1], iq)
+        Y[m, 1] ~ dnorm(X[m, 1], tau)
+    }
+
+    for (t in 2:T) {
+        for (m in 1:M) {   
+            ## rows ind = Fp[m]+1 ... Fp[m+1]
+            ## cols Fs[ind]
+            mu[m, t] <- sum(alpha[(Fp[m]+1):(Fp[m+1])] * Y[Fi[(Fp[m]+1):(Fp[m+1])],t-1])
+            X[m, t] ~ dnorm(mu[m, t], iq) ## X <- AX + Q
+            Y[m, t] ~ dnorm(X[m, t], tau)
         }
+    }
+
+    for (i in 1:NNZ) {
+        alpha[i] ~ dnorm(1, 1e-6)
     }
 }
