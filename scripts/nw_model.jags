@@ -5,11 +5,12 @@ model {
 
     q2 ~ dunif(0, 1000)
     q <- pow(q2, 0.5)
-    iq <- 1/q
+    iq <- 1/q2
 
     for (m in 1:M) {
         mu[m, 1] ~ dnorm(10, 1e-6)
-        X[m, 1] ~ dnorm(mu[m, 1], iq)
+        X[m, 1] <- mu[m,1]
+        Xdot[m, 1] ~ dnorm(0, 1e2)
         Y[m, 1] ~ dnorm(X[m, 1], tau)
     }
 
@@ -17,13 +18,14 @@ model {
         for (m in 1:M) {   
             ## rows ind = Fp[m]+1 ... Fp[m+1]
             ## cols Fs[ind]
-            mu[m, t] <- sum(alpha[(Fp[m]+1):(Fp[m+1])] * Y[Fi[(Fp[m]+1):(Fp[m+1])],t-1])
-            X[m, t] ~ dnorm(mu[m, t], iq) ## X <- AX + Q
+            mu[m, t] <- sum(alpha[(Fp[m]+1):(Fp[m+1])] * Xdot[Fi[(Fp[m]+1):(Fp[m+1])],t-1])
+            Xdot[m, t] ~ dnorm(mu[m, t], iq)
+            X[m, t] <- X[m, t-1] + Xdot[m, t]
             Y[m, t] ~ dnorm(X[m, t], tau)
         }
     }
 
     for (i in 1:NNZ) {
-        alpha[i] ~ dnorm(1, 1e-6)
+        alpha[i] ~ dnorm(0, 1e-6)
     }
 }

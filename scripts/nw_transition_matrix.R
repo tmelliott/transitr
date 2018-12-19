@@ -3,7 +3,7 @@ library(tidyverse)
 library(ggraph)
 library(tidygraph)
 library(Matrix)
-#library(rjags)
+library(rjags)
 
 # 1. create a toy network
 segments <- 
@@ -54,20 +54,45 @@ library(mvtnorm)
 
 plotspeedmatrix <- function(x, fit) {
     colnames(x) <- paste0("seg", 1:ncol(x))
-    x %>% as.tibble %>% mutate(t = 1:n()) %>%
+    p <- x %>% as.tibble %>% mutate(t = 1:n()) %>%
         gather(key = "segment", value = "speed", -t) %>%
         ggplot(aes(t, speed, group = segment, color = segment)) +
-            geom_path()
+        ylim(range(x))
+    if (missing(fit)) return(p + geom_path())
+
+    ## fit should be a vector of values
+    Xhat <- fit[grep("^X", names(fit))]
+    Xhat <- t(matrix(Xhat, ncol = nrow(x)))
+    colnames(Xhat) <- colnames(x)
+    Xdf <- Xhat %>% as.tibble %>% mutate(t = 1:n()) %>%
+        gather(key = "segment", value = "speed", -t)
+    p + geom_path(lty = 2) +
+        geom_path(data = Xdf)
 }
 
 ### simulation 1: uncorrelated speeds
 ## cols: segments; rows: times
 set.seed(12345)
-Y <- matrix(NA, nrow = 100, ncol = 6)
-Y[1, ] <- c(10, 8, 20, 7, 12, 14)
-for (i in 2:nrow(Y)) {
-    Y[i, ] <- rnorm(ncol(Y), Y[i-1,], 0.5)
+X <- matrix(NA, nrow = 100, ncol = 6)
+Xdot <- X
+X[1, ] <- c(10, 8, 20, 7, 12, 14)
+Xdot[1, ]<- c(0.01, -0.05, -1, 0.05, 0, -0.02)/10
+F <- generate_matrix(segments)
+tF <- t(F)
+attr(tF, "x") <- c(
+    1, 0, 
+    0, 0.95, 0, 0.03, 0.02,
+    0.03, 0.97,
+    0, 1,
+    0.06, 0.9, 0.04,
+    0.01, 0.99
+)
+F <- t(tF)
+for (i in 2:nrow(X)) {
+    Xdot[i, ] <- rnorm(ncol(X), drop(F %*% Xdot[i-1,]), 0.002)
+    X[i, ] <- X[i-1, ] + Xdot[i, ]
 }
+for (i in 1:nrow(X)) Y[i, ] <- rnorm(ncol(X), X[i, ], 1)
 plotspeedmatrix(Y)
 # apply(Y, 1, function(x) {
 #     dev.hold()
@@ -91,15 +116,25 @@ jags.data <- list(
     NNZ = length(attr(tF, "x"))
 )
 
-jags.fit <- jags.model('scripts/nw_model.jags', jags.data, n.chains = 2)
-fsamps <- coda.samples(jags.fit, c('alpha', 'q2', 'sigma2'), n.iter = 10000, thin = 10)
+jags.fit <- jags.model('scripts/nw_model.jags', jags.data, 
+    n.chains = 2, n.adapt = 10000)
+fsamps <- coda.samples(jags.fit, c('X'), n.iter = 10000, thin = 10)
 summary(fsamps)
 
-o <- par(mfrow = c(3, 6))
-densplot(fsamps)
-par(o)
+asamps <- coda.samples(jags.fit, c('alpha'), n.iter = 10000, thin = 10)
+plot(asamps)
+
+# o <- par(mfrow = c(4, 6))
+# traceplot(fsamps)
+# par(o)
 
 ## extract a simulation and plot
+sm <- as.matrix(fsamps)
+for (i in 1:100) {
+    dev.hold()
+    print(plotspeedmatrix(Y, sm[sample(1:nrow(sm), 1), ]))
+    dev.flush()
+}
 
 
 
