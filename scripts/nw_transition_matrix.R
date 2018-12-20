@@ -4,6 +4,9 @@ library(ggraph)
 library(tidygraph)
 library(Matrix)
 library(rjags)
+library(RSQLite)
+library(dbplyr)
+
 
 # 1. create a toy network
 segments <- 
@@ -44,7 +47,10 @@ generate_matrix <- function(x) {
         if (length(toi) > 0) m[i, toi] <- 1
         if (length(fromi) > 0) m[i, fromi] <- 1
     }
-    sweep(m, 1, rowSums(m), "/")
+    diag(m) <- 0
+    m <- sweep(m, 1, 2 * rowSums(m), "/")
+    diag(m) <- 0.5
+    m
 }
 
 mat <- generate_matrix(segments)
@@ -92,15 +98,11 @@ for (i in 2:nrow(X)) {
     Xdot[i, ] <- rnorm(ncol(X), drop(F %*% Xdot[i-1,]), 0.002)
     X[i, ] <- X[i-1, ] + Xdot[i, ]
 }
+Y <- X * NA
 for (i in 1:nrow(X)) Y[i, ] <- rnorm(ncol(X), X[i, ], 1)
 plotspeedmatrix(Y)
-# apply(Y, 1, function(x) {
-#     dev.hold()
-#     print(drawnw(nwgraph, x))
-#     dev.flush(dev.flush())
-#     # Sys.sleep(1)
-# })
 
+# 2. use data ("speeds") to calculate coefficients
 ## we want to estimate p(F | mu, sigma, X, Y), assuming mu(t) = mu for all t
 X <- Y * NA
 F <- generate_matrix(segments)
@@ -118,63 +120,235 @@ jags.data <- list(
 
 jags.fit <- jags.model('scripts/nw_model.jags', jags.data, 
     n.chains = 2, n.adapt = 10000)
-fsamps <- coda.samples(jags.fit, c('X'), n.iter = 10000, thin = 10)
+fsamps <- coda.samples(jags.fit, 
+    c('alpha_raw', 'alpha', 'pr_alpha_zero', 'sigma', 'q'), 
+    n.iter = 1000, thin = 1)
 summary(fsamps)
 
-asamps <- coda.samples(jags.fit, c('alpha'), n.iter = 10000, thin = 10)
-plot(asamps)
-
-# o <- par(mfrow = c(4, 6))
-# traceplot(fsamps)
-# par(o)
+devAskNewPage(TRUE)
+plot(fsamps)
+devAskNewPage(FALSE)
 
 ## extract a simulation and plot
-sm <- as.matrix(fsamps)
+sm <- coda.samples(jags.fit, c('X'), n.iter = 1000, thin = 10) %>% 
+    as.matrix
 for (i in 1:100) {
     dev.hold()
     print(plotspeedmatrix(Y, sm[sample(1:nrow(sm), 1), ]))
     dev.flush()
 }
 
+Xsamps <- coda.samples(jags.fit, c('alpha'), n.iter = 10000, thin = 10)
+plot(asamps)
+
+
+### Use some real data!
+
+get_segment_data <- function(routes) {
+    con <- dbConnect(SQLite(), "fulldata.db")
+    on.exit(dbDisconnect(con))
+    if (missing(routes)) {
+        segments <- con %>% tbl("road_segments")
+    } else {
+        rids <- con %>% tbl("routes") %>%
+            filter(route_short_name %in% routes &
+                (route_long_name %like% "%To City%" |
+                 route_long_name %like% "%To Britomart%" |
+                 route_long_name %like% "%To Mayoral%" |
+                 route_long_name %like% "%To Auckland Universities%")) %>%
+            collect %>% pluck("route_id") %>% unique
+        sids <- con %>% tbl("trips") %>%
+            filter(route_id %in% rids) %>%
+            collect %>% pluck("shape_id") %>% unique
+        segids <- con %>% tbl("shape_segments") %>% 
+            filter(shape_id %in% sids) %>%
+            collect %>% pluck("road_segment_id") %>% unique
+        segments <- con %>% tbl("road_segments") %>%
+            filter(road_segment_id %in% segids)
+    }
+    intersections <- con %>% tbl("intersections")
+    segments <- segments %>% 
+        inner_join(intersections, by = c("int_from" = "intersection_id"), suffix = c("", "_start")) %>%
+        inner_join(intersections, by = c("int_to" = "intersection_id"), suffix = c("", "_end")) %>%
+        select(road_segment_id, length, intersection_lat, intersection_lon, intersection_lat_end, intersection_lon_end) %>%
+        collect
+    segments
+}
+
+read_segment_data <- function(sim) {
+    file.path("simulations", sim, "history") %>%
+        list.files(pattern = "segment_", full.names = TRUE) %>%
+        lapply(
+            read_csv, 
+            col_types = "ciid", 
+            col_names = 
+                c("segment_id", "timestamp", "travel_time", "error")
+        ) %>%
+        bind_rows() %>%
+        mutate(timestamp = as.POSIXct(timestamp, origin = "1970-01-01"))
+}
+
+## just segments of these routes
+segdata <- get_segment_data(c("27W", "27H", "22N", "22R", "22A"))
+segdata <- get_segment_data(c("NX1", "NX2", "82"))
+sids <- unique(segdata$road_segment_id)
+
+con <- dbConnect(SQLite(), "fulldata.db")
+seglens <- con %>% tbl("road_segments") %>% 
+    filter(road_segment_id %in% sids) %>%
+    select(road_segment_id, length, int_from, int_to) %>% collect %>%
+    mutate(road_segment_id = as.character(road_segment_id),
+           from = int_from, to = int_to)
+dbDisconnect(con)
+
+
+rawdata <- read_segment_data("sim000") %>% 
+    filter(segment_id %in% sids) %>%
+    left_join(seglens, by = c("segment_id" = "road_segment_id"))
+segg <- rawdata %>%
+    mutate(speed = length / travel_time) %>%
+    group_by(segment_id) %>% 
+        summarize(
+            speed = mean(speed) * 60 * 60 / 1000,
+            from = first(from), to = first(to)
+        ) %>%
+    as_tbl_graph()
+
+ggraph(segg, layout = 'kk') + 
+    geom_edge_fan(
+        aes(color = speed),
+        arrow = arrow(length = unit(1, 'mm')), 
+        start_cap = circle(1, 'mm'),
+        end_cap = circle(1, 'mm')) +
+    scale_edge_colour_gradientn(colours = viridis::viridis(256, option = "A"), limits = c(0, 100)) +
+    geom_node_point(shape = 19, size = 0.5)
+
+### by the hour (for now)
+discretise <- function(x, seconds = 3600) {
+    date <- as.integer(as.POSIXct(format(x$timestamp[1], "%Y-%m-%d 00:00:00")))
+    bins <- seq(5*60*60, 24*60*60, by = seconds)
+    ts <- as.integer(x$timestamp) - date
+    x$time <- cut(ts, breaks = bins, 
+        labels = as.POSIXct(date + bins[-length(bins)], origin = "1970-01-01") %>%
+            format("%T"))
+    x
+}
+
+seg.hour <- rawdata %>% discretise(60*15) %>%
+    mutate(speed = length / travel_time) %>%
+    group_by(segment_id, time) %>% 
+        summarize(
+            speed = mean(speed) * 60 * 60 / 1000,
+            from = first(from), to = first(to)
+        )
+segg.hour <- seg.hour %>% as_tbl_graph() %>% activate(edges)
+
+ggraph(segg.hour, layout = 'kk') + 
+    geom_edge_fan(aes(color = speed)) +
+    scale_edge_colour_gradientn(colours = viridis::viridis(256, option = "A"), limits = c(0, 100)) +
+    facet_wrap(~time)
+
+## Generate observation matrix
+segY <- seg.hour %>% spread(key = time, value = speed) %>% ungroup() %>%
+    mutate(segment_id = as.character(segment_id)) %>% arrange(segment_id)
+Y <- segY %>% select(-from, -to, -segment_id) %>% as.matrix
+
+segm <- segY %>% mutate(id = segment_id) %>% select(id, from, to)
+F <- generate_matrix(segm)
+tF <- t(F) ## flip to get row-major form, for easier manipulation 
+jags.data <- list(
+    M = nrow(Y), 
+    T = ncol(Y), 
+    Y = Y,
+    alpha = attr(tF, "x"),
+    Fp = attr(tF, "p"),     # the column indexes
+    Fi = attr(tF, "i") + 1 # the row indexes
+    # NNZ = length(attr(tF, "x"))
+)
+
+jags.fit <- jags.model('scripts/nw_model.jags', jags.data, 
+    n.chains = 1, n.adapt = 10000)
+fsamps <- coda.samples(jags.fit, 
+    c('sigma', 'q'), 
+    # c('alpha_raw', 'pr_alpha_zero', 'sigma', 'q'), 
+    n.iter = 10000, thin = 10)
+summary(fsamps)
+
+plot(fsamps)
+
+betas <- coda.samples(jags.fit, "beta", n.iter = 10000, thin = 10)
+Fhat <- tF
+attr(Fhat, "x") <- as.matrix(betas) %>% apply(1, median)
+Fhat <- t(Fhat)
+image(Fhat, cuts = 20, col.regions = viridis::viridis(21), 
+    colorkey = TRUE, lwd = 0)
 
 
 
-Q <- Matrix(diag(ncol(X)) * 10)  ## system noise
-R <- Matrix(diag(ncol(X)) * 5)   ## measurement error
-I <- Matrix(diag(ncol(X)))       ## an identity matrix
-
-
-
-
-xhat <- cbind(rep(10, ncol(X)))
-P <- Matrix(diag(ncol(X)) * 100, doDiag = FALSE)
-
-pb <- txtProgressBar(0, nrow(Y), style = 3)
-for (i in 1:nrow(Y)) {
-    ## predict
-    xhat <- as.matrix(F %*% xhat)
-    P <- F %*% P %*% t(F) + Q
-
-    ## update
-    y <- Y[i, ] - xhat
-    y[is.na(y)] <- 0
-    S <- R + P
-    K <- P %*% solve(S)
-    X[i, ] <- xhat <- xhat + as.matrix(K %*% y)
-    P <- (I - K) %*% P %*% t(I - K) + K %*% R %*% t(K)
-    setTxtProgressBar(pb, i)
-}; close(pb)
-
-
-drawnw(nwgraph, speeds[, 1])
-for (i in 1:nrow(X)) {
-    p <- drawnw(nwgraph, X[i, ])
+mb <- as.matrix(betas)
+tfhat <- t(F)
+for (i in sample(1:nrow(mb), 100)) {
+    attr(tfhat, "x") <- mb[i, ]
+    Fhat <- t(tfhat)
     dev.hold()
-    print(p)
+    print(image(Fhat, cuts = 20, col.regions = viridis::viridis(21), 
+        colorkey = TRUE, lwd = 0))
     dev.flush()
 }
 
-plotspeedmatrix(Y)
+devAskNewPage(TRUE)
+plot(betas)
+devAskNewPage(FALSE)
 
+Xsamps <- coda.samples(jags.fit, "X", n.iter = 1000)
 
-# 3. use data ("speeds") to calculate coefficients
+drawX <- function(x, d, t = "12:00:00") {
+    ## put x into a matrix
+    dx <- expand.grid(
+        segment_id = unique(d$segment_id), 
+        time = unique(d$time)
+    ) %>% 
+        as.tibble %>%
+        mutate(speed = x, segment_id = as.character(segment_id))
+    ds <- d %>% summarize(from = first(from), to = first(to))
+    g <- dx %>% left_join(ds) %>%
+        as_tbl_graph %>% activate(edges)
+    ggraph(g %>% filter(time == t), layout = 'kk') + 
+        geom_edge_fan(
+            aes(color = speed),
+            arrow = arrow(length = unit(1, 'mm')), 
+            edge_width = 1,
+            start_cap = circle(1, 'mm'),
+            end_cap = circle(1, 'mm')) +
+        scale_edge_colour_gradientn(
+            colours = viridis::viridis(256, option = "A"), 
+            limits = c(0, 100)
+        ) +
+        geom_node_point(shape = 19, size = 0.5)
+}
+
+Xm <- as.matrix(Xsamps)
+dev.flush(dev.flush())
+si <- sample(1:nrow(Xm), 1)
+for (t in sort(unique(seg.hour$time))) {
+    dev.hold()
+    print(drawX(Xm[si, ], seg.hour, t) + ggtitle(t))
+    dev.flush()
+}
+
+for (i in sample(1:nrow(Xm), 100)) {
+    Xmi <- expand.grid(
+            segment_id = sort(unique(seg.hour$segment_id)),
+            time = sort(unique(seg.hour$time))
+        ) %>%
+        as.tibble %>%
+        mutate(segment_id = as.character(segment_id)) %>%
+        left_join(seg.hour %>% summarize(from = first(from), to = first(to))) %>%
+        mutate(speed = Xm[i, ],
+            time = as.POSIXct(paste(Sys.Date(), time), origin = "1970-01-01"))
+    dev.hold()
+    print(ggplot(Xmi, aes(time, speed, group = segment_id)) +
+        geom_path(aes(colour = segment_id)) +
+        ylim(0, 100))
+    dev.flush(dev.flush())
+}
