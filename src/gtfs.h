@@ -67,13 +67,15 @@ namespace Gtfs
 
     struct par
     {
-        int n_particles = 1000;
         int n_core = 1;
-        float gps_error = 5;     // std. dev. of observation error
+        int n_particles = 1000;
         float system_noise = 5;  // std. dev. of speed variance/second
         float pr_stop = 0.5;
         float dwell_time = 10.0;
         float gamma = 5.0;
+        float gps_error = 5.0;   // std. dev. of observation error
+        float arrival_error = 5.0;
+        float departure_error = 5.0;
         bool save_timings = false;
         par () {}
         par (Rcpp::List parameters);
