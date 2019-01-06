@@ -1747,36 +1747,42 @@ namespace Gtfs
     par::par (Rcpp::List parameters)
     {
         // fetch the parameters
-        Rcpp::IntegerVector np = parameters["n_particles"];
         Rcpp::IntegerVector nc = parameters["n_core"];
-        Rcpp::NumericVector sigy = parameters["gps_error"];
+        Rcpp::IntegerVector np = parameters["n_particles"];
         Rcpp::NumericVector sigx = parameters["system_noise"];
         Rcpp::NumericVector prstop = parameters["pr_stop"];
         Rcpp::NumericVector dwell = parameters["dwell_time"];
         Rcpp::NumericVector gam = parameters["gamma"];
+        Rcpp::NumericVector sigy = parameters["gps_error"];
+        Rcpp::NumericVector siga = parameters["arrival_error"];
+        Rcpp::NumericVector sigd = parameters["departure_error"];
         Rcpp::LogicalVector tim = parameters["save_timings"];
 
         // set the parameters
-        n_particles = (int) np[0];
         n_core = (int) nc[0];
-        gps_error = (float) sigy[0];
+        n_particles = (int) np[0];
         system_noise = (float) sigx[0];
         pr_stop = (float) prstop[0];
         dwell_time = (float) dwell[0];
         gamma = (float) gam[0];
+        gps_error = (float) sigy[0];
+        arrival_error = (float) siga[0];
+        departure_error = (float) sigd[0];
         save_timings = (bool) tim[0];
     }
 
     void par::print ()
     {
         std::cout << "\n >>> Using the following parameters:"
-            << "\n - n_particles = " << n_particles
             << "\n - n_core = " << n_core
-            << "\n - gps_error = " << gps_error
+            << "\n - n_particles = " << n_particles
             << "\n - system_noise = " << system_noise
             << "\n - pr_stop = " << pr_stop
             << "\n - dwell_time = " << dwell_time
             << "\n - gamma = " << gamma
+            << "\n - gps_error = " << gps_error
+            << "\n - arrival_error = " << arrival_error
+            << "\n - departure_error = " << departure_error
             << "\n - save_timings = " << (save_timings ? "true" : "false")
             << "\n";
     }
@@ -1827,6 +1833,8 @@ namespace Gtfs
         _prstop = params->pr_stop;
         _dwelltime = params->dwell_time;
         _gamma = params->gamma;
+        _arrival_error = params->arrival_error;
+        _departure_error = params->departure_error;
         _N = params->n_particles;
     }
 
