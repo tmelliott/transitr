@@ -573,6 +573,10 @@ namespace Gtfs
             bool valid ();
             bool complete ();
 
+            unsigned short int vehicle_type ();
+            bool is_bus ();
+            bool is_train ();
+
             // statistics things
             void initialize (RNG& rng);
             void initialize (Event& e, RNG& rng);

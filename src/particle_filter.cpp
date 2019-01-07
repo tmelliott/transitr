@@ -9,6 +9,8 @@ namespace Gtfs {
     void Vehicle::initialize (Event& e, RNG& rng)
     {
         std::cout << "\n    -> initializing";
+        std::cout.flush ();
+
         initialize (rng);
         _timestamp = e.timestamp;
         _delta = 0;
@@ -103,9 +105,14 @@ namespace Gtfs {
 
     void Vehicle::initialize (RNG& rng)
     {
+        std::cout << " (1a) ";
+        std::cout.flush ();
         _state.clear ();
         _state.reserve (_N);
         resample_count = 0;
+
+        std::cout << " (1b) ";
+        std::cout.flush ();
 
         if (_trip == nullptr || _trip->shape () == nullptr) return;
 
@@ -119,8 +126,14 @@ namespace Gtfs {
         _segment_travel_times.clear ();
         _stop_arrival_times.clear ();
 
+        std::cout << " (1c) ";
+        std::cout.flush ();
+
         _segment_travel_times.resize (_trip->shape ()->segments ().size (), 0);
         _stop_arrival_times.resize (_trip->stops ().size (), 0);
+
+        std::cout << " (1d - end) ";
+        std::cout.flush ();
     }
 
     void Vehicle::mutate (RNG& rng, Gtfs* gtfs)
@@ -139,6 +152,7 @@ namespace Gtfs {
             time_events.at (current_event_index - 1).print ();
         }
         else std::cout << "uninitialized]";
+        std::cout.flush ();
 
         // repeat until there are no more events
         while (current_event_index < time_events.size ())
@@ -178,9 +192,20 @@ namespace Gtfs {
                 throw std::runtime_error ("Trip not found");
             }
 
-            std::cout << std::endl << "    [" << e.timestamp << "] "
-                << _trip->route ()->route_short_name ()
-                << " (" << _trip->stops ().at (0).departure_time << "): ";
+            std::cout 
+                << std::endl << "    [" << e.timestamp << "] "
+                << _trip->route ()->route_short_name ();
+            if (_trip->stops ().size () == 0)
+            {
+                std::cout << " -> has no stops ... :/";
+            }
+            else
+            {
+                std::cout 
+                    << " (" << _trip->stops ().at (0).departure_time 
+                    << ", " << _trip->stops ().size () << " stops"
+                    << "): ";
+            }
             e.print ();
 
             // is the event "bad"?
@@ -226,11 +251,14 @@ namespace Gtfs {
                     << " stops " << " (d = " 
                     << _trip->stops ().at (_stop_index).distance << "m)";
             }
+            std::cout.flush ();
 
             mutate_to (e, rng);
+            std::cout.flush ();
 
             // if the current iteration fails, start again from here
             if (bad_sample) initialize (e, rng);
+            std::cout.flush ();
 
             {
                 std::cout << "\n    ** estimating travel times";
@@ -315,20 +343,28 @@ namespace Gtfs {
 
     void Vehicle::mutate_to (Event& e, RNG& rng)
     {
+        std::cout << "(1)";
+        std::cout.flush();
         if (_newtrip || bad_sample)
         {
             initialize (e, rng);
             return;
         }
+        std::cout << "(2)";
+        std::cout.flush();
 
         bad_sample = true;
 
         _delta = e.timestamp - _timestamp;
         _timestamp = e.timestamp;
 
+        std::cout << "(3) -> delta = " << _delta;
+        std::cout.flush();
+
         // move the particles
         if (_complete || !valid () || _delta == 0) return;
         std::cout << "\n     + " << _delta << " seconds";
+        std::cout.flush ();
 
         bool all_complete = true;
         double dbar = 0.0, vbar = 0.0, 

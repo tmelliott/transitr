@@ -1882,7 +1882,9 @@ namespace Gtfs
             //     << _trip->route ()->route_short_name ()
             //     << " (" << _trip->route ()->route_long_name () << ")";
             // exiting trip is "completed" (and forgets vehicle)
+            std::cout << " (x) ";
             _trip->complete ();
+            std::cout << " () " << std::endl;
             // if (trip)
             // {
             //     std::cout << " -> " << trip->route ()->route_short_name ()
@@ -2105,6 +2107,22 @@ namespace Gtfs
     bool Vehicle::complete ()
     {
         return _complete;
+    }
+
+    unsigned short int Vehicle::vehicle_type ()
+    {
+        // somehow fetch the vehicle type from the database
+        return _trip->route ()->route_type ();
+    }
+
+    bool Vehicle::is_bus ()
+    {
+        return vehicle_type () == 3;
+    }
+
+    bool Vehicle::is_train ()
+    {
+        return vehicle_type () == 2;
     }
 
     float Vehicle::gps_error ()
