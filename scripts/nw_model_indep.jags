@@ -1,0 +1,38 @@
+model {
+    sigma2 ~ dunif(0, 1000)
+    sigma <- pow(sigma2, 0.5)
+    tau <- 1/sigma2
+
+    q2 ~ dunif(0, 1000)
+    q <- pow(q2, 0.5)
+    iq <- 1/q2
+
+    for (m in 1:M) {
+        mu[m, 1] ~ dnorm(10, 1e-6)
+        X[m, 1] <- mu[m,1]
+        Xdot[m, 1] ~ dnorm(0, 1e2)
+        Y[m, 1] ~ dnorm(X[m, 1], tau)
+
+        ## Dirichlet prior on betas
+        beta[(Fp[m]+1):(Fp[m+1])] ~ ddirch(alpha[(Fp[m]+1):(Fp[m+1])])
+    }
+
+    for (t in 2:T) {
+        for (m in 1:M) {   
+            ## rows ind = Fp[m]+1 ... Fp[m+1]
+            ## cols Fs[ind]
+            mu[m, t] <- sum(beta[(Fp[m]+1):(Fp[m+1])] * 
+                Xdot[Fi[(Fp[m]+1):(Fp[m+1])],t-1])
+            Xdot[m, t] ~ dnorm(mu[m, t], iq)
+            X[m, t] <- X[m, t-1] + Xdot[m, t]
+            Y[m, t] ~ dnorm(X[m, t], tau)
+        }
+    }
+
+    #for (i in 1:NNZ) {
+        #beta[i] ~ dunif(0, 1)
+        #pr_alpha_zero[i] ~ dbeta(0.5, 0.5)
+        #alpha_zero[i] ~ dbin(pr_alpha_zero[i], 1)
+        #alpha[i] <- ifelse(alpha_zero[i] == 1, 0, alpha_raw[i])
+    #}
+}

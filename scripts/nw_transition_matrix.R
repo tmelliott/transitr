@@ -34,8 +34,9 @@ drawnw <- function(nw, speeds = 10, .seed = 1234) {
 drawnw(nwgraph)
 
 # 2. generate matrix
-generate_matrix <- function(x) {
+generate_matrix <- function(x, deg = 1) {
     m <- Matrix(diag(nrow(x)), doDiag = FALSE)
+    if (deg == 0) return(m)
     ## convert id to factor
     x$id <- as.integer(as.factor(x$id))
     ids <- unique(c(x$from, x$to))
@@ -139,7 +140,7 @@ for (i in 1:100) {
 }
 
 Xsamps <- coda.samples(jags.fit, c('alpha'), n.iter = 10000, thin = 10)
-plot(asamps)
+plot(Xsamps)
 
 
 ### Use some real data!
@@ -254,7 +255,7 @@ segY <- seg.hour %>% spread(key = time, value = speed) %>% ungroup() %>%
 Y <- segY %>% select(-from, -to, -segment_id) %>% as.matrix
 
 segm <- segY %>% mutate(id = segment_id) %>% select(id, from, to)
-F <- generate_matrix(segm)
+F <- generate_matrix(segm, 0)
 tF <- t(F) ## flip to get row-major form, for easier manipulation 
 jags.data <- list(
     M = nrow(Y), 
