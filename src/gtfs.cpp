@@ -13,7 +13,7 @@ namespace Gtfs
     /***************************************************** GTFS */
     Gtfs::Gtfs (std::string& name) : _dbname (name), _startdate (time (0))
     {
-        Rcpp::Rcout << "Connected to GTFS database `"
+        std::cout << "Connected to GTFS database `"
             << _dbname << "`\n\n"
             << " *** creating templates\n";
 
@@ -64,7 +64,7 @@ namespace Gtfs
                                    std::forward_as_tuple (aid, this));
             }
             sqlite3_finalize (stmt);
-            Rcpp::Rcout << " + Created " << _agencies.size () << " agencies\n";
+            std::cout << " + Created " << _agencies.size () << " agencies\n";
         }
         // load ROUTES
         {
@@ -100,7 +100,7 @@ namespace Gtfs
                                  std::forward_as_tuple (rid, this));
             }
             sqlite3_finalize (stmt);
-            Rcpp::Rcout << " + Created " << _routes.size () << " routes\n";
+            std::cout << " + Created " << _routes.size () << " routes\n";
         }
         // load TRIPS
         {
@@ -136,7 +136,7 @@ namespace Gtfs
                                  std::forward_as_tuple (tid, this));
             }
             sqlite3_finalize (stmt);
-            Rcpp::Rcout << " + Created " << _trips.size () << " trips\n";
+            std::cout << " + Created " << _trips.size () << " trips\n";
         }
         // load SHAPES
         {
@@ -172,7 +172,7 @@ namespace Gtfs
                                  std::forward_as_tuple (sid, this));
             }
             sqlite3_finalize (stmt);
-            Rcpp::Rcout << " + Created " << _shapes.size () << " shapes\n";
+            std::cout << " + Created " << _shapes.size () << " shapes\n";
         }
         // load SEGMENTS
         {
@@ -208,7 +208,7 @@ namespace Gtfs
                                     std::forward_as_tuple (sid, this));
             }
             sqlite3_finalize (stmt);
-            Rcpp::Rcout << " + Created " << _segments.size () << " segments\n";
+            stc::cout << " + Created " << _segments.size () << " segments\n";
         }
         // load INTERSECTIONS
         {
@@ -244,7 +244,7 @@ namespace Gtfs
                                         std::forward_as_tuple (iid, this));
             }
             sqlite3_finalize (stmt);
-            Rcpp::Rcout << " + Created " << _intersections.size () << " intersections\n";
+            std::cout << " + Created " << _intersections.size () << " intersections\n";
         }
         // load STOPS
         {
@@ -280,7 +280,7 @@ namespace Gtfs
                                  std::forward_as_tuple (sid, this));
             }
             sqlite3_finalize (stmt);
-            Rcpp::Rcout << " + Created " << _stops.size () << " stops\n";
+            std::cout << " + Created " << _stops.size () << " stops\n";
         }
         // load CALENDAR
         {
@@ -316,7 +316,7 @@ namespace Gtfs
                                    std::forward_as_tuple (cid, this));
             }
             sqlite3_finalize (stmt);
-            Rcpp::Rcout << " + Created " << _calendar.size () << " services\n";
+            std::cout << " + Created " << _calendar.size () << " services\n";
         }
 
         close_connection ();    
@@ -351,7 +351,7 @@ namespace Gtfs
             maxTries--;
             std::this_thread::sleep_for (std::chrono::milliseconds (100));
         }
-        Rcpp::Rcout << "\n max tries exceeded\n";
+        std::cout << "\n max tries exceeded\n";
         return nullptr;
     }
 
@@ -849,6 +849,7 @@ namespace Gtfs
 
     void Trip::unload (bool complete)
     {
+        if (!loaded) return;
         std::lock_guard<std::mutex> lk (load_mutex);
         
         completed = complete;
@@ -860,7 +861,7 @@ namespace Gtfs
         _block_id = "";
         _trip_headsign = "";
         _vehicle = nullptr;
-        Rcpp::Rcout << " + Trip " << _trip_id << " is unloaded\n";
+        std::cout << " + Trip " << _trip_id << " is unloaded" << std::endl;
     }
 
     void Trip::complete ()
@@ -1113,7 +1114,7 @@ namespace Gtfs
         loaded = false;
         _path.clear ();
         _segments.clear ();
-        Rcpp::Rcout << " + Shape " << _shape_id << " is unloaded\n";
+        std::cout << " + Shape " << _shape_id << " is unloaded\n";
     }
 
     std::string& Shape::shape_id () { 
@@ -1521,7 +1522,7 @@ namespace Gtfs
         _zone_id = "";
         _parent_station = "";
         _trips.clear ();
-        Rcpp::Rcout << " + Stop " << _stop_id << " is unloaded\n";
+        std::cout << " + Stop " << _stop_id << " is unloaded\n";
     }
 
     std::string& Stop::stop_id () {
@@ -1673,7 +1674,7 @@ namespace Gtfs
         loaded = false;
         _start_date = "";
         _end_date = "";
-        Rcpp::Rcout << " + Calendar " << _service_id << " is unloaded\n";
+        std::cout << " + Calendar " << _service_id << " is unloaded\n";
     }
 
     std::string& Calendar::service_id () { 

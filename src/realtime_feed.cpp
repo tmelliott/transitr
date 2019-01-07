@@ -244,7 +244,6 @@ void write_vehicles (Gtfs::vehicle_map* vehicles, std::string& file)
 
         // Stop Time Events
         Gtfs::etavector etas (v->second.get_etas ());
-        std::cout.flush ();
         for (int si=0; si<etas.size (); ++si)
         {
             transit_realtime::TripUpdate::StopTimeUpdate* stu = tu->add_stop_time_update ();
