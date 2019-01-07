@@ -255,7 +255,22 @@ segY <- seg.hour %>% spread(key = time, value = speed) %>% ungroup() %>%
 Y <- segY %>% select(-from, -to, -segment_id) %>% as.matrix
 
 segm <- segY %>% mutate(id = segment_id) %>% select(id, from, to)
-F <- generate_matrix(segm, 0)
+
+## independent version
+F <- generate_matrix(segm, 0) %>% diag()
+jags.data <- list(
+    M = nrow(Y),
+    T = ncol(Y),
+    Y = Y,
+    alpha = F
+)
+
+
+
+
+## non-independence version
+F <- generate_matrix(segm)
+
 tF <- t(F) ## flip to get row-major form, for easier manipulation 
 jags.data <- list(
     M = nrow(Y), 
