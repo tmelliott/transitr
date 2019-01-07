@@ -208,7 +208,7 @@ namespace Gtfs
                                     std::forward_as_tuple (sid, this));
             }
             sqlite3_finalize (stmt);
-            stc::cout << " + Created " << _segments.size () << " segments\n";
+            std::cout << " + Created " << _segments.size () << " segments\n";
         }
         // load INTERSECTIONS
         {
