@@ -14,28 +14,29 @@ done
 SCRIPTDIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
 PKGDIR="$( cd $SCRIPTDIR && cd ../../ && pwd )"
 
+CDIR=$( pwd )
+cd $PKGDIR
+
 ## check for updates
-( cd $PKGDIR && git fetch )
+git fetch
 
 UPSTREAM=${1:-'@{u}'}
-LOCAL=$(cd $PKGDIR && git rev-parse @)
-REMOTE=$(cd $PKGDIR && git rev-parse "$UPSTREAM")
-BASE=$(cd $PKGDIR && git merge-base @ "$UPSTREAM")
+LOCAL=$(git rev-parse @)
+REMOTE=$(git rev-parse "$UPSTREAM")
+BASE=$(git merge-base @ "$UPSTREAM")
 
 if [ $LOCAL = $REMOTE ]; then
     echo "Up-to-date"
 elif [ $LOCAL = $BASE ]; then
     echo "Updating ..."
-    $(cd $PKGDIR && git pull)
-    $(cd $PKGDIR && make clean install)
+    git pull
+    make clean install
 else
     echo "You've doen something ... please fix!"
     exit 1
 fi
 
 ## Up-to-date ... launch program
-CDIR=$( pwd )
-cd $PKGDIR
 
 ## check for existing one
 if [ -f .running_pid ]; then
