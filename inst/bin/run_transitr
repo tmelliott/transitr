@@ -22,7 +22,6 @@ LOCAL=$(cd $PKGDIR && git rev-parse @)
 REMOTE=$(cd $PKGDIR && git rev-parse "$UPSTREAM")
 BASE=$(cd $PKGDIR && git merge-base @ "$UPSTREAM")
 
-ISOK=0
 if [ $LOCAL = $REMOTE ]; then
     echo "Up-to-date"
 elif [ $LOCAL = $BASE ]; then
