@@ -36,6 +36,7 @@ Suggests:
     covr
 LinkingTo: 
     Rcpp, 
+    RcppThread,
     BH,
     testthat
 RoxygenNote: 6.1.0.9000

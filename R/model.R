@@ -32,6 +32,6 @@ model <- function(nw) {
 #' @export
 set_parameters <- function(nw, ...) {
     pars <- list(...)
-    nw$parameters <- modifyList(nw$parameters, pars)
+    nw$parameters <- utils::modifyList(nw$parameters, pars)
     nw
 }

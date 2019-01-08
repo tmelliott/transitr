@@ -8,7 +8,7 @@ construct_network <- function(nw) {
     ## For each route ...
     routes <- RSQLite::dbGetQuery(con, "SELECT route_id FROM routes")
 
-    pb <- txtProgressBar(0, nrow(routes), style = 3)
+    pb <- utils::txtProgressBar(0, nrow(routes), style = 3)
     for (route in routes$route_id) {
         pb$up(pb$getVal() + 1)
         

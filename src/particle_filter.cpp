@@ -9,6 +9,7 @@ namespace Gtfs {
     void Vehicle::initialize (Event& e, RNG& rng)
     {
         std::cout << "\n    -> initializing";
+
         initialize (rng);
         _timestamp = e.timestamp;
         _delta = 0;
@@ -119,6 +120,7 @@ namespace Gtfs {
         _segment_travel_times.clear ();
         _stop_arrival_times.clear ();
 
+
         _segment_travel_times.resize (_trip->shape ()->segments ().size (), 0);
         _stop_arrival_times.resize (_trip->stops ().size (), 0);
     }
@@ -178,9 +180,19 @@ namespace Gtfs {
                 throw std::runtime_error ("Trip not found");
             }
 
-            std::cout << std::endl << "    [" << e.timestamp << "] "
-                << _trip->route ()->route_short_name ()
-                << " (" << _trip->stops ().at (0).departure_time << "): ";
+            std::cout << "\n    [" << e.timestamp << "] "
+                << _trip->route ()->route_short_name ();
+            if (_trip->stops ().size () == 0)
+            {
+                std::cout << " -> has no stops ... :/";
+            }
+            else
+            {
+                std::cout 
+                    << " (" << _trip->stops ().at (0).departure_time 
+                    << ", " << _trip->stops ().size () << " stops"
+                    << "): ";
+            }
             e.print ();
 
             // is the event "bad"?
@@ -246,7 +258,6 @@ namespace Gtfs {
                 std::vector<ShapeSegment>& segs = _trip->shape ()->segments ();
                 std::cout << " -> from stop "
                     << _current_segment << " to stop ";
-                std::cout.flush ();
                 int m = find_stop_index (dmin, &(_trip->stops ()));
                 std::cout << m;
                 //  << "; of "
@@ -255,7 +266,6 @@ namespace Gtfs {
 
                 // int l = find_segment_index (dmin, &segs);
                 // std::cout << l;
-                // std::cout.flush ();
 
                 // update segment travel times for intermediate ones ...
                 double tt, ttp, err;

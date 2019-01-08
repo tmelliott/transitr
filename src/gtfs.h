@@ -15,6 +15,9 @@
 #include "vendor/sqlite3/sqlite3.h"
 #include <Rcpp.h>
 
+#define RCPPTHREAD_OVERRIDE_COUT 1
+#include "RcppThread.h"
+
 #ifndef VERBOSE
 #define VERBOSE 1
 #endif
@@ -572,6 +575,10 @@ namespace Gtfs
             void update (Gtfs* gtfs); // move new_events -> time_events, validate, etc
             bool valid ();
             bool complete ();
+
+            unsigned short int vehicle_type ();
+            bool is_bus ();
+            bool is_train ();
 
             // statistics things
             void initialize (RNG& rng);
