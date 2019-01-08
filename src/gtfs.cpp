@@ -861,7 +861,7 @@ namespace Gtfs
         _block_id = "";
         _trip_headsign = "";
         _vehicle = nullptr;
-        std::cout << " + Trip " << _trip_id << " is unloaded" << std::endl;
+        std::cout << " + Trip " << _trip_id << " is unloaded\n";
     }
 
     void Trip::complete ()

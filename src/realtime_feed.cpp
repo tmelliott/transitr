@@ -264,7 +264,7 @@ void write_vehicles (Gtfs::vehicle_map* vehicles, std::string& file)
     std::fstream output (file.c_str (), std::ios::out | std::ios::trunc | std::ios::binary);
     if (!feed.SerializeToOstream (&output)) 
     {
-        std::cerr << "\n x Failed to write feed to `" << file << "`\n";
+        Rcpp::Rcerr << "\n x Failed to write feed to `" << file << "`\n";
     }
 
 }

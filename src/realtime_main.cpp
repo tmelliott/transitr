@@ -1,11 +1,12 @@
-// [[Rcpp::plugins("cpp11")]]
-
 #include <vector>
 
 #include "realtime_feed.h"
 
 #include <Rcpp.h>
 #include "vendor/sqlite3/sqlite3.h"
+
+#define RCPPTHREAD_OVERRIDE_COUT 1
+#include "RcppThread.h"
 
 #include <chrono>
 #include <thread>
@@ -34,9 +35,9 @@ void run_realtime_model (List nw)
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
 #if USE_HAVERSINE
-    Rcout << "\nNOTE: using Haversine distance formula, which is slower but more accurate.\n\n";
+    std::cout << "\nNOTE: using Haversine distance formula, which is slower but more accurate.\n\n";
 #else
-    Rcout << "\nNOTE: using Equirectangular approxmiation distance formula, which is faster but less accurate.\n\n";
+    std::cout << "\nNOTE: using Equirectangular approxmiation distance formula, which is faster but less accurate.\n\n";
 #endif
 
     // Process nw components into c++ things

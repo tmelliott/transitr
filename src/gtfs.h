@@ -15,6 +15,9 @@
 #include "vendor/sqlite3/sqlite3.h"
 #include <Rcpp.h>
 
+#define RCPPTHREAD_OVERRIDE_COUT 1
+#include "RcppThread.h"
+
 #ifndef VERBOSE
 #define VERBOSE 1
 #endif
