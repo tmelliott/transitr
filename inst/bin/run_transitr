@@ -32,7 +32,7 @@ elif [ $LOCAL = $BASE ]; then
     git pull
     make clean install
 else
-    echo "You've doen something ... please fix!"
+    echo "You've done something ... please fix!"
     exit 1
 fi
 
