@@ -36,7 +36,7 @@ namespace Gtfs {
         xhat = res.first;
         Phat = res.second;
 
-#if VERBOSE == 1
+#if VERBOSE > 1
         std::cout << "\n + Segment " << _segment_id << " >> "
             << "[" << xhat << ", " << Phat << "] >> ";
 #endif
@@ -48,7 +48,7 @@ namespace Gtfs {
             double Z = pow(Phat, -1);
             double z = xhat * Z;
 
-#if VERBOSE == 1
+#if VERBOSE > 1
             std::cout << "(";
 #endif
             double I = std::accumulate (_data.begin (), _data.end (), 0.0, 
@@ -62,7 +62,7 @@ namespace Gtfs {
 #endif
                                             return a + (double) b.first * pow (b.second, -1);
                                         });
-#if VERBOSE == 1
+#if VERBOSE > 1
             std::cout << ") >> { "
                 << I << ", " << i << " } >> ";
 #endif
@@ -75,7 +75,7 @@ namespace Gtfs {
             xhat = z * Phat;
         }
 
-#if VERBOSE == 1
+#if VERBOSE > 1
         std::cout << "[" << xhat << ", " << Phat << "]";
 #endif
 

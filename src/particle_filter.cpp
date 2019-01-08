@@ -8,7 +8,7 @@ namespace Gtfs {
 
     void Vehicle::initialize (Event& e, RNG& rng)
     {
-#if VERBOSE == 1
+#if VERBOSE > 1
         std::cout << "\n    -> initializing";
 #endif
 
@@ -130,13 +130,13 @@ namespace Gtfs {
     void Vehicle::mutate (RNG& rng, Gtfs* gtfs)
     {
         int nnew = time_events.size () - current_event_index;
-#if VERBOSE == 1
+#if VERBOSE > 1
         std::cout << "\n\n+ vehicle " << _vehicle_id << ": "       
             << nnew << " new events";
 #endif
         if (nnew == 0) return;
 
-#if VERBOSE == 1
+#if VERBOSE > 1
         std::cout << "\n    [";
         if (_timestamp > 0 && current_event_index > 0) 
         {
@@ -186,7 +186,7 @@ namespace Gtfs {
                 throw std::runtime_error ("Trip not found");
             }
 
-#if VERBOSE == 1
+#if VERBOSE > 1
             std::cout << "\n    [" << e.timestamp << "] "
                 << _trip->route ()->route_short_name ();
             if (_trip->stops ().size () == 0)
@@ -213,7 +213,7 @@ namespace Gtfs {
                         double dist = _trip->shape ()->distance_of (e.position);
                         latlng coord = _trip->shape ()->coordinates_of (dist);
                         dist_to_route = distanceEarth (e.position, coord);
-#if VERBOSE == 1
+#if VERBOSE > 1
                         std::cout << " -> distance to route = " << dist_to_route << "m";
 #endif
                         if (dist_to_route > 50)
@@ -244,7 +244,7 @@ namespace Gtfs {
             {
                 _stop_index = e.stop_index;
                 // ----------------------------------- CHECK STOP INDEX
-#if VERBOSE == 1
+#if VERBOSE > 1
                 std::cout << " - there are " << _trip->stops ().size () 
                     << " stops " << " (d = " 
                     << _trip->stops ().at (_stop_index).distance << "m)";
@@ -257,7 +257,7 @@ namespace Gtfs {
             if (bad_sample) initialize (e, rng);
 
             {
-#if VERBOSE == 1
+#if VERBOSE > 1
                 std::cout << "\n    ** estimating travel times";
 #endif
                 // NETWORK STUFF
@@ -270,12 +270,12 @@ namespace Gtfs {
                     }
                 }
                 std::vector<ShapeSegment>& segs = _trip->shape ()->segments ();
-#if VERBOSE == 1
+#if VERBOSE > 1
                 std::cout << " -> from stop "
                     << _current_segment << " to stop ";
 #endif
                 int m = find_stop_index (dmin, &(_trip->stops ()));
-#if VERBOSE == 1
+#if VERBOSE > 1
                 std::cout << m;
 #endif
                 //  << "; of "
@@ -356,7 +356,7 @@ namespace Gtfs {
 
         // move the particles
         if (_complete || !valid () || _delta == 0) return;
-#if VERBOSE == 1
+#if VERBOSE > 1
         std::cout << "\n     + " << _delta << " seconds";
 #endif
 
@@ -366,7 +366,7 @@ namespace Gtfs {
             dtbar = 0;
         for (auto& p : _state)
         {
-#if VERBOSE == 1
+#if VERBOSE > 1
             if (_N < 20)
                 std::cout << "\n      [" << p.get_distance () 
                     << ", " << p.get_speed ()
@@ -380,14 +380,14 @@ namespace Gtfs {
 
             if (p.is_complete ()) 
             {
-#if VERBOSE == 1
+#if VERBOSE > 1
                 if (_N < 20) std::cout << " -> complete";
 #endif
                 continue;
             }
             // if any aren't complete, prevent vehicle from finishing trip
             all_complete = false;
-#if VERBOSE == 1
+#if VERBOSE > 1
             if (_N < 20)
                 std::cout << " -> [" << p.get_distance () 
                     << ", " << p.get_speed () 
@@ -420,13 +420,13 @@ namespace Gtfs {
                     break;
             }
 
-#if VERBOSE == 1
+#if VERBOSE > 1
             if (_N < 20)
                 std::cout << " => l(Y|Xi) = " << exp (p.get_ll ());
 #endif
         }
 
-#if VERBOSE == 1
+#if VERBOSE > 1
         std::cout << "\n    =========================================================================\n"
             << "      [" << dbar << ", " << vbar << "] -> "
             << "[" << dbar2 << ", " << vbar2<< "] => ";
@@ -479,7 +479,7 @@ namespace Gtfs {
         }
 #endif
 
-#if VERBOSE == 1
+#if VERBOSE > 1
         std::cout << "\n   -> sum(l(y|x)) = " << sumlh;
 #endif
         // if no likelihoods are that big, give up
@@ -535,7 +535,7 @@ namespace Gtfs {
             }
         }
 
-#if VERBOSE == 1
+#if VERBOSE > 1
         std::cout << "\n         => Posterior: ["
             << dbar << ", " << vbar << "] => ";
         switch (e.type)
@@ -567,7 +567,7 @@ namespace Gtfs {
                                         });
 
         _Neff = pow (sumwt2, -1);
-#if VERBOSE == 1
+#if VERBOSE > 1
         std::cout << "\n   -> Neff = " << _Neff;
 #endif
 
@@ -595,7 +595,7 @@ namespace Gtfs {
 
         if (_Neff >= (_N / 4) || _complete) return;
 
-#if VERBOSE == 1
+#if VERBOSE > 1
         std::cout << " -> resampling";
 #endif
         select (rng);
@@ -1137,7 +1137,7 @@ namespace Gtfs {
 
         if (t == 0) 
         {
-#if VERBOSE == 1
+#if VERBOSE > 1
             if (vehicle->get_n () < 20)
                 std::cout << " => hasn't "
                     << (e.type == EventType::arrival ? "arrived" : "departed");
@@ -1147,7 +1147,7 @@ namespace Gtfs {
         }
 
         int tdiff = t - e.timestamp;
-#if VERBOSE == 1
+#if VERBOSE > 1
         if (vehicle->get_n () < 20)
             std::cout << " => "
                 << (e.type == EventType::arrival ? "arrived" : "departed")
