@@ -25,11 +25,6 @@ before_install:
   - sudo apt-get install g++-4.9 -y
   - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.9 100
 
-script:
-- R CMD INSTALL .
-- R CMD build .
-- R CMD check *tar.gz
-
 after_success:
   - Rscript -e 'covr::codecov()'
 
