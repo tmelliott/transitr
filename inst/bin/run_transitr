@@ -1,0 +1,40 @@
+#!/bin/bash
+
+## config
+AUTOUPDATE=true
+Rcmd="$(which R) --slave"
+
+## script directory
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+done
+SCRIPTDIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+PKGDIR="$( cd $SCRIPTDIR && cd ../../ && pwd )"
+
+## check for updates
+# ( cd $PKGDIR && git status )
+
+UPSTREAM=${1:-'@{u}'}
+LOCAL=$(cd $PKGDIR && git rev-parse @)
+REMOTE=$(cd $PKGDIR && git rev-parse "$UPSTREAM")
+BASE=$(cd $PKGDIR && git merge-base @ "$UPSTREAM")
+
+ISOK=0
+if [ $LOCAL = $REMOTE ]; then
+    echo "Up-to-date"
+elif [ $LOCAL = $BASE ]; then
+    echo "Updating ..."
+    $(cd $PKGDIR && git pull)
+    $(cd $PKGDIR && make clean install)
+else
+    echo "You've doen something ... please fix!"
+    exit 1
+fi
+
+## Up-to-date ... launch program
+cd $PKGDIR && $Rcmd -f scripts/run_model.R
+
+exit 0
