@@ -75,6 +75,7 @@ void run_realtime_model (List nw)
 
     // Allow the program to be stopped gracefully    
     signal (SIGINT, intHandler);
+    signal (SIGTERM, intHandler);
     Timer timer;
     if (params.save_timings) {
         timer.save_to ("timings.csv", "iteration,timestamp,nvehicles");
