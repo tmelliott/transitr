@@ -1338,6 +1338,11 @@ namespace Gtfs
         return _uncertainty;
     }
 
+    std::vector<std::pair<int, double> >& Segment::get_data ()
+    {
+        return _data;
+    }
+
     void Segment::push_data (int time, double err, uint64_t ts)
     {
         if (!loaded) load ();

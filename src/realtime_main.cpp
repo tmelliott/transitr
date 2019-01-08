@@ -160,6 +160,27 @@ void run_realtime_model (List nw)
         Rcout << "\n\n";
         timer.report ("updating vehicle states");
 
+#if SIMULATION
+        {
+            std::ofstream fout;
+            fout.open ("segment_observations.csv", std::ofstream::app);
+            // fout << "segment_id,timestamp,travel_time,uncertainty\n";
+            for (auto sl = gtfs.segments ().begin (); sl != gtfs.segments ().end (); ++sl)
+            {
+                if (sl->second.get_data ().size () == 0) continue;
+
+                for (auto& ds : sl->second.get_data ())
+                {
+                    fout << sl->second.segment_id () << ","
+                        << rtfeed.feed()->header ().timestamp () << ","
+                        << ds.first << "," 
+                        << ds.second << "\n";
+                }
+            }
+            fout.close ();
+        }
+#endif
+
         // Now update the network state
         #pragma omp parallel for num_threads (1)
         for (unsigned l=0; l<gtfs.segments ().bucket_count (); ++l)
@@ -171,24 +192,6 @@ void run_realtime_model (List nw)
         }
         timer.report ("updating network state");
 
-#if SIMULATION
-        {
-            std::ofstream fout;
-            fout.open ("segment_states.csv", std::ofstream::app);
-            // fout << "segment_id,timestamp,travel_time,uncertainty\n";
-            for (auto sl = gtfs.segments ().begin (); sl != gtfs.segments ().end (); ++sl)
-            {
-                if (sl->second.uncertainty () > 0)
-                {
-                    fout << sl->second.segment_id () << ","
-                        << sl->second.timestamp () << ","
-                        << sl->second.travel_time () << "," 
-                        << sl->second.uncertainty () << "\n";
-                }
-            }
-            fout.close ();
-        }
-#endif
         
         // Predict ETAs
         // #pragma omp parallel for num_threads(params.n_core)
