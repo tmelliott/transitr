@@ -36,8 +36,10 @@ namespace Gtfs {
         xhat = res.first;
         Phat = res.second;
 
+#if VERBOSE == 1
         std::cout << "\n + Segment " << _segment_id << " >> "
             << "[" << xhat << ", " << Phat << "] >> ";
+#endif
 
         
         // then update with observations
@@ -46,18 +48,24 @@ namespace Gtfs {
             double Z = pow(Phat, -1);
             double z = xhat * Z;
 
+#if VERBOSE == 1
             std::cout << "(";
+#endif
             double I = std::accumulate (_data.begin (), _data.end (), 0.0, 
                                         [](double a, std::pair<int, double>& b) {
                                             return a + pow (b.second, -1);
                                         });
             double i = std::accumulate (_data.begin (), _data.end (), 0.0, 
                                         [](double a, std::pair<int, double>& b) {
+#if VERBOSE > 1
                                             std::cout << b.first << ", " << b.second << " ; ";
+#endif
                                             return a + (double) b.first * pow (b.second, -1);
                                         });
+#if VERBOSE == 1
             std::cout << ") >> { "
                 << I << ", " << i << " } >> ";
+#endif
 
             Z += I;
             z += i;
@@ -67,7 +75,9 @@ namespace Gtfs {
             xhat = z * Phat;
         }
 
+#if VERBOSE == 1
         std::cout << "[" << xhat << ", " << Phat << "]";
+#endif
 
         _travel_time = xhat;
         _uncertainty = Phat;

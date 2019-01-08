@@ -861,7 +861,9 @@ namespace Gtfs
         _block_id = "";
         _trip_headsign = "";
         _vehicle = nullptr;
+#if VERBOSE == 1
         std::cout << " + Trip " << _trip_id << " is unloaded\n";
+#endif
     }
 
     void Trip::complete ()
@@ -1888,9 +1890,7 @@ namespace Gtfs
             //     << _trip->route ()->route_short_name ()
             //     << " (" << _trip->route ()->route_long_name () << ")";
             // exiting trip is "completed" (and forgets vehicle)
-            std::cout << " (x) ";
             _trip->complete ();
-            std::cout << " () " << std::endl;
             // if (trip)
             // {
             //     std::cout << " -> " << trip->route ()->route_short_name ()
