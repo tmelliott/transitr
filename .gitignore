@@ -10,7 +10,7 @@ fulldata.db
 *.pb
 *.rda
 
-./config.json
+config.json
 .running_pid
 
 *.db-shm
