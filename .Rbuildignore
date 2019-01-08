@@ -12,3 +12,4 @@
 ^.gtfs_date$
 ^.+\.pb$
 ^simulations$
+^.running_pid$

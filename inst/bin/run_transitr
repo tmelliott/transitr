@@ -35,6 +35,23 @@ else
 fi
 
 ## Up-to-date ... launch program
-cd $PKGDIR && $Rcmd -f scripts/run_model.R
+CDIR=$( pwd )
+cd $PKGDIR
+
+## check for existing one
+if [ -f .running_pid ]; then
+    echo "Killing currently running process ... "
+    typeset -i PID=$( cat .running_pid )
+    kill -s TERM $PID 2>/dev/null
+    while kill -0 $PID 2>/dev/null; do sleep 1; done
+    rm .running_pid
+fi
+
+echo "Starting ... "
+
+$Rcmd -f scripts/run_model.R > run.log 2>&1 & 
+echo $! >> .running_pid
+
+cd $CDIR
 
 exit 0

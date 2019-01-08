@@ -11,6 +11,7 @@ fulldata.db
 *.rda
 
 ./config.json
+.running_pid
 
 *.db-shm
 *.db-wal
