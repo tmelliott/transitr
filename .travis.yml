@@ -19,6 +19,11 @@ addons:
       - protobuf-compiler 
       - libgoogle-perftools-dev
 
+script:
+- R CMD INSTALL .
+- R CMD build .
+- R CMD check *tar.gz
+
 after_success:
   - Rscript -e 'covr::codecov()'
 
