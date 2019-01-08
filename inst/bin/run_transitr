@@ -53,5 +53,4 @@ $Rcmd -f scripts/run_model.R > run.log 2>&1 &
 echo $! >> .running_pid
 
 cd $CDIR
-
 exit 0
