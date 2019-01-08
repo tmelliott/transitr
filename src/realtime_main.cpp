@@ -5,9 +5,6 @@
 #include <Rcpp.h>
 #include "vendor/sqlite3/sqlite3.h"
 
-#define RCPPTHREAD_OVERRIDE_COUT 1
-#include "RcppThread.h"
-
 #include <chrono>
 #include <thread>
 typedef std::chrono::high_resolution_clock Clock;
