@@ -123,7 +123,7 @@ void run_realtime_model (List nw)
         timer.report ("updating vehicle information");
 
         // *** Some debugging code **********************************************
-#if VERBOSE > 1
+#if VERBOSE > 0
         Rcout << vehicles.size () << " vehicles\n";
 #endif
         // for (auto v = vehicles.begin (); v != vehicles.end (); ++v)
@@ -151,7 +151,7 @@ void run_realtime_model (List nw)
         // *** end debugging code ***********************************************
 
         // Update vehicle states
-#if VERBOSE > 1
+#if VERBOSE > 0
         Rcout << "\n\n >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Mutations\n";
 #endif
         #pragma omp parallel for num_threads(params.n_core)
@@ -162,7 +162,7 @@ void run_realtime_model (List nw)
                 v->second.mutate (rngs.at (omp_get_thread_num ()), &gtfs);
             }
         }
-#if VERBOSE > 1
+#if VERBOSE > 0
         Rcout << "\n\n";
 #endif
         timer.report ("updating vehicle states");
