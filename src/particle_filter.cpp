@@ -426,11 +426,11 @@ namespace Gtfs {
 #endif
         }
 
+        latlng px = latlng ();
 #if VERBOSE > 0
         std::cout << "\n    =========================================================================\n"
             << "      [" << dbar << ", " << vbar << "] -> "
             << "[" << dbar2 << ", " << vbar2<< "] => ";
-        latlng px = latlng ();
         switch (e.type)
         {
             case EventType::gps :
