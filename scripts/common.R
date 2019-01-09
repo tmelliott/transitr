@@ -23,7 +23,7 @@ loadsim <- function(sim, time) {
             lapply(ent, function(e) {
                 stus <- e$trip_update$stop_time_update
                 if (length(stus) == 0) return(NULL)
-                tibble(
+                xdf <- tibble(
                     vehicle_id = e$trip_update$vehicle$id,
                     trip_id = e$trip_update$trip$trip_id,
                     route_id = e$trip_update$trip$route_id,
@@ -38,6 +38,20 @@ loadsim <- function(sim, time) {
                         else NA
                         )
                 )
+                qq <- stus[[length(stus)]]$getExtension(transit_network.eta)$quantiles
+                if (length(qq) > 0) {
+                    ## fetch quantiles and bind to xdf
+                    quantiles <- sapply(qq, function(x) x$quantile)
+                    qs <- sapply(stus, function(stu) {
+                        qs <- sapply(stu$getExtension(transit_network.eta)$quantiles, 
+                            function(x) ifelse(x$value == 0, NA, x$value))
+                        if (length(qs) != length(quantiles)) return(integer(length(quantiles)))
+                        qs
+                    }) %>% t %>% as.tibble
+                    names(qs) <- paste0("q", quantiles)
+                    xdf <- bind_cols(xdf, qs)
+                }
+                xdf
             })
         ) %>%
             mutate(time = as.POSIXct(time, origin = "1970-01-01")) %>%
@@ -47,3 +61,33 @@ loadsim <- function(sim, time) {
     etas
 }
 
+all_sims <- function(sim) {
+    times <- gsub("etas_|\\.pb", "", list.files(file.path("simulations", sim, "etas"), ".pb")) %>%
+        as.integer
+    do.call(bind_rows, pbapply::pblapply(times, function(t) loadsim(sim, t)))
+}
+
+library(RSQLite)
+library(dbplyr)
+get_schedule <- function(trip) {
+    con <- dbConnect(SQLite(), "fulldata.db")
+    on.exit(dbDisconnect(con))
+    con %>% tbl("stop_times") %>% filter(trip_id == trip) %>% arrange(stop_sequence) %>%
+        select(trip_id, stop_sequence, arrival_time, departure_time) %>% collect
+}
+
+getshape <- function(route, trip) {
+    con <- dbConnect(SQLite(), "fulldata.db")
+    if (!missing(route)) {
+        rid <- con %>% tbl("routes") %>% filter(route_short_name == route) %>% 
+            select(route_id) %>% head(1) %>% collect %>% pluck("route_id")
+        sid <- con %>% tbl("trips") %>% filter(route_id == rid) %>% 
+            select(shape_id) %>% head(1) %>% collect %>% pluck("shape_id")
+    } else if (!missing(trip)) {
+        sid <- con %>% tbl("trips") %>% filter(trip_id == trip) %>%
+            select(shape_id) %>% head(1) %>% collect %>% pluck("shape_id")
+    }
+    shape <- con %>% tbl("shapes") %>% filter(shape_id == sid) %>% arrange(shape_pt_sequence) %>% collect
+    dbDisconnect(con)
+    shape
+}

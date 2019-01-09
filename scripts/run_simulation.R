@@ -23,8 +23,16 @@ if (!is.null(config$simulation_history)) {
 if (dir.exists("etas")) unlink("etas", recursive = TRUE, force = TRUE)
 dir.create("etas")
 
+if (dir.exists("modeleval")) unlink("modeleval", recursive = TRUE, force = TRUE)
+dir.create("modeleval")
+
+if (file.exists("segment_states.csv")) unlink("segment_states.csv")
+
 nw <- load_gtfs("../../fulldata.db", output = "etas.pb") %>%
-    realtime_feed(sprintf("http://localhost:3000/%s/vehicle_positions", ca[1]), 
+    realtime_feed(c(sprintf("http://localhost:3000/%s/vehicle_positions", ca[1]), 
+    # realtime_feed(c(sprintf("http://localhost:3000/%s/500/1100/vehicle_positions", ca[1]), 
+    # realtime_feed(c(sprintf("http://localhost:3000/%s/1538934818/minutes/0/vehicle_positions", ca[1]), 
+                    sprintf("http://localhost:3000/%s/trip_updates", ca[1])),
                   response = "protobuf")
 nw <- do.call(set_parameters, c(list(nw), config))
 

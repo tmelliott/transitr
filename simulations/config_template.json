@@ -1,0 +1,15 @@
+{
+    "n_core": 1,
+    "n_particles": 1000,
+    // vehicle transition parameters
+    "system_noise": 0.1,
+    "pr_stop": 0.1,
+    "dwell_time": 6,
+    "gamma": 5,
+    // vehicle likelihood parameters
+    "gps_error": 3,
+    "arrival_error": 5,
+    "departure_error": 5,
+    // network parameters ...
+    "save_timings": true
+}

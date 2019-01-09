@@ -3,7 +3,7 @@ source("scripts/common.R")
 library(RSQLite)
 library(dbplyr)
 
-simnames <- list.files("simulations", pattern = "sim*", include.dirs = TRUE)
+simnames <- list.files("simulations", pattern = "^sim*", include.dirs = TRUE)
 if (file.exists("simulations/arrivaldata.rda")) {
     load("simulations/arrivaldata.rda")
 } else {
@@ -43,6 +43,13 @@ routes <- con %>% tbl("routes") %>% select(route_id, route_short_name, route_lon
 trips <- con %>% tbl("stop_times") %>% filter(stop_sequence == 1) %>% select(trip_id, departure_time) %>% collect
 dbDisconnect(con)
 
+get_stop_times <- function(tid) {
+    con <- dbConnect(SQLite(), "fulldata.db")
+    on.exit(dbDisconnect(con))
+    con %>% tbl("stop_times") %>% filter(trip_id == tid) %>%
+        select(stop_sequence, arrival_time) %>% arrange(stop_sequence) %>% collect
+}
+
 routes <- routes[routes$route_id %in% names(ids), ] %>%
     arrange(route_short_name, route_long_name)
 trips <- trips[trips$trip_id %in% arrivaldata$trip_id, ] %>% 
@@ -52,6 +59,8 @@ names(rl) <- paste(routes$route_short_name, routes$route_long_name)
 
 ## Clean them at the start of the vis
 # system("rm -f simulations/*/etas/*.rda")
+
+astime <- function(x) as.POSIXct(x, origin = "1970-01-01")
 
 ## Load simulations
 whatOrder <- c("number of vehicles", "loading vehicle positions", 
@@ -72,17 +81,48 @@ view <- function(sim) {
         geom_line() +
         facet_grid(what~., scales = "free_y")
 }
-eta <- function(sim, ta, ts) {
+eta <- function(sim, ta, ts, sched) {
     config <- jsonlite::read_json(file.path("simulations", sim, "config.json"))
     
     etatime <- as.POSIXct(as.numeric(ts), origin = "1970-01-01")
-    etadata <- loadsim(sim, as.integer(ts)) %>%
-        filter(trip_id == ta$trip_id[1])
-    ggplot(ta, aes(time, stop_sequence)) +
+    etadata <- loadsim(sim, as.integer(ts))
+    # cat(" 3 ------\n")
+    # print(etadata)
+    # cat(" 4 ------\n")
+    # print(unique(etadata$trip_id))
+    # cat(" 5 ------\n")
+    # print(ta$trip_id[1])
+    etadata <- etadata %>% filter(trip_id == ta$trip_id[1])
+    # cat(" 6 ------\n")
+    # print(etadata %>% select(timestamp, stop_sequence, time))
+    
+    ## calculate the actual arrival/departure time at the most recently visited stop
+    delay <- 0
+    Slast <- ta %>% filter(time <= astime(ts)) %>% tail(1)
+    if (nrow(Slast) == 1)
+        delay <- Slast$time - sched$arrival_time[Slast$stop_sequence]
+
+    if (nrow(Slast) == 1)
+        sched2 <- sched %>% filter(stop_sequence > Slast$stop_sequence)
+    else sched2 <- sched
+    p <- ggplot(ta, aes(time, stop_sequence)) +
         geom_point(aes(colour = type)) +
+        geom_point(aes(x = arrival_time), data = sched, color = "magenta", pch = 4) +
+        geom_point(aes(x = arrival_time + delay), data = sched2, color = "magenta", pch = 2) +
         geom_vline(aes(xintercept = etatime), data = NULL, col = "red", lty = 3) + 
         ggtitle(sprintf("ETAs at %s", format(etatime, "%H:%M:%S"))) +
-        geom_point(data = etadata, color = "black", pch = 3)
+        xlim(min(ta$time, sched$arrival_time), max(ta$time, sched$arrival_time))
+    # print(etadata %>% select(stop_sequence, time, q5, q100))
+    if (all(c("q5", "q95") %in% names(etadata))) {
+        p <- p + geom_segment(aes(x = astime(q0), xend = pmin(max(ta$time, sched$arrival_time), astime(q95)), yend = stop_sequence), 
+            data = etadata %>% filter(q0 > 0 & q95 > 0))
+    }
+    if ("q50" %in% names(etadata)) {
+        p <- p + geom_point(aes(x = astime(q50)), data = etadata %>% filter(q50 > 0), color = "black")
+    } else {
+        p <- p + geom_point(data = etadata, color = "black", pch = 3)
+    }
+    p
 }
 vehicle <- function(vps, ts, prop) {
     obstime <- as.POSIXct(as.numeric(ts), origin = "1970-01-01")
@@ -144,9 +184,32 @@ vehicle <- function(vps, ts, prop) {
         theme(legend.position = 'none') +
         xlab("Distance Traveled (m)") + xlim(0, Dmax) +
         ylab("Log Likelihood")
+    p7 <- ggplot(p, aes(wt)) +
+        geom_density(col = 'orangered', data = prop %>% filter(timestamp == as.integer(obstime))) +
+        geom_density()
 
-    gridExtra::grid.arrange(p1, p3, p5, p2, p4, p6, 
-        layout_matrix = cbind(c(1, 1, 1, 1, 6), c(2:6)))
+    gridExtra::grid.arrange(p1, p3, p5, p2, p4, p6, p7,
+        layout_matrix = cbind(c(1, 1, 1, 1, 6), c(2:5, 7)))
+}
+
+modeleval <- function(data, n, gps) {
+    data <- data %>% mutate(ts = astime(ts))
+
+    p <- ggplot(data, aes(ts)) + xlab("Time")
+
+    p_neff <- p + geom_point(aes(y = Neff, color = factor(resample, levels = 0:1))) +
+        theme(legend.position = "top") + ylim(0, n) + ylab("Effective Sample Size")
+    p_prior <- p + 
+        geom_hline(aes(yintercept = gps^2), lty = 3) + 
+        geom_path(aes(y = pmin(10 * gps^2, dist_to_path)), lty = 2, col = 'darkblue') + 
+        geom_path(aes(y = pmin(10 * gps^2, prior_mse %>% sqrt))) + 
+        geom_path(aes(y = pmin(10 * gps^2, posterior_mse %>% sqrt)), color = 'orangered') +
+        ylim(0, 10 * gps^2) + ylab("MSE (m)") +
+        facet_wrap(~trip_id, scales = "free_x")
+
+    gridExtra::grid.arrange(
+        p_neff, p_prior,
+        layout_matrix = cbind(1:2), heights = c(1, 3))
 }
 
 library(shiny)
@@ -156,14 +219,16 @@ ui <- fluidPage(
             selectInput("simnum", label="Simulation", choices = simnames),
             verbatimTextOutput("simconfig"),
             hr(),
-            selectInput("plottype", label="Graph", choices = c("Timings", "Vehicles", "ETAs")),
+            selectInput("plottype", label="Graph", choices = c("Timings", "Vehicles", "ETAs", "Model Evaluation")),
             conditionalPanel(condition = "input.plottype == 'ETAs'",
                 selectInput("routeid", label="Route ID", choices = rl),
                 selectInput("tripid", label="Trip ID", ""),
                 sliderInput("predtime", label="Prediction Time", min = 1, max = 1, step=1, value = 1)
             ),
+            conditionalPanel(condition = "input.plottype == 'Vehicles' || input.plottype == 'Model Evaluation'",
+                selectInput("vehicleid", label="Vehicle ID", choices = "")
+            ),
             conditionalPanel(condition = "input.plottype == 'Vehicles'",
-                selectInput("vehicleid", label="Vehicle ID", choices = ""),
                 sliderInput("obstime", label="Observation Time", min = 1, max = 1, step=1, value = 1)
             )
         ),
@@ -179,6 +244,7 @@ server <- function(input, output, session) {
     rv$ta <- NULL
     rv$etatimes <- NULL
     rv$tatimes <- NULL
+    rv$schedule <- NULL
     rv$config <- NULL
     rv$vehicledata <- NULL
     rv$hdir <- NULL
@@ -203,6 +269,8 @@ server <- function(input, output, session) {
             rv$etatimes <- NULL
             rv$tatimes <- NULL
         } else {
+            # rv$etatimes <- all_sims(input$simnum) %>% filter(!is.na(time))
+            # rv$tatimes <- rv$etatimes %>% filter(trip_id == )
             rv$etatimes <- as.POSIXct(as.numeric(gsub("etas_|\\.pb", "", fts)), origin = "1970-01-01")
             rv$tatimes <- rv$etatimes[rv$etatimes >= min(rv$ta$time) &
                                       rv$etatimes <= max(rv$ta$time)]
@@ -221,31 +289,55 @@ server <- function(input, output, session) {
             
             tstart <- as.POSIXct(paste(day, trips[trips$trip_id == rv$ta$trip_id[1], "departure_time"]))
             rv$ta <- rv$ta %>% filter(stop_sequence > 1 | time < tstart + 60*30)
+            rv$schedule <- get_stop_times(input$tripid) %>% 
+                mutate(arrival_time = as.POSIXct(paste(day, arrival_time)))
             if (!is.null(rv$etatimes)) {
+                # rv$tatimes <- rv$etatimes %>% filter(trip_id == input$tripid) %>%
+                #     pluck("timestamp") %>% unique() %>% sort()
                 rv$tatimes <- rv$etatimes[rv$etatimes >= min(rv$ta$time) &
-                                          rv$etatimes <= max(rv$ta$time)]
+                                          rv$etatimes <= max(rv$ta$time) + 60*60]
             } else {
+                rv$tatimes <- NULL
                 rv$tatimes <- NULL
             }
             updateSliderInput(session, "predtime", max = length(rv$tatimes))
         }
     })
     observeEvent(input$vehicleid, {
-        if (input$vehicleid != "") {
+        if (input$vehicleid == "") return()
+        if (input$plottype == "Vehicles") {
             rv$vehicledata <- read_csv(sprintf("%s/vehicle_%s.csv", rv$hdir, input$vehicleid),
-                col_names = c('timestamp', 'trip_id', 'obs_lat', 'obs_lon', 'distance', 'speed', 'acceleration', 'll', 'model_lat', 'model_lon'))
+                col_names = c('timestamp', 'trip_id', 'obs_lat', 'obs_lon', 'distance', 'speed', 'acceleration', 'll', 'wt', 'model_lat', 'model_lon'))
             rv$vehicleprop <- read_csv(sprintf("%s/vehicle_%s_proposals.csv", rv$hdir, input$vehicleid),
-                col_names = c('timestamp', 'trip_id', 'distance', 'speed', 'acceleration', 'll', 'model_lat', 'model_lon'))
+                col_names = c('timestamp', 'trip_id', 'distance', 'speed', 'acceleration', 'll', 'wt', 'model_lat', 'model_lon'))
             rv$vehicletimes <- unique(rv$vehicledata$timestamp)
             updateSliderInput(session, "obstime", max = length(rv$vehicletimes))
+        } else {
+            rv$vehicledata <- read_csv(sprintf("simulations/%s/modeleval/vehicle_%s.csv", input$simnum, input$vehicleid),
+                col_names = c("vehicle_id", "trip_id", "ts", "prior_mse", "posterior_mse", "dist_to_path", "Neff", "resample"))
+            # print(rv$vehicledata)
         }
+    })
+    observeEvent(input$plottype, {
+        if (input$plottype == "Vehicles" && 
+            dir.exists(rv$hdir)) {
+            vids <- gsub("vehicle_|\\.csv", "", list.files(rv$hdir))
+            vids <- vids[!grepl("_", vids)]
+            updateSelectInput(session, "vehicleid", choices = vids)
+        }
+        if (input$plottype == "Model Evaluation" && 
+            dir.exists(file.path("simulations", input$simnum, "modeleval"))) {
+            vids <- gsub("vehicle_|\\.csv", "", list.files(file.path("simulations", input$simnum, "modeleval")))
+            updateSelectInput(session, "vehicleid", choices = vids)
+        }    
     })
     output$graph <- renderPlot({
         # refresh()
         switch(input$plottype, 
             "Timings" = view(input$simnum),
-            "ETAs" = eta(input$simnum, rv$ta, rv$tatimes[input$predtime]),
-            "Vehicles" = vehicle(rv$vehicledata, rv$vehicletimes[input$obstime], rv$vehicleprop)
+            "ETAs" = eta(input$simnum, rv$ta, rv$tatimes[input$predtime], rv$schedule),
+            "Vehicles" = vehicle(rv$vehicledata, rv$vehicletimes[input$obstime], rv$vehicleprop),
+            "Model Evaluation" = modeleval(rv$vehicledata, rv$config$n_particles, rv$config$gps_error)
         )
     })
 }

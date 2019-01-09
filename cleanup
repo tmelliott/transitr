@@ -1,6 +1,6 @@
 #!/bin/sh
 
-rm -f config.* \
+rm -f config.log config.status \
     src/Makevars \
     src/*.o src/*.d src/*.a src/*.dll src/*.so src/*.rc */*~ *~ \
     src/vendor/protobuf/*.pb.* \

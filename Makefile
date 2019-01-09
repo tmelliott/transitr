@@ -22,15 +22,22 @@ test:
 clean:
 	./cleanup
 
+DEBUG ?= ""
+ifeq ($(DEBUG), "")
+	xDEBUG = ""
+else
+	xDEBUG = -d "$(DEBUG)"
+endif
+
 run:
-	R --slave -f scripts/run_model.R
+	R $(xDEBUG) --slave -f scripts/run_model.R
 
 startserver:
 	cd simulations && yarn start &
 
 SIM ?= sim000
 simulation:
-	R --slave -f scripts/run_simulation.R --args $(SIM)
+	R $(xDEBUG) --slave -f scripts/run_simulation.R --args $(SIM)
 
 view:
 	R --slave -f scripts/track_simulations.R
@@ -41,3 +48,8 @@ coverage:
 
 exports:
 	R -e "Rcpp::compileAttributes()"
+
+
+DRY?=n
+syncSims:
+	rsync -avP$(DRY) --delete --exclude="sim1*" --exclude="sim0*" --exclude node_modules --exclude="*.zip" tell029@certellprd01.its.auckland.ac.nz:/data/transitr/simulations/ simulations
