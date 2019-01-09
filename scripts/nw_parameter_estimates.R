@@ -35,11 +35,31 @@ nwobs <-
 seg <- nwobs$segment_id %>% table %>% sort %>% names %>% tail(20)
 
 ps <- ggplot(nwobs %>% filter(segment_id %in% seg)) +
-    facet_wrap(~segment_id)
+    facet_wrap(~segment_id, scales = "free") +
+    scale_x_time()
+
+ggplot(nwobs, aes(timestamp, speedkm)) + 
+    geom_point(alpha = 0.05) +
+    geom_quantile(quantiles = 0.5)
 
 ps + geom_histogram(aes(travel_time))
-ps + geom_histogram(aes(speedkm))
+ps + geom_histogram(aes(speedkm)) + xlim(0, 100)
 
 ps + geom_point(aes(timestamp, travel_time))
-ps + geom_point(aes(timestamp, speedkm))
+ps + geom_point(aes(timestamp, speedkm)) + ylim(0, 100)
 
+
+## which time period does each obs belong?
+times <- pretty(nwobs$timestamp, 20)
+nwobsf <- nwobs %>%
+    mutate(period = cut(nwobs$timestamp, breaks = times)) %>%
+    group_by(segment_id, period) %>%
+    summarize(travel_time = median(travel_time), length = first(length)) %>%
+    mutate(
+        speed = length / travel_time,
+        speedkm = speed / 1000 * 60 * 60
+    )
+
+ggplot(nwobsf, aes(period, speedkm)) + 
+    geom_path() +
+    facet_wrap(~segment_id)
