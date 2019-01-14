@@ -1,38 +1,34 @@
 model {
-    sigma2 ~ dunif(0, 1000)
-    sigma <- pow(sigma2, 0.5)
-    tau <- 1/sigma2
-
-    q2 ~ dunif(0, 1000)
-    q <- pow(q2, 0.5)
-    iq <- 1/q2
+    ## system noise hyperparameters
+    Q_mu ~ dunif(0, 100)
+    Q_tau ~ dgamma(0.001, 0.001)
+    Q_sig <- 1 / sqrt(Q_tau)
 
     for (m in 1:M) {
-        mu[m, 1] ~ dnorm(10, 1e-6)
-        X[m, 1] <- mu[m,1]
-        Xdot[m, 1] ~ dnorm(0, 1e2)
-        Y[m, 1] ~ dnorm(X[m, 1], tau)
+        ## system noise
+        q_tau[m] <- 1 / pow(q[m], 2)
+        q[m] ~ dnorm(Q_mu, Q_tau)
 
-        ## Dirichlet prior on betas
-        beta[(Fp[m]+1):(Fp[m+1])] ~ ddirch(alpha[(Fp[m]+1):(Fp[m+1])])
-    }
-
-    for (t in 2:T) {
-        for (m in 1:M) {   
-            ## rows ind = Fp[m]+1 ... Fp[m+1]
-            ## cols Fs[ind]
-            mu[m, t] <- sum(beta[(Fp[m]+1):(Fp[m+1])] * 
-                Xdot[Fi[(Fp[m]+1):(Fp[m+1])],t-1])
-            Xdot[m, t] ~ dnorm(mu[m, t], iq)
-            X[m, t] <- X[m, t-1] + Xdot[m, t]
-            Y[m, t] ~ dnorm(X[m, t], tau)
+        ## state transition
+        X[m, 1] ~ dnorm(0,1e-5) T(0,)
+        Xdot[m, 1] ~ dnorm(0, 0.001)
+        for (t in 2:T) {
+            Xdot[m, t] ~ dt(Xdot[m, t - 1], q_tau[m], 1)
+            X[m, t] <- X[m, t - 1] + Xdot[m, t]
         }
     }
 
-    #for (i in 1:NNZ) {
-        #beta[i] ~ dunif(0, 1)
-        #pr_alpha_zero[i] ~ dbeta(0.5, 0.5)
-        #alpha_zero[i] ~ dbin(pr_alpha_zero[i], 1)
-        #alpha[i] <- ifelse(alpha_zero[i] == 1, 0, alpha_raw[i])
-    #}
+    ## measurement error
+    R_mu ~ dunif(0, 100)
+    R_tau ~ dgamma(0.001, 0.001)
+    R_sig <- 1 / sqrt(R_tau)
+
+    ## likelihood
+    for (m in 1:M) {
+        r_tau[m] <- 1 / pow(r[m], 2)
+        r[m] ~ dnorm(R_mu, R_tau)
+        for (t in 1:T) {
+            Y[m, t] ~ dnorm(X[m, t], r_tau[m]) T(0,)
+        }
+    }
 }
