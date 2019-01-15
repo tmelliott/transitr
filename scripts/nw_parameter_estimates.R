@@ -90,14 +90,14 @@ nwdata <-
     list(
         M = nrow(Ymat),
         T = ncol(Ymat),
-        Y = Ymat
+        Y = Ymat %>% log
     )
 
 jags.fit <- 
     jags.model(
         'scripts/nw_model_indep.jags', 
         nwdata,
-        n.adapt = 1000,
+        n.adapt = 10000,
         n.chains = 1
     )
 
@@ -105,8 +105,8 @@ samps <-
     coda.samples(
         jags.fit, 
         c('Q_mu', 'Q_sig', 'R_mu', 'R_sig'), 
-        n.iter = 1000, 
-        thin = 1
+        n.iter = 10000, 
+        thin = 10
     )
 
 summary(samps)
@@ -126,36 +126,34 @@ xdf <-
         segment = 1:nwdata$M, 
         time = as.POSIXct(as.character(unique(nwobsf$period)), origin = "1970-01-01")
     ) %>% 
-    as.tibble()
-for (i in sample(1:10)) {
-    X1 <- matrix(as.array(Xs)[i,], nrow = nwdata$M)
-    X1df <- xdf %>% mutate(estimate = as.numeric(X1), obs = as.numeric(Ymat))
+    as.tibble() %>%
+    arrange(time, segment)
+i <- sample(990, 10)
+X1df <- xdf %>% 
+    mutate(
+        obs = as.numeric(Ymat),
+        estimate0 = as.array(Xs)[i[10],] %>% matrix(nrow = nwdata$M) %>% as.numeric,
+        estimate1 = as.array(Xs)[i[1],] %>% matrix(nrow = nwdata$M) %>% as.numeric,
+        estimate2 = as.array(Xs)[i[2],] %>% matrix(nrow = nwdata$M) %>% as.numeric,
+        estimate3 = as.array(Xs)[i[3],] %>% matrix(nrow = nwdata$M) %>% as.numeric,
+        estimate4 = as.array(Xs)[i[4],] %>% matrix(nrow = nwdata$M) %>% as.numeric,
+        estimate5 = as.array(Xs)[i[5],] %>% matrix(nrow = nwdata$M) %>% as.numeric,
+        estimate6 = as.array(Xs)[i[6],] %>% matrix(nrow = nwdata$M) %>% as.numeric,
+        estimate7 = as.array(Xs)[i[7],] %>% matrix(nrow = nwdata$M) %>% as.numeric,
+        estimate8 = as.array(Xs)[i[8],] %>% matrix(nrow = nwdata$M) %>% as.numeric,
+        estimate9 = as.array(Xs)[i[9],] %>% matrix(nrow = nwdata$M) %>% as.numeric
+    )
+ggplot(X1df) + 
+    geom_point(aes(time, obs)) + 
+    geom_path(aes(time, estimate0), colour = 'red') + 
+    geom_path(aes(time, estimate1), colour = 'red') + 
+    geom_path(aes(time, estimate2), colour = 'red') + 
+    geom_path(aes(time, estimate3), colour = 'red') + 
+    geom_path(aes(time, estimate4), colour = 'red') + 
+    geom_path(aes(time, estimate5), colour = 'red') + 
+    geom_path(aes(time, estimate6), colour = 'red') + 
+    geom_path(aes(time, estimate7), colour = 'red') + 
+    geom_path(aes(time, estimate8), colour = 'red') + 
+    geom_path(aes(time, estimate9), colour = 'red') + 
+    facet_wrap(~segment)
 
-    g <- ggplot(X1df) + 
-        geom_point(aes(time, obs)) + 
-        geom_path(aes(time, estimate), colour = 'red') + 
-        facet_wrap(~segment)
-    dev.hold()
-    print(g)
-    dev.flush()
-}
-
-Xds <- coda.samples(jags.fit, 'Xdot', n.iter = 1000, thin = 1)
-
-xdf <- 
-    expand.grid(
-        segment = 1:nwdata$M, 
-        time = as.POSIXct(as.character(unique(nwobsf$period)), origin = "1970-01-01")
-    ) %>% 
-    as.tibble()
-for (i in sample(1:10)) {
-    Xd1 <- matrix(as.array(Xds)[i,], nrow = nwdata$M)
-    Xd1df <- xdf %>% mutate(estimate = as.numeric(Xd1))
-
-    g <- ggplot(Xd1df) + 
-        geom_path(aes(time, estimate), colour = 'red') + 
-        facet_wrap(~segment) + ylim(range(as.matrix(Xds)))
-    dev.hold()
-    print(g)
-    dev.flush()
-}

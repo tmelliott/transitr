@@ -12,9 +12,10 @@ model {
         ## state transition
         X[m, 1] ~ dnorm(0,1e-5) T(0,)
         Xdot[m, 1] ~ dnorm(0, 0.001)
+        Xdotdot[m, 1] ~ dnorm(0, 0.01)
         for (t in 2:T) {
-            Xdot[m, t] ~ dt(Xdot[m, t - 1], q_tau[m], 1)
-            X[m, t] <- X[m, t - 1] + Xdot[m, t]
+            Xdot[m, t] ~ dnorm(Xdot[m, t - 1], q_tau[m]) T(-X[m,t-1], )
+            X[m, t] <- max(X[m, t - 1] + Xdot[m, t], 1e-10)
         }
     }
 
@@ -28,7 +29,7 @@ model {
         r_tau[m] <- 1 / pow(r[m], 2)
         r[m] ~ dnorm(R_mu, R_tau)
         for (t in 1:T) {
-            Y[m, t] ~ dnorm(X[m, t], r_tau[m]) T(0,)
+            Y[m, t] ~ dnorm(log(X[m, t]), r_tau[m])
         }
     }
 }
