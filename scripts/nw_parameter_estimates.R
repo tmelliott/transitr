@@ -68,7 +68,7 @@ ggraph(g, layout = 'kk') +
 ## look at the data
 seg <- nwobs$segment_id %>% table %>% sort %>% names %>% tail(10)
 
-# ps <- ggplot(nwobs) + #%>% filter(segment_id %in% seg)) +
+ps <- ggplot(nwobs) #+ #%>% filter(segment_id %in% seg)) +
 
 # ggplot(nwobs, aes(timestamp, speedkm)) + 
 #     geom_point(alpha = 0.05) +
