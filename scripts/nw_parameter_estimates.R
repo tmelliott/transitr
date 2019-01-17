@@ -10,15 +10,17 @@ source("scripts/common2.R")
 
 sim <- "sim000"
 
+### --- work on a SUBSET (route NX1)
+
 ## fetch the data
-segdata <- get_segment_data()
+segdata <- get_segment_data("982")
 nwobs <- 
     read_csv(
         file.path("simulations", sim, "segment_observations.csv"),
         col_names = c("segment_id", "timestamp", "travel_time", "measurement_error"),
         col_types = "iiin"
     ) %>% 
-    filter(timestamp > 0) %>%
+    filter(timestamp > 0 & segment_id %in% unique(segdata$road_segment_id)) %>%
     mutate(
         timestamp = as.POSIXct(timestamp, origin = "1970-01-01")
     ) %>%
@@ -31,11 +33,42 @@ nwobs <-
         speedkm = speed / 1000 * 60 * 60
     )
 
+sids <- unique(segdata$road_segment_id)
+
+con <- dbConnect(SQLite(), "fulldata.db")
+seglens <- con %>% tbl("road_segments") %>% 
+    filter(road_segment_id %in% sids) %>%
+    select(road_segment_id, length, int_from, int_to) %>% collect %>%
+    mutate(road_segment_id,
+           from = int_from, to = int_to)
+dbDisconnect(con)
+
+nwobs <- nwobs %>% 
+    left_join(seglens, by = c("segment_id" = "road_segment_id")) %>%
+    mutate(length = length.x)
+g <- nwobs %>%
+    group_by(segment_id) %>% 
+        summarize(
+            speed = mean(speed) * 60 * 60 / 1000,
+            from = first(from), to = first(to)
+        ) %>%
+    as_tbl_graph()
+
+ggraph(g, layout = 'kk') + 
+    geom_edge_fan(
+        aes(color = speed),
+        arrow = arrow(length = unit(1, 'mm')), 
+        start_cap = circle(1, 'mm'),
+        end_cap = circle(1, 'mm')) +
+    scale_edge_colour_gradientn(colours = viridis::viridis(256, option = "A"), limits = c(0, 100)) +
+    geom_node_point(shape = 19, size = 0.5)
+
+
+
 ## look at the data
 seg <- nwobs$segment_id %>% table %>% sort %>% names %>% tail(10)
 
-ps <- ggplot(nwobs %>% filter(segment_id %in% seg)) +
-    facet_wrap(~segment_id)
+# ps <- ggplot(nwobs) + #%>% filter(segment_id %in% seg)) +
 
 # ggplot(nwobs, aes(timestamp, speedkm)) + 
 #     geom_point(alpha = 0.05) +
@@ -44,21 +77,28 @@ ps <- ggplot(nwobs %>% filter(segment_id %in% seg)) +
 ps + geom_histogram(aes(travel_time)) + scale_x_continuous(trans = "log")
 ps + geom_histogram(aes(speedkm)) + xlim(0, 100)
 
-ps + geom_path(aes(timestamp, travel_time)) #+ scale_y_log10()
+ps + geom_path(aes(timestamp, travel_time)) + 
+    facet_wrap(~segment_id, scales="free_y") +
+    scale_x_datetime(labels = function(x) 
+        paste0(as.numeric(format(x, "%I")), format(x, "%P")))
 ps + geom_point(aes(timestamp, speedkm)) + ylim(0, 100)
 
-
 ## which time period does each obs belong?
-times <- pretty(nwobs$timestamp, 20 * 4)
+times <- pretty(nwobs$timestamp, 20 * 2)
 nwobsf <- nwobs %>%
-    filter(segment_id %in% seg) %>%
+    # filter(segment_id %in% seg) %>%
     mutate(period = cut((.)$timestamp, breaks = times)) %>%
     group_by(segment_id, period) %>%
+    do(
+        (.) %>% mutate(wt = 1 / sum(1 / measurement_error^2) / measurement_error^2)
+    ) %>%
     summarize(
-        time = mean(travel_time, na.rm = TRUE),
+        sumwt = sum(wt),
+        time = sum(travel_time * wt, na.rm = TRUE),
+        error = sum(wt * (travel_time - time)^2),
         error = sd(travel_time, na.rm = TRUE),
-        log_time = mean(log(travel_time), na.rm = TRUE),
-        log_error = sd(log(travel_time), na.rm = TRUE),
+        # log_time = mean(log(travel_time), na.rm = TRUE),
+        # log_error = sd(log(travel_time), na.rm = TRUE),
         n = n(),
         length = first(length)
     ) %>%
@@ -68,7 +108,10 @@ nwobsf <- nwobs %>%
         speedkm = speed / 1000 * 60 * 60
     ) %>%
     arrange(segment_id, period) %>%
-    mutate(period_int = as.integer(period))
+    mutate(
+        period_int = as.integer(period),
+        period = as.POSIXct(period)
+    )
 
 Ymat <- nwobsf %>% 
     select(segment_id, period_int, time) %>% 
@@ -80,8 +123,12 @@ Yerr <- nwobsf %>%
     select(-1) %>% as.matrix
 
 ggplot(nwobsf) +
-    geom_path(aes(period_int, time)) +
-    facet_wrap(~segment_id)
+    geom_ribbon(aes(period, ymin = pmax(0, time - error), ymax = time + error),
+        fill = "gray") +
+    geom_path(aes(period, time)) +
+    facet_wrap(~segment_id, scales = "free_y") +
+    scale_x_datetime(labels = function(x) 
+        paste0(as.numeric(format(x, "%I")), format(x, "%P")))
 
 mean(apply(Ymat, 1, function(x) sd(diff(x), na.rm = TRUE)), na.rm = TRUE) ## Sigma_mu
 sd(apply(Ymat, 1, function(x) sd(diff(x), na.rm = TRUE)), na.rm = TRUE)   ## Sigma_sig
