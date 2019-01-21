@@ -129,7 +129,7 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
             // std::cout << " - vehicle " << ent.vehicle ().vehicle ().id ()
                 // << " - " << ent.vehicle ().trip ().id () << "\n";
             std::string id (ent.vehicle ().vehicle ().id ());
-            // if (id != "2C9F") continue;
+            if (id != "567F") continue;
             auto vs = vehicles->find (id);
             if (vs == vehicles->end ())
             {
@@ -150,7 +150,7 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
         if (ent.has_trip_update () && ent.trip_update ().stop_time_update ().size () > 0)
         {
             std::string id (ent.trip_update ().vehicle ().id ());
-            // if (id != "2C9F") continue;
+            if (id != "567F") continue;
             auto vs = vehicles->find (id);
             if (vs == vehicles->end ())
             {

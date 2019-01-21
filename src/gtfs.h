@@ -22,6 +22,10 @@
 #define VERBOSE 0
 #endif
 
+#ifndef SIMULATION
+#define SIMULATION 0
+#endif
+
 namespace Gtfs 
 {
 

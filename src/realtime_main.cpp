@@ -188,6 +188,9 @@ void run_realtime_model (List nw)
         }
 #endif
 
+#if VERBOSE > 0
+        Rcout << "\n\n >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> Network Update\n";
+#endif
         // Now update the network state
         #pragma omp parallel for num_threads (1)
         for (unsigned l=0; l<gtfs.segments ().bucket_count (); ++l)
@@ -200,16 +203,19 @@ void run_realtime_model (List nw)
         timer.report ("updating network state");
 
         
+#if VERBOSE > 0
+        Rcout << "\n\n >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ETA Predictions\n";
+#endif
         // Predict ETAs
-        // #pragma omp parallel for num_threads(params.n_core)
-        // for (unsigned i=0; i<vehicles.bucket_count (); ++i)
-        // {
-        //     for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
-        //     {
-        //         v->second.predict_etas (rngs.at (omp_get_thread_num ()));
-        //     }
-        // }
-        // timer.report ("predicting ETAs");
+        #pragma omp parallel for num_threads(params.n_core)
+        for (unsigned i=0; i<vehicles.bucket_count (); ++i)
+        {
+            for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
+            {
+                v->second.predict_etas (rngs.at (omp_get_thread_num ()));
+            }
+        }
+        timer.report ("predicting ETAs");
 
         // Write vehicles to (new) feed
 // #if SIMULATION
@@ -233,6 +239,9 @@ void run_realtime_model (List nw)
         // std::this_thread::sleep_for (std::chrono::milliseconds (10 * 1000));
 
         iteration++;
+#ifdef MAXIT
+        if (iteration >= MAXIT) ongoing = 0;
+#endif
     }
 
     Rcout << "\n\n --- Finished ---\n\n";
