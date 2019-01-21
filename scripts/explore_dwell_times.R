@@ -177,7 +177,7 @@ trip_times_to_travel_times <- function(x) {
     x <- x %>% distinct() %>% arrange(stop_sequence, type) %>%
         mutate(time = as.POSIXct(time, origin = "1970-01-01"))
     ## all should be increasing
-    if (nrow(x) < 3 || any(diff(x2$time) < 0)) 
+    if (nrow(x) < 3 || any(diff(x$time) < 0)) 
         return(x %>% filter(FALSE) %>% 
             mutate(segment_index = stop_sequence, 
                 time_from = time, time_to = time, travel_time = numeric()) %>%
@@ -235,10 +235,64 @@ tu1 <- tu0 %>% mutate(route_number = rnums[route_id])
     #     time = first(time)
     # )
 
+std <- function(x) {
+    if (length(x) == 1) return(0)
+    (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE)
+}
+
+rids <- names(sort(table(tu$route_id), TRUE))
+RID <- rids[10]; routei %>% filter(route_id == RID)
+
+tu1r <- tu1 %>% 
+    filter(
+        route_id == RID &
+        between(travel_time, 20, 60*30)
+    ) %>%
+    filter(
+        segment_index < max((.)$segment_index)
+    ) %>%
+    group_by(segment_index) %>%
+    do((.) %>% mutate(
+        travel_time.std = std(travel_time)
+    )) %>%
+    ungroup() %>%
+    arrange(segment_index, time_from)
+ 
+
 ggplot(
-    tu1 %>% filter(route_id == tu0$route_id[1] & between(travel_time, 0, 60*30)), 
-    aes(segment_index, travel_time/60)
-) + geom_path(aes(group = trip_id))
+    tu1r, 
+    aes(time_from, travel_time/60)
+) + geom_point() + facet_wrap(~segment_index)
+
+ggplot(
+    tu1r, 
+    aes(time_from, travel_time.std/60)
+) + geom_point() + facet_wrap(~segment_index)
+
+## num -> [30min intervals]
+times <- pretty(tu1r$time_from, 20 * 2)
+smry <- tu1r %>%
+    mutate(
+        period = cut((.)$time_from, breaks = times)
+    ) %>%
+    group_by(segment_index, period) %>%
+    summarize(
+        tt = mean(travel_time, na.rm = TRUE),
+        sd.tt = sd(travel_time, na.rm = TRUE),
+        n = n()
+    ) %>%
+    mutate(
+        time = as.POSIXct(period)
+    )
+
+ggplot(smry, aes(time, tt/60)) + 
+    geom_point() +
+    facet_wrap(~segment_index)
+
+
+
+
+
 
 ## now a combination of [trip_id, shape_id, segment_index] can get [segment_id]
 con <- dbConnect(SQLite(), "fulldata.db")
@@ -281,6 +335,7 @@ ggplot(sx20, aes(time_from, travel_time / 60)) +
 ### I want the model to work on both mu and sigma
 # i.e., mu(t) and sigma(t)
 
+r1 <- 
 
 
 
@@ -288,47 +343,47 @@ ggplot(sx20, aes(time_from, travel_time / 60)) +
 
 
 
-tu0s <- tu0 %>% ungroup() %>%
-    group_by(vehicle_id, route_id, trip_id, stop_sequence) %>%
-    summarize(
-        arr = min(time),
-        dep = max(time),
-        dwell = dep - arr
-    ) %>%
-    do((.) %>%
-        arrange(stop_sequence) %>%
-        mutate(travel_time = c(0, .$arr[-1] - .$dep[-n()]))
-    )
-## arr time at 'next' stop - dep time at 'this' stop
+# tu0s <- tu0 %>% ungroup() %>%
+#     group_by(vehicle_id, route_id, trip_id, stop_sequence) %>%
+#     summarize(
+#         arr = min(time),
+#         dep = max(time),
+#         dwell = dep - arr
+#     ) %>%
+#     do((.) %>%
+#         arrange(stop_sequence) %>%
+#         mutate(travel_time = c(0, .$arr[-1] - .$dep[-n()]))
+#     )
+# ## arr time at 'next' stop - dep time at 'this' stop
 
-ggplot(tu0s, aes(trip_id, travel_time)) +
-    geom_point()
+# ggplot(tu0s, aes(trip_id, travel_time)) +
+#     geom_point()
 
-trs <- tu0s %>% group_by(vehicle_id, route_id, trip_id) %>%
-    summarize(
-        time = min(arr),
-        trip_time = sum(travel_time),
-        n_stops = n(),
-        min_stop = min(stop_sequence),
-        max_stop = max(stop_sequence)
-    ) 
+# trs <- tu0s %>% group_by(vehicle_id, route_id, trip_id) %>%
+#     summarize(
+#         time = min(arr),
+#         trip_time = sum(travel_time),
+#         n_stops = n(),
+#         min_stop = min(stop_sequence),
+#         max_stop = max(stop_sequence)
+#     ) 
 
-## only those with full obs [trip_id -> stop_count]
-library(RSQLite)
-library(dbplyr)
-tids <- unique(trs$trip_id)
-con <- dbConnect(SQLite(), "fulldata.db")
-stopn <- con %>% tbl("stop_times") %>% 
-    filter(trip_id %in% tids) %>%
-    group_by(trip_id) %>%
-    summarize(n = n()) %>%
-    collect()
-dbDisconnect(con)
+# ## only those with full obs [trip_id -> stop_count]
+# library(RSQLite)
+# library(dbplyr)
+# tids <- unique(trs$trip_id)
+# con <- dbConnect(SQLite(), "fulldata.db")
+# stopn <- con %>% tbl("stop_times") %>% 
+#     filter(trip_id %in% tids) %>%
+#     group_by(trip_id) %>%
+#     summarize(n = n()) %>%
+#     collect()
+# dbDisconnect(con)
 
-stopn <- structure(stopn$n, .Names = stopn$trip_id)
-trs2 <- trs %>% filter(min_stop == 1 & max_stop == stopn[trip_id])
+# stopn <- structure(stopn$n, .Names = stopn$trip_id)
+# trs2 <- trs %>% filter(min_stop == 1 & max_stop == stopn[trip_id])
 
-ggplot(trs, aes(time, trip_time/60)) + geom_point()
+# ggplot(trs, aes(time, trip_time/60)) + geom_point()
 
 
-## can we map each observed segment to a road_segment ???
+# ## can we map each observed segment to a road_segment ???
