@@ -24,13 +24,13 @@ clean:
 
 DEBUG ?= ""
 ifeq ($(DEBUG), "")
-	xDEBUG = ""
+	Rcmd = R
 else
-	xDEBUG = -d "$(DEBUG)"
+	Rcmd = R -d "$(DEBUG)"
 endif
 
 run:
-	R $(xDEBUG) --slave -f scripts/run_model.R
+	$(Rcmd) --slave -f scripts/run_model.R
 
 startserver:
 	cd simulations && yarn start &

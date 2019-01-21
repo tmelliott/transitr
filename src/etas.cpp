@@ -33,6 +33,13 @@ namespace Gtfs {
             // for (int i=0; i<p->get_arrival_times ().size (); ++i) 
             //     std::cout << p->get_arrival_time (i) << ",";
         }
+        std::cout << "\n  -> travel times: ";
+        for (auto& p : state)
+        {
+            std::cout << "\n       => ";
+
+        }
+
 #if VERBOSE == 2
         std::cout << " (" << timer.cpu_seconds () << "ms)\n";
 #endif
@@ -182,6 +189,7 @@ namespace Gtfs {
             {
                 t0 += vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
             }
+            dt.at (stop_index) = t0;
             // std::cout << "(" << m << ") " << at.at (m) << ", ";
         }
     }
