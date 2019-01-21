@@ -4,6 +4,7 @@ namespace Gtfs {
 
     std::pair<double,double> Segment::predict (int delta)
     {
+        if (!loaded) load ();
         // use current estimate and (historical) prior to predict future state
         double xhat, Phat;
         xhat = _travel_time;
@@ -23,6 +24,7 @@ namespace Gtfs {
 
     void Segment::update (uint64_t now)
     {
+        if (!loaded) load ();
         if (_data.size () == 0) return;
 
         // first, predict the future state ...
@@ -87,6 +89,7 @@ namespace Gtfs {
 
     double Segment::get_speed ()
     {
+        if (!loaded) load ();
         if (_uncertainty > 0 && _travel_time > 0)
         {
             return _length / _travel_time;
@@ -95,6 +98,7 @@ namespace Gtfs {
     }
     double Segment::get_speed (int delta)
     {
+        if (!loaded) load ();
         if (_uncertainty > 0 && _travel_time > 0)
         {
             auto x = predict (delta);
@@ -108,6 +112,7 @@ namespace Gtfs {
     }
     int Segment::sample_travel_time (RNG& rng, int delta)
     {
+        if (!loaded) load ();
         if (_uncertainty == 0 || _travel_time == 0) return 0.0;
 
         auto x = predict (delta);
