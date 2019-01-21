@@ -371,6 +371,7 @@ namespace Gtfs {
                 std::cout << "\n      [" << p.get_distance () 
                     << ", " << p.get_speed ()
                     << ", " << (p.get_stop_index () + 1)
+                    << ", " << (p.get_segment_index () + 1)
                     << "]";
 #endif
             dbar += p.get_distance () * p.get_weight ();
@@ -684,7 +685,7 @@ namespace Gtfs {
         std::vector<StopTime>* stops;
         stops = &(vehicle->trip ()->stops ());
         int M (stops->size ());
-        // if (stop_index == 0) stop_index = find_stop_index (distance, stops);
+        // stop_index = find_stop_index (distance, stops);
         // std::cout << " [M=" << M << ",m=" << stop_index << "], ";
         if (stop_index == M-1) 
         {
@@ -700,8 +701,8 @@ namespace Gtfs {
         segments = &(vehicle->trip ()->shape ()->segments ());
         int L (segments->size ());
         // std::cout << " [L=" << L;
-        unsigned int l (find_segment_index (distance, segments));
-        // std::cout << ",l=" << l << "], ";
+        unsigned int l (segment_index);
+        // std::cout << ",l=" << l << " --> " << segment_index << "], ";
         double next_segment_d;
         next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
         
@@ -840,6 +841,7 @@ namespace Gtfs {
             {
                 // reaching intersection ... 
                 l++;
+                segment_index++;
                 tt.at (l) = 0;
                 next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
                 // vmax = rng.runif () < 0.5 ? 30.0 : 15.0;

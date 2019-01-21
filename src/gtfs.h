@@ -622,7 +622,9 @@ namespace Gtfs
         double acceleration = 0.0;
         int accelerating = 0.0;
         unsigned int stop_index = 0;
+        unsigned int segment_index = 0;
         std::vector<int> tt;      // segment travel times
+        std::vector<int> ttpred;  // predicted travel times
         std::vector<uint64_t> at; // stop arrival times
         std::vector<uint64_t> dt; // stop departure times
 
@@ -643,6 +645,7 @@ namespace Gtfs
         double get_speed ();
         double get_acceleration ();
         unsigned int get_stop_index ();
+        unsigned int get_segment_index ();
         double get_ll ();
         double get_weight ();
         std::vector<uint64_t>& get_arrival_times ();
@@ -653,6 +656,7 @@ namespace Gtfs
         std::vector<int>& get_travel_times ();
         void set_departure_time (int i, uint64_t t);
         int get_travel_time (int i);
+        int get_travel_time_prediction (int i);
 
         void travel (int delta, Event& e, RNG& rng);
         bool bus_stop (uint64_t time, RNG& rng);

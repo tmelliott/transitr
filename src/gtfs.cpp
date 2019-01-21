@@ -2196,6 +2196,7 @@ namespace Gtfs
         speed = s;
         acceleration = a;
         stop_index = find_stop_index (d, &(v->trip ()->stops ()));
+        segment_index = find_segment_index (d, &(v->trip ()->shape ()->segments ()));
         // initialize travel times to -1 and set to 0 when starting segment
         tt.resize (vehicle->trip ()->shape ()->segments ().size (), -1);
         at.resize (vehicle->trip ()->stops ().size (), 0);
@@ -2212,6 +2213,7 @@ namespace Gtfs
         acceleration = p.acceleration;
         accelerating = p.accelerating;
         stop_index = p.stop_index;
+        segment_index = p.segment_index;
         tt = p.tt;
         at = p.at;
         dt = p.dt;
@@ -2250,6 +2252,11 @@ namespace Gtfs
     unsigned int Particle::get_stop_index ()
     {
         return stop_index;
+    }
+
+    unsigned int Particle::get_segment_index ()
+    {
+        return segment_index;
     }
 
     double Particle::get_ll ()
@@ -2304,6 +2311,11 @@ namespace Gtfs
     {
         if (i >= tt.size ()) return 0;
         return tt.at (i);
+    }
+    int Particle::get_travel_time_prediction (int i)
+    {
+        if (i >= ttpred.size ()) return 0;
+        return ttpred.at (i);
     }
 
 

@@ -37,7 +37,7 @@ startserver:
 
 SIM ?= sim000
 simulation:
-	R $(xDEBUG) --slave -f scripts/run_simulation.R --args $(SIM)
+	$(Rcmd) --slave -f scripts/run_simulation.R --args $(SIM)
 
 view:
 	R --slave -f scripts/track_simulations.R

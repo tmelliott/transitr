@@ -34,14 +34,22 @@ namespace Gtfs {
             //     std::cout << p->get_arrival_time (i) << ",";
         }
         std::cout << "\n  -> travel times: ";
-        for (auto& p : state)
+        int L = _trip->shape ()->segments ().size ();
+        std::cout << " [" << L << "]";
+        for (auto& p : _state)
         {
             std::cout << "\n       => ";
-
+            // get travel time for each stop
+            std::cout << " [" << p.get_segment_index () << " of "
+                << L << "] ";
+            for (int l=p.get_segment_index (); l<L; l++)
+            {
+                std::cout << p.get_travel_time_prediction (l) << ", ";
+            }
         }
 
 #if VERBOSE == 2
-        std::cout << " (" << timer.cpu_seconds () << "ms)\n";
+        std::cout << "\n   (" << timer.cpu_seconds () << "ms)\n";
 #endif
     }
 
@@ -119,79 +127,159 @@ namespace Gtfs {
         // std::cout << "\n > ";
         if (complete) return;
         // std::cout << "| ";
+        
+        // predict travel times along all remaining segments
+        if (!vehicle->trip ()->shape ()) return;
+        std::vector<ShapeSegment>* segments;
+        segments = &(vehicle->trip ()->shape ()->segments ());
+        int L (segments->size ());
+        ttpred.resize (L, 0);
 
-        // get STOPS
+        // current segment is partial
+        ttpred.at (segment_index) = (distance - segments->at (segment_index).distance) / speed + 0.5;
+        // store cumlative travel time for forecasting ahead
+        int tcum = ttpred.at (segment_index);
+        for (int l=segment_index+1; l<L; l++)
+        {
+            ttpred.at (l) = segments->at (l).segment->sample_travel_time (rng, tcum);
+            tcum += ttpred.at (l);
+        }
+
+        // now use those predictions for stop arrival times
         std::vector<StopTime>* stops;
         if (!vehicle || !vehicle->trip ()) return;
         stops = &(vehicle->trip ()->stops ());
         int M (stops->size ());
         if (M == 0) return;
-        at.clear ();
         at.resize (M, 0);
-        stop_index = find_stop_index (distance, stops);
-        // std::cout << " @" << m << " > ";
-        if (stop_index == M-1) 
-        {
-            return;
-        }
-        double Dmax = stops->back ().distance;
-        
-        if (!vehicle->trip ()->shape ()) return;
-        std::vector<ShapeSegment>* segments;
-        segments = &(vehicle->trip ()->shape ()->segments ());
-        int L (segments->size ());
-        unsigned int l (find_segment_index (distance, segments));
-        double next_segment_d;
-        next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
+        dt.resize (M, 0);
 
         double dcur = distance;
-        double dnext;
+
+        int si (stop_index + 1); // next stop to predict
+        unsigned int l, li; // the segment index of current/next stop, respectively        
+        double Dmax = stops->back ().distance;
+
+        li = find_segment_index (stops->at (stop_index).distance, segments);
+
         uint64_t t0 = vehicle->timestamp ();
-        // std::cout << t0 << " > ";
-        int etat, tt_total = 0;
-        double vel;
-        vel = segments->at (l).segment->sample_speed (rng);
-        if (vel == 0.0 && speed >= 0.0) vel = speed;
-        while (vel <= 0 || vel > 30)
+        int etat; // the eta (in seconds)
+        // if (vehicle_at_stop) then add dwell time for stop (stop_index)
+        
+        double v;
+        while (si < M)
         {
-            vel = rng.rnorm () * 8.0 + 15.0;
-        }
-        while (stop_index < M-1)
-        {
-            stop_index++; // `next` stop index
-            dnext = stops->at (stop_index).distance;
             etat = 0;
-            // std::cout << " [";
-            while (next_segment_d < dnext && l < L-1)
+            l = li;
+            li = find_segment_index (stops->at (si).distance, segments);
+
+            if (l == li)
             {
-                // time to get to end of segment
-                etat += (next_segment_d - dcur) / vel;
-                tt_total += (next_segment_d - dcur) / vel;
-                dcur = next_segment_d;
-                l++;
-                next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
-                vel = segments->at (l).segment->sample_speed (rng, tt_total);
-                if (vel == 0.0 && speed >= 0.0) vel = speed;
-                while (vel <= 0.0 || vel > 30)
+                // both stops in the same segment
+                v = (l == segment_index) ? speed : segments->at (l).segment->length () / ttpred.at (l);
+                etat = (stops->at (si).distance - dcur) / v + 0.5;
+            }
+            else 
+            {
+                // stops in different segments
+                // first, rest of segment (l)
+                v = (l == segment_index) ? speed : segments->at (l).segment->length () / ttpred.at (l);
+                // using segment length avoids l+1 being out of index
+                etat += (segments->at (l).segment->length () - dcur + segments->at (l).distance) / v + 0.5;
+
+                // then any intermediate segments
+                for (int j=l+1; j<li-1; j++)
                 {
-                    vel = rng.rnorm () * 8.0 + 15.0;
+                    etat += ttpred.at (j);
                 }
-                // std::cout << vel << "; ";
+
+                // then beginning bit of segment (li)
+                if (segments->at (li).distance < stops->at (si).distance)
+                {
+                    v = segments->at (li).segment->length () / ttpred.at (li);
+                    etat += (stops->at (si).distance - segments->at (li).distance) / v + 0.5;
+                }
             }
-            // std::cout << "] ";
-            etat += (dnext - dcur) / vel;
-            tt_total += (dnext - dcur) / vel;
-            at.at (stop_index) = t0 + etat; // makes no sense because speeds are noise
-            dcur = dnext;
-            // and add some dwell time
-            t0 = at.at (stop_index);
-            if (rng.runif () < vehicle->dwell_time ())
-            {
-                t0 += vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
-            }
-            dt.at (stop_index) = t0;
-            // std::cout << "(" << m << ") " << at.at (m) << ", ";
+
+            dcur = stops->at (si).distance;
+            t0 += etat;
+            at.at (si) = t0;
+            // add dwell time 
+            t0 += 0;
+            dt.at (si) = t0;
+            si++;
         }
+
+        return;
+
+        
+        // double dcur = distance;
+        // double dnext;
+        // uint64_t t0 = vehicle->timestamp ();
+        // // std::cout << t0 << " > ";
+        // int etat, tt_total = 0;
+        // // double vel;
+        // // vel = segments->at (l).segment->sample_speed (rng);
+        // // if (vel == 0.0 && speed >= 0.0) vel = speed;
+        // // // std::cout << "\n        P: stop " << (stop_index+1) << "/" << M
+        // // //     << ", segment " << (l+1) << "/" << L;
+        // // while (vel <= 0 || vel > 30)
+        // // {
+        // //     vel = rng.rnorm () * 8.0 + 15.0;
+        // // }
+
+        // // -------------------------------- FOR NOW! update in future
+        // ttpred.resize (L, 0);
+
+        // std::cout << "\n";
+        // while (si < M-1)
+        // {
+        //     std::cout << " | si = " << si << " -> ";
+        //     si++; // `next` stop index
+        //     std::cout << si << ", ";
+        //     dnext = stops->at (si).distance;
+        //     etat = 0;
+        //     // std::cout << " [";
+        //     while (next_segment_d <= dnext && l < L-1)
+        //     {
+        //         std::cout << " l = " << l << " -> ";
+        //         // time to get to end of segment
+        //         ttpred.at (l) += (next_segment_d - dcur) / vel + 0.5; // 0.5 for integer rounding
+        //         etat += ttpred.at (l);
+        //         tt_total += ttpred.at (l);
+        //         dcur = next_segment_d;
+        //         l++;
+        //         std::cout << l << ", ";
+        //         next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
+        //         vel = segments->at (l).segment->sample_speed (rng, tt_total);
+        //         if (vel == 0.0 && speed >= 0.0) vel = speed;
+        //         while (vel <= 0.0 || vel > 30)
+        //         {
+        //             vel = rng.rnorm () * 8.0 + 15.0;
+        //         }
+        //         // std::cout << vel << "; ";
+        //     }
+        //     // std::cout << "] ";
+        //     ttpred.at (l) += (dnext - dcur) / vel + 0.5;
+        //     etat += (dnext - dcur) / vel + 0.5;
+        //     tt_total += (dnext - dcur) / vel + 0.5;
+        //     t0 += etat;
+        //     dcur = dnext;
+        //     at.at (si) = t0;
+        //     // and add some dwell time
+        //     if (rng.runif () < vehicle->pr_stop ())
+        //     {
+        //         t0 += vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
+        //     }
+        //     dt.at (si) = t0;
+        //     // std::cout << "(" << m << ") " << at.at (m) << ", ";
+        // }
+        // // last segment
+        // std::cout << l << "..." << ttpred.at (l) << " ... ";
+        // if (l < L-1)
+        // {
+        //     std::cout << " not finished...";
+        // }
     }
 
 }
