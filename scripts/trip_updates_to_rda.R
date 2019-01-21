@@ -49,31 +49,34 @@ cat(" done\n")
 
 suppressPackageStartupMessages(library(tidyverse))
 cat(" * reading trip updates ...")
-rda <- sprintf("trip_updates_%s.rda", format(date, "%Y-%m-%d"))
-pbapply::pblapply(
-    tufiles, function(file) {
-        pb <- unzip(f, file = file)
-        feed <- read(transit_realtime.FeedMessage, pb)
-        unlink(pb)
-        if (length(feed$entity) == 0) return(NULL)
-        lapply(feed$entity, function(e) {
-            stus <- e$trip_update$stop_time_update
-            if (length(stus) == 0) return(NULL)
-            xdf <- tibble(
-                vehicle_id = e$trip_update$vehicle$id,
-                trip_id = e$trip_update$trip$trip_id,
-                route_id = e$trip_update$trip$route_id,
-                timestamp = as.POSIXct(e$trip_update$timestamp, origin = "1970-01-01"),
-                stop_sequence = sapply(stus, function(stu) 
-                    if (stu$has('stop_sequence')) stu$stop_sequence else NA
-                ),
-                type = sapply(stus, function(stu) ifelse(stu$has('arrival'), 'arrival', 'departure')),
-                time = sapply(stus, function(stu) if (stu$has('arrival')) stu$arrival$time else stu$departure$time)
-            )
-        }) %>% bind_rows
-    }
-) %>% 
-bind_rows %>%
-save(file = rda)
+rda <- sprintf("trip_updates_%s.rda", format(DATE, "%Y-%m-%d"))
+tu <- 
+    pbapply::pblapply(
+        tufiles, function(file) {
+            pb <- unzip(f, file = file)
+            feed <- read(transit_realtime.FeedMessage, pb)
+            unlink(pb)
+            if (length(feed$entity) == 0) return(NULL)
+            lapply(feed$entity, function(e) {
+                stus <- e$trip_update$stop_time_update
+                if (length(stus) == 0) return(NULL)
+                xdf <- tibble(
+                    vehicle_id = e$trip_update$vehicle$id,
+                    trip_id = e$trip_update$trip$trip_id,
+                    route_id = e$trip_update$trip$route_id,
+                    timestamp = as.POSIXct(e$trip_update$timestamp, origin = "1970-01-01"),
+                    stop_sequence = sapply(stus, function(stu) 
+                        if (stu$has('stop_sequence')) stu$stop_sequence else NA
+                    ),
+                    type = sapply(stus, function(stu) ifelse(stu$has('arrival'), 'arrival', 'departure')),
+                    time = sapply(stus, function(stu) if (stu$has('arrival')) stu$arrival$time else stu$departure$time)
+                )
+            }) %>% bind_rows
+        }
+    ) %>% 
+    bind_rows
+cat("done\n")
 
-cat("done\n * saved to", rda, "\n\n")
+cat(" * saving to", rda, "...")
+save(tu, file = rda)
+cat("done\n\n")
