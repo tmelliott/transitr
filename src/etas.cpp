@@ -18,6 +18,17 @@ namespace Gtfs {
 #if VERBOSE == 2
         Timer timer;
         std::cout << "\n- vehicle " << _vehicle_id << " - predicting etas";
+
+        std::cout << "\n\n Segment information ...";
+        auto segments = _trip->shape ()->segments ();
+        for (int l = 0; l < segments.size (); l++)
+        {
+            std::cout << "\n  - " << l
+                << ": tt=" << segments.at (l).segment->travel_time ()
+                << " (" << segments.at (l).segment->uncertainty ()
+                << ")";
+        }
+
 #endif
         for (auto p = _state.begin (); p != _state.end (); ++p) 
         {
@@ -34,6 +45,19 @@ namespace Gtfs {
             //     std::cout << p->get_arrival_time (i) << ",";
         }
 
+        std::cout << "\n  --- travel times ...";
+        // get travel time for each stop
+        int L = _trip->shape ()->segments ().size ();
+        for (auto& p : _state)
+        {
+            std::cout << "\n    > ";
+            for (int l=p.get_segment_index (); l<L; l++)
+            {
+                std::cout << p.get_travel_time_prediction (l) << ", ";
+            }
+        }
+
+
         /**
          * Now, we assume the particles have taken into account any correlation
          * structure between segment travel times.
@@ -45,23 +69,25 @@ namespace Gtfs {
         int M = stops.size ();
         
         std::cout << std::setprecision (0) << std::fixed;
-        std::cout << "\n\n E(B) vector: [";
-        for (auto b : _tt_state) std::cout << " " << b << " ";
-        std::cout << "]\n Var(B) matrix: ";
-        for (auto br : _tt_cov)
-        {
-            std::cout << "\n  ";
-            for (auto bc : br) std::cout << std::setw(9) << std::round (bc) << "  ";
-        }
-        std::cout << "\n ---------\n";
+        // std::cout << "\n\n E(B) vector: [";
+        // for (auto b : _tt_state) std::cout << " " << b << " ";
+        // std::cout << "]\n Var(B) matrix: ";
+        // for (auto br : _tt_cov)
+        // {
+        //     std::cout << "\n  ";
+        //     for (auto bc : br) std::cout << std::setw(9) << std::round (bc) << "  ";
+        // }
+        // std::cout << "\n ---------\n";
         
         std::cout << "\n >> generate observation of B (Z) and estimate of R\n";
         std::vector<double> tt_obs (M, 0.0);
         std::vector<std::vector<double> > tt_r (M, std::vector<double> (M, 0.0));
 
         double cov_lj;
+        std::cout << " > curtime = " << _timestamp << "\n";
         for (int l=_current_stop+1; l<M; l++)
         {
+            std::cout << "\n STOP " << l << ": ";
             tt_obs.at (l) = std::accumulate(_state.begin (), _state.end (), 0.0,
                                             [&](double d, Particle& p) {
                                                 int dt;
@@ -72,7 +98,11 @@ namespace Gtfs {
                                                 else 
                                                 {
                                                     dt = p.get_arrival_time (l) - p.get_departure_time (l - 1);
+                                                    std::cout << "("
+                                                        << p.get_arrival_time (l) << " - "
+                                                        << p.get_departure_time (l - 1) << " = ) ";
                                                 }
+                                                std::cout << std::setw (5) << dt << ", ";
                                                 return d + dt;
                                             });
             tt_obs.at (l) /= (double)_state.size ();
@@ -139,6 +169,7 @@ namespace Gtfs {
 
 
         _tt_time = _timestamp;
+        std::cout << std::setprecision (6);
 
 #if VERBOSE == 2
         std::cout << "\n   (" << timer.cpu_seconds () << "ms)\n";

@@ -1279,7 +1279,7 @@ namespace Gtfs
         gtfs->close_connection ();
 
         _travel_time = _length / 10.0;
-        _uncertainty = _travel_time; // m/s
+        _uncertainty = _travel_time / 2; // m/s
 
         min_tt = _length / max_speed;
         // min_err = sqrt (min_tt);
