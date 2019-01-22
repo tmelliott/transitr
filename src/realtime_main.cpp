@@ -212,6 +212,7 @@ void run_realtime_model (List nw)
         {
             for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
             {
+                if (v->second.trip ()->route ()->route_short_name () != "NX1") continue;
                 v->second.predict_etas (rngs.at (omp_get_thread_num ()));
             }
         }

@@ -556,6 +556,11 @@ namespace Gtfs
             int _current_segment;
             int _current_stop;
 
+            std::vector<double> _tt_state; // travel time state vector
+            std::vector<std::vector<double> > _tt_cov; // covariance matrix for travel time
+            uint64_t _tt_time; // time travel times were last updated
+
+
         public:
             Vehicle (std::string& id, par* params);
 

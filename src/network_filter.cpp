@@ -133,7 +133,7 @@ namespace Gtfs {
     double Segment::sample_speed (RNG& rng, int delta)
     {
         int x = sample_travel_time (rng, delta);
-        if (x == 0) return 0.0;
+        x = std::max(5, x);
         return _length / x;
     }
 

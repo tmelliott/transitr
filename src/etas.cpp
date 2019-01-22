@@ -13,7 +13,7 @@ namespace Gtfs {
 
     void Vehicle::predict_etas (RNG& rng)
     {
-        if (!valid ()) return;
+        if (!valid () || complete ()) return;
 
 #if VERBOSE == 2
         Timer timer;
@@ -26,27 +26,119 @@ namespace Gtfs {
             std::cout << "\n       => ";
             for (auto eta : p->get_arrival_times ()) {
                 if (eta <= _timestamp) std::cout << "*, ";
-                else std::cout << ((eta - _timestamp) / 60) << ", ";
+                else std::cout << ((eta - _timestamp)) << ", ";
             }
 #endif
             // std::cout << "\n VERSUS ... ";
             // for (int i=0; i<p->get_arrival_times ().size (); ++i) 
             //     std::cout << p->get_arrival_time (i) << ",";
         }
-        std::cout << "\n  -> travel times: ";
-        int L = _trip->shape ()->segments ().size ();
-        std::cout << " [" << L << "]";
-        for (auto& p : _state)
+
+        /**
+         * Now, we assume the particles have taken into account any correlation
+         * structure between segment travel times.
+         *
+         * Simply need to compute B and Cov matrix for travel times (for this vehicle)
+         */
+        
+        auto stops = _trip->stops ();
+        int M = stops.size ();
+        
+        std::cout << std::setprecision (0) << std::fixed;
+        std::cout << "\n\n E(B) vector: [";
+        for (auto b : _tt_state) std::cout << " " << b << " ";
+        std::cout << "]\n Var(B) matrix: ";
+        for (auto br : _tt_cov)
         {
-            std::cout << "\n       => ";
-            // get travel time for each stop
-            std::cout << " [" << p.get_segment_index () << " of "
-                << L << "] ";
-            for (int l=p.get_segment_index (); l<L; l++)
+            std::cout << "\n  ";
+            for (auto bc : br) std::cout << std::setw(9) << std::round (bc) << "  ";
+        }
+        std::cout << "\n ---------\n";
+        
+        std::cout << "\n >> generate observation of B (Z) and estimate of R\n";
+        std::vector<double> tt_obs (M, 0.0);
+        std::vector<std::vector<double> > tt_r (M, std::vector<double> (M, 0.0));
+
+        double cov_lj;
+        for (int l=_current_stop+1; l<M; l++)
+        {
+            tt_obs.at (l) = std::accumulate(_state.begin (), _state.end (), 0.0,
+                                            [&](double d, Particle& p) {
+                                                int dt;
+                                                if (l == _current_stop + 1)
+                                                {
+                                                    dt = p.get_arrival_time (l) - _timestamp;
+                                                }
+                                                else 
+                                                {
+                                                    dt = p.get_arrival_time (l) - p.get_departure_time (l - 1);
+                                                }
+                                                return d + dt;
+                                            });
+            tt_obs.at (l) /= (double)_state.size ();
+        }
+        std::cout << "\n\n Z vector: [";
+        for (auto z : tt_obs) std::cout << " " << z << " ";
+
+        for (int l=_current_stop+1; l<M; l++) {
+            for (int j=_current_stop+1; j<M; j++)
             {
-                std::cout << p.get_travel_time_prediction (l) << ", ";
+                cov_lj = std::accumulate(_state.begin (), _state.end (), 0.0,
+                                         [&](double d, Particle& p) {
+                                            double xi, yi;
+                                            if (l == _current_stop + 1)
+                                            {
+                                                xi = p.get_arrival_time (l) - _timestamp;
+                                            }
+                                            else
+                                            {
+                                                xi = p.get_arrival_time (l) - p.get_departure_time (l - 1);
+                                            }
+                                            
+                                            if (l == j) 
+                                            {
+                                                yi = xi;
+                                            }
+                                            else if (j == _current_stop + 1)
+                                            {
+                                                yi = p.get_arrival_time (j) - _timestamp;
+                                            }
+                                            else
+                                            {
+                                                yi = p.get_arrival_time (j) - p.get_departure_time (j - 1);
+                                            }
+
+                                            xi -= tt_obs.at (l); // xi - xbar
+                                            yi -= tt_obs.at (j); // yi - ybar
+                                            return d + xi * yi;
+                                         });
+                tt_r.at (l).at (j) = cov_lj / (_state.size () - 1);
             }
         }
+
+        std::cout << "]\n R matrix: ";
+        for (auto br : tt_r)
+        {
+            std::cout << "\n  ";
+            for (auto bc : br) std::cout << std::setw(9) << std::round (bc) << "  ";
+        }
+        std::cout << "\n ---------\n";
+        
+
+        std::cout << "\n Now update the travel time estimates' state ...\n";
+        if (_tt_time == 0)
+        {
+            _tt_state = tt_obs;
+            _tt_cov = tt_r;
+        }
+        else
+        {
+            int tt_delta = _timestamp - _tt_time;
+            std::cout << " -> " << tt_delta << " seconds ... \n";
+        }
+
+
+        _tt_time = _timestamp;
 
 #if VERBOSE == 2
         std::cout << "\n   (" << timer.cpu_seconds () << "ms)\n";
@@ -142,6 +234,11 @@ namespace Gtfs {
         for (int l=segment_index+1; l<L; l++)
         {
             ttpred.at (l) = segments->at (l).segment->sample_travel_time (rng, tcum);
+            if (ttpred.at (l) == 0)
+            {
+                // something from [5, 25]
+                ttpred.at (l) = segments->at (l).segment->length () / (rng.runif () * 20.0 + 15.0);
+            }
             tcum += ttpred.at (l);
         }
 

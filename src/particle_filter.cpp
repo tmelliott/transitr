@@ -121,10 +121,16 @@ namespace Gtfs {
         _current_stop = 0;
         _segment_travel_times.clear ();
         _stop_arrival_times.clear ();
+        _tt_state.clear ();
+        _tt_cov.clear ();
 
 
         _segment_travel_times.resize (_trip->shape ()->segments ().size (), 0);
         _stop_arrival_times.resize (_trip->stops ().size (), 0);
+        _tt_state.resize (_trip->stops ().size (), 0.0);
+        _tt_cov.resize (_trip->stops ().size (),
+                        std::vector<double> (_trip->stops ().size (), 0.0));
+        _tt_time = 0;
     }
 
     void Vehicle::mutate (RNG& rng, Gtfs* gtfs)
