@@ -190,10 +190,15 @@ trip_times_to_travel_times <- function(x) {
 
 tu <- tripupdates
 rm(tripupdates)
-tu0 <- tu %>% distinct() %>%
-    mutate(date = as.Date(format(timestamp, '%Y-%m-%d'))) %>%
-    group_by(date, trip_id, vehicle_id) %>%
-    do((.) %>% trip_times_to_travel_times())
+if (file.exists("tu0.rda")) {
+    load("tu0.rda")
+} else {
+    tu0 <- tu %>% distinct() %>%
+        mutate(date = as.Date(format(timestamp, '%Y-%m-%d'))) %>%
+        group_by(date, trip_id, vehicle_id) %>%
+        do((.) %>% trip_times_to_travel_times())
+    save(tu0, file = "tu0.rda")
+}
 
 library(RSQLite)
 library(dbplyr)
