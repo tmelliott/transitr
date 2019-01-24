@@ -481,7 +481,7 @@ test.lag %>% mutate(tt.pred = predict(lfit, newdata = test.lag)) %>%
         data = train.lag %>% mutate(tt.pred = predict(lfit, train.lag)), col = 'gray') +
     geom_point(aes(y = (tt - tt.lag)/60), col = 'orangered', size = 0.5) +
     # geom_path(col = 'orangered') +
-    facet_grid(segment~dayofweek, scales = "free_y") +
+    facet_grid(segment~weekend, scales = "free_y") +
     xlab("Time") + 
     ylab("Travel Time (min)") + 
     scale_x_datetime(label = function(x) format(x, '%H:%M'))
