@@ -1,77 +1,62 @@
 library(tidyverse)
 library(RProtoBuf)
 
-curd <- setwd("src/vendor/protobuf")
-readProtoFiles("gtfs-realtime.proto")
-setwd(curd)
+# curd <- setwd("src/vendor/protobuf")
+# readProtoFiles("gtfs-realtime.proto")
+# setwd(curd)
 
 ## load trip updates
 if (!file.exists("tripupdates.rda")) {
-    tufiles <- list.files(file.path("simulations", "archive"), 
-        pattern = "trip_updates*", full.name = TRUE)
-    tu <- pbapply::pblapply(tufiles, function(f) {
-        feed <- read(transit_realtime.FeedMessage, f)
-        if (length(feed$entity) == 0) return(NULL)
-        lapply(feed$entity, function(e) {
-            stus <- e$trip_update$stop_time_update
-            if (length(stus) == 0) return(NULL)
-            xdf <- tibble(
-                vehicle_id = e$trip_update$vehicle$id,
-                trip_id = e$trip_update$trip$trip_id,
-                route_id = e$trip_update$trip$route_id,
-                timestamp = as.POSIXct(e$trip_update$timestamp, origin = "1970-01-01"),
-                stop_sequence = sapply(stus, function(stu) 
-                    if (stu$has('stop_sequence')) stu$stop_sequence else NA
-                ),
-                type = sapply(stus, function(stu) ifelse(stu$has('arrival'), 'arrival', 'departure')),
-                time = sapply(stus, function(stu) if (stu$has('arrival')) stu$arrival$time else stu$departure$time)
-            )
-        }) %>% bind_rows
-    }) %>% bind_rows
-    save(tu, file = "tripupdates.rda")
+    tufiles <- list.files(pattern = "trip_updates_.*\\.rda")
+    tripupdates <- NULL
+    for (f in tufiles) {
+        load(f)
+        tripupdates <- tripupdates %>% bind_rows(tu %>% distinct())
+        rm(tu)
+    }
+    save(tripupdates, file = "tripupdates.rda")
 } else {
     load("tripupdates.rda")
 }
 
 ## load vehilce positions
-if (!file.exists("vehiclepositions.rda")) {
-    vpfiles <- list.files(file.path("simulations", "archive"), 
-        pattern = "vehicle_locations*", full.name = TRUE)
-    vp <- pbapply::pblapply(vpfiles, function(f) {
-        feed <- read(transit_realtime.FeedMessage, f)
-        if (length(feed$entity) == 0) return(NULL)
-        lapply(feed$entity, function(e) {
-            if (!e$has('vehicle')) return(NULL)
-            if (!e$vehicle$has('position')) return(NULL)
-            xdf <- tibble(
-                vehicle_id = e$vehicle$vehicle$id,
-                trip_id = e$vehicle$trip$trip_id,
-                route_id = e$vehicle$trip$route_id,
-                timestamp = as.POSIXct(e$vehicle$timestamp, origin = "1970-01-01"),
-                position_latitude = e$vehicle$position$latitude,
-                position_longitude = e$vehicle$position$longitude
-            )
-        }) %>% bind_rows
-    }) %>% bind_rows
-    save(vp, file = "vehiclepositions.rda")
-} else {
-    load("vehiclepositions.rda")
-}
+# if (!file.exists("vehiclepositions.rda")) {
+#     vpfiles <- list.files(file.path("simulations", "archive"), 
+#         pattern = "vehicle_locations*", full.name = TRUE)
+#     vp <- pbapply::pblapply(vpfiles, function(f) {
+#         feed <- read(transit_realtime.FeedMessage, f)
+#         if (length(feed$entity) == 0) return(NULL)
+#         lapply(feed$entity, function(e) {
+#             if (!e$has('vehicle')) return(NULL)
+#             if (!e$vehicle$has('position')) return(NULL)
+#             xdf <- tibble(
+#                 vehicle_id = e$vehicle$vehicle$id,
+#                 trip_id = e$vehicle$trip$trip_id,
+#                 route_id = e$vehicle$trip$route_id,
+#                 timestamp = as.POSIXct(e$vehicle$timestamp, origin = "1970-01-01"),
+#                 position_latitude = e$vehicle$position$latitude,
+#                 position_longitude = e$vehicle$position$longitude
+#             )
+#         }) %>% bind_rows
+#     }) %>% bind_rows
+#     save(vp, file = "vehiclepositions.rda")
+# } else {
+#     load("vehiclepositions.rda")
+# }
 
-dt <- tu %>%
+dt <- tripupdates %>%
     filter(type == "arrival") %>%
     mutate(arrival = time) %>%
     select(vehicle_id, trip_id, timestamp, stop_sequence, arrival) %>%
     distinct() %>% 
     full_join(
-        tu %>% filter(type == "departure") %>% mutate(departure = time) %>%
+        tripupdates %>% filter(type == "departure") %>% mutate(departure = time) %>%
             select(vehicle_id, trip_id, stop_sequence, departure),
         # by = c("vehicle_id", "trip_id", "stop_sequence"),
         suffix = c(".arrival", ".departure")
     ) %>%
     arrange(vehicle_id, trip_id, stop_sequence) %>%
     mutate(dwell = departure - arrival) %>% filter(!is.na(dwell)) %>%
-    ## only include dwell times [0, 1min]
     filter(dwell >= 0 & dwell <= 1*60)
 
 hp <- ggplot(dt, aes(dwell)) + 
@@ -86,87 +71,87 @@ hp + geom_vline(aes(xintercept = x),
 
 
 ## how about the rate of vehicle updates?
-dv <- vp %>% group_by(vehicle_id) %>% distinct() %>%
-    do((.) %>% arrange(timestamp) %>% mutate(dt = c(-1, diff(timestamp)))) %>%
-    filter(dt >= 0 & dt <= 1*60)
+# dv <- vp %>% group_by(vehicle_id) %>% distinct() %>%
+#     do((.) %>% arrange(timestamp) %>% mutate(dt = c(-1, diff(timestamp)))) %>%
+#     filter(dt >= 0 & dt <= 1*60)
 
-dp <- ggplot(dv, aes(dt)) +
-    geom_histogram(binwidth = 1) +
-    xlab("Time between updates (sec)") + ylab("Number of updates")
+# dp <- ggplot(dv, aes(dt)) +
+#     geom_histogram(binwidth = 1) +
+    # xlab("Time between updates (sec)") + ylab("Number of updates")
 
-dp + geom_vline(aes(xintercept = x), 
-    data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) 
+# dp + geom_vline(aes(xintercept = x), 
+#     data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) 
 
-dt2 <- tu %>% group_by(vehicle_id) %>% distinct() %>%
-    do((.) %>% arrange(timestamp) %>% mutate(dt = c(-1, diff(timestamp)))) %>%
-    filter(dt >= 0 & dt <= 1*60)
+# dt2 <- tu %>% group_by(vehicle_id) %>% distinct() %>%
+#     do((.) %>% arrange(timestamp) %>% mutate(dt = c(-1, diff(timestamp)))) %>%
+#     filter(dt >= 0 & dt <= 1*60)
 
-hp2 <- ggplot(dt2, aes(dt)) +
-    geom_histogram(binwidth = 1) +
-    xlab("Time between updates (sec)") + ylab("Number of updates")
+# hp2 <- ggplot(dt2, aes(dt)) +
+#     geom_histogram(binwidth = 1) +
+#     xlab("Time between updates (sec)") + ylab("Number of updates")
 
-hp2 + geom_vline(aes(xintercept = x), 
-    data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) 
+# hp2 + geom_vline(aes(xintercept = x), 
+#     data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) 
 
 
 ## join
-dd <- dv %>% full_join(dt, by = c("vehicle_id", "timestamp")) %>%
-    distinct() %>%
-    do((.) %>% arrange(timestamp) %>% mutate(dt = c(-1, diff(timestamp)))) %>%
-    filter(dt >= 0 & dt <= 1*60)
+# dd <- dv %>% full_join(dt, by = c("vehicle_id", "timestamp")) %>%
+#     distinct() %>%
+#     do((.) %>% arrange(timestamp) %>% mutate(dt = c(-1, diff(timestamp)))) %>%
+#     filter(dt >= 0 & dt <= 1*60)
 
-dp2 <- ggplot(dd %>% filter(dt < 1*60), aes(dt)) +
-    geom_histogram(binwidth = 1) +
-    xlab("Time between updates (sec)") + ylab("Number of updates")
+# dp2 <- ggplot(dd %>% filter(dt < 1*60), aes(dt)) +
+#     geom_histogram(binwidth = 1) +
+#     xlab("Time between updates (sec)") + ylab("Number of updates")
 
-dp2 + geom_vline(aes(xintercept = x), 
-    data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) 
+# dp2 + geom_vline(aes(xintercept = x), 
+#     data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) 
 
-gridExtra::grid.arrange(
-    hp + geom_vline(aes(xintercept = x), 
-        data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) +
-        ggtitle("Dwell times"),
-    hp2 + geom_vline(aes(xintercept = x), 
-        data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) +
-        ggtitle("Trip updates only"),
-    dp + geom_vline(aes(xintercept = x), 
-        data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) +
-        ggtitle("Vehicle positions only"),
-    dp2 + geom_vline(aes(xintercept = x), 
-        data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) +
-        ggtitle("Combined"),
-    nrow = 4)
+# gridExtra::grid.arrange(
+#     hp + geom_vline(aes(xintercept = x), 
+#         data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) +
+#         ggtitle("Dwell times"),
+#     hp2 + geom_vline(aes(xintercept = x), 
+#         data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) +
+#         ggtitle("Trip updates only"),
+#     dp + geom_vline(aes(xintercept = x), 
+#         data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) +
+#         ggtitle("Vehicle positions only"),
+#     dp2 + geom_vline(aes(xintercept = x), 
+#         data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) +
+#         ggtitle("Combined"),
+#     nrow = 4)
 
 
 
-## find the stop
-library(RSQLite)
-library(dbplyr)
-tids <- unique(dt$trip_id)
-sts <- dbConnect(SQLite(), "fulldata.db") %>% tbl("stop_times") %>% 
-    select(trip_id, stop_sequence, stop_id) %>%
-    filter(trip_id %in% tids) %>%
-    collect
+# ## find the stop
+# library(RSQLite)
+# library(dbplyr)
+# tids <- unique(dt$trip_id)
+# sts <- dbConnect(SQLite(), "fulldata.db") %>% tbl("stop_times") %>% 
+#     select(trip_id, stop_sequence, stop_id) %>%
+#     filter(trip_id %in% tids) %>%
+#     collect
 
-dt <- dt %>% left_join(sts) %>%
-    mutate(
-        stop_id = as.factor(stop_id),
-        stopid = as.numeric(stop_id)
-    )
+# dt <- dt %>% left_join(sts) %>%
+#     mutate(
+#         stop_id = as.factor(stop_id),
+#         stopid = as.numeric(stop_id)
+#     )
 
-# library(biglm)
+# # library(biglm)
 
-# i <- 1
-# size <- 1000
-# fit <- biglm(dwell ~ stop_id, data = dt[i:(i+size-1),])
-# i <- i+size
-# cat("\n")
-# while (i < nrow(dt)) {
-#     cat(sprintf("\r%i / %i ", i, nrow(dt)))
-#     fit <- update(fit, dt[i:(i+size-1),])
-#     i <- i+size
-# }
-# cat("\r done                  \n")
+# # i <- 1
+# # size <- 1000
+# # fit <- biglm(dwell ~ stop_id, data = dt[i:(i+size-1),])
+# # i <- i+size
+# # cat("\n")
+# # while (i < nrow(dt)) {
+# #     cat(sprintf("\r%i / %i ", i, nrow(dt)))
+# #     fit <- update(fit, dt[i:(i+size-1),])
+# #     i <- i+size
+# # }
+# # cat("\r done                  \n")
 
 
 
@@ -203,8 +188,11 @@ trip_times_to_travel_times <- function(x) {
 # x <- tu %>% filter(trip_id == tu$trip_id[1])
 # x <- x %>% filter(vehicle_id == x$vehicle_id %>% table %>% sort %>% tail(1) %>% names)
 
+tu <- tripupdates
+rm(tripupdates)
 tu0 <- tu %>% distinct() %>%
-    group_by(trip_id, vehicle_id) %>%
+    mutate(date = as.Date(format(timestamp, '%Y-%m-%d'))) %>%
+    group_by(date, trip_id, vehicle_id) %>%
     do((.) %>% trip_times_to_travel_times())
 
 library(RSQLite)
@@ -218,7 +206,10 @@ routei <- con %>% tbl("routes") %>%
 dbDisconnect(con)
 rnums <- structure(routei$route_short_name, .Names = routei$route_id)
 
-tu1 <- tu0 %>% mutate(route_number = rnums[route_id])
+tu1 <- tu0 %>% mutate(
+    short_route_id = gsub('-.*', '', route_id),
+    route_number = rnums[route_id]
+)
 
     #     filter(between(
     #         timestamp, 
@@ -240,12 +231,12 @@ std <- function(x) {
     (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE)
 }
 
-rids <- names(sort(table(tu$route_id), TRUE))
-RID <- rids[10]; routei %>% filter(route_id == RID)
+rids <- names(sort(table(tu1$short_route_id), TRUE))
+RID <- rids[21]; routei %>% filter(grepl(RID, route_id))
 
 tu1r <- tu1 %>% 
     filter(
-        route_id == RID &
+        short_route_id == RID &
         between(travel_time, 20, 60*30)
     ) %>%
     filter(
@@ -253,43 +244,61 @@ tu1r <- tu1 %>%
     ) %>%
     group_by(segment_index) %>%
     do((.) %>% mutate(
+        time = as.POSIXct(paste(Sys.Date(), format(time_from, '%H:%M:%S'))),
+        dow = as.numeric(format(time_from, '%u')),
+        week = as.factor(ifelse(as.numeric(format(time_from, '%d')) < 8, 1, 2)),
+        weekend = as.numeric(dow > 5),
         travel_time.std = std(travel_time)
     )) %>%
     ungroup() %>%
     arrange(segment_index, time_from)
  
-
 ggplot(
     tu1r, 
-    aes(time_from, travel_time/60)
-) + geom_point() + facet_wrap(~segment_index)
+    aes(time, travel_time/60, colour = as.factor(dow))
+) + geom_point() + facet_grid(segment_index~weekend, scales = "free_y") +
+    scale_x_datetime(label = function(x) format(x, '%H')) +
+    geom_smooth(se = FALSE)
 
 ggplot(
-    tu1r, 
-    aes(time_from, travel_time.std/60)
-) + geom_point() + facet_wrap(~segment_index)
+    tu1r %>% filter(segment_index == 33), 
+    aes(time, travel_time/60, colour = as.factor(dow))
+) + geom_point() + facet_grid(week~weekend) +
+    scale_x_datetime(label = function(x) format(x, '%H'))
+
+ggplot(
+    tu1r %>% filter(segment_index == 33), 
+    aes(time, travel_time.std/60, colour = as.factor(dow))
+) + geom_point() + facet_grid(week~weekend) +
+    scale_x_datetime(label = function(x) format(x, '%H'))
 
 ## num -> [30min intervals]
-times <- pretty(tu1r$time_from, 20 * 2)
+times <- pretty(tu1r$time, 20 * 2)
 smry <- tu1r %>%
     mutate(
-        period = cut((.)$time_from, breaks = times)
+        period = cut((.)$time, breaks = times)
     ) %>%
-    group_by(segment_index, period) %>%
+    group_by(date, segment_index, period) %>%
     summarize(
         tt = mean(travel_time, na.rm = TRUE),
         sd.tt = sd(travel_time, na.rm = TRUE),
-        n = n()
+        n = n(),
+        dow = first(dow),
+        week = first(week),
+        weekend = first(weekend)
     ) %>%
     mutate(
         time = as.POSIXct(period)
     )
 
-ggplot(smry, aes(time, tt/60)) + 
+ggplot(smry %>% filter(segment_index == 18), 
+    aes(time, tt/60, colour = as.factor(dow))) + 
     geom_point() +
-    facet_wrap(~segment_index)
+    facet_grid(week~weekend) +
+    scale_x_datetime(label = function(x) format(x, '%H')) 
 
 
+## drop it into a matrix
 
 
 
@@ -311,23 +320,62 @@ segs <- con %>% tbl("road_segments") %>%
     collect()
 dbDisconnect(con)
 
-sx <- tu1 %>% left_join(tsegs, by = c("trip_id", "segment_index" = "shape_road_sequence")) %>%
+## short trip ...
+tu1 <- tu1 %>% mutate(short_trip_id = gsub('-.*', '', trip_id))
+tsegs <- tsegs %>% mutate(short_trip_id = gsub('-.*', '', trip_id))
+sx <- tu1 %>% inner_join(tsegs, by = c("short_trip_id", "segment_index" = "shape_road_sequence")) %>%
     filter(travel_time > 20 & travel_time < 60*30) %>%
     arrange(road_segment_id, time_from) %>%
     mutate(speed = length / travel_time) %>%
     filter(speed < 30)
 
-seg20 <- sx$road_segment_id %>% table %>% sort(TRUE) %>% names
-sx20 <- sx %>% filter(road_segment_id %in% seg20[61:80])
-# ggplot(sx20, aes(time_from, speed / 1000 * 60 * 60)) + 
-ggplot(sx20, aes(time_from, travel_time / 60)) + 
-    geom_point(aes(colour = route_id)) +
-    facet_wrap(~road_segment_id, scales = "free_y") +
+NX1segs <- sx %>% ungroup() %>% 
+    filter(grepl(RID, route_id)) %>%
+    select(road_segment_id, segment_index) %>% distinct() %>%
+    arrange(segment_index) %>%
+    filter(segment_index < max(segment_index))
+
+# seg20 <- sx$road_segment_id %>% table %>% sort(TRUE) %>% names
+sxnex <- sx %>% filter(road_segment_id %in% NX1segs$road_segment_id) %>%
+    mutate(
+        segment = factor(road_segment_id, levels = NX1segs$road_segment_id),
+        time = as.POSIXct(paste(Sys.Date(), format(time_from, '%H:%M:%S'))),
+        dow = as.numeric(format(time_from, '%u')),
+        week = as.factor(ifelse(as.numeric(format(time_from, '%d')) < 8, 1, 2)),
+        weekend = as.numeric(dow > 5)
+    )
+
+times2 <- pretty(sxnex$time, 20 * 2)
+smry2 <- sxnex %>% ungroup () %>%
+    mutate(
+        period = cut((.)$time, breaks = times2)
+    ) %>%
+    group_by(date, segment, period) %>%
+    summarize(
+        tt = mean(travel_time, na.rm = TRUE),
+        sd.tt = sd(travel_time, na.rm = TRUE),
+        n = n(),
+        speed = mean(speed, na.rm = TRUE)
+    ) %>%
+    ungroup () %>%
+    mutate(
+        time = as.POSIXct(period),
+        dow = as.numeric(format(date, '%u')),
+        week = as.factor(ifelse(as.numeric(format(date, '%d')) < 8, 1, 2)),
+        weekend = as.numeric(dow > 5)
+    )
+
+
+ggplot(smry2, aes(time, speed / 1000 * 60 * 60)) + 
+# ggplot(smry2, aes(time, tt / 60)) + 
+    geom_point(aes(colour = as.factor(week))) +
+    # geom_path(aes(colour = date)) +
+    facet_grid(segment~weekend, scales = "free_y") +
     xlab("Time") + 
-    # ylab("Speed (km/h)") +
     ylab("Travel time (min)") +
-    scale_colour_discrete(guide = FALSE) + 
     scale_x_datetime(label = function(x) format(x, '%H:%M'))
+    # geom_smooth(aes(colour = route_number), se = FALSE) + 
+    # scale_colour_discrete(guide = FALSE) + 
     # scale_y_log10()
     # geom_smooth(method = lm, formula = y ~ splines::bs(x, 4))
 
@@ -335,55 +383,38 @@ ggplot(sx20, aes(time_from, travel_time / 60)) +
 ### I want the model to work on both mu and sigma
 # i.e., mu(t) and sigma(t)
 
-r1 <- 
+alldata <- smry2 %>% 
+    select(date, time, segment, tt, speed, dow, week, weekend) %>%
+    mutate(
+        date = factor(date),
+        dow = factor(dow),
+        week = factor(week),
+        saturday = as.numeric(dow == 6),
+        sunday = as.numeric(dow == 7)
+    )
+train <- alldata %>% filter(week == 1)
+test <- alldata %>% filter(week == 2)
+
+rmse <- function(fit, data) 
+    mean((predict(fit, newdata = data) - data$tt)^2, na.rm = TRUE)
+
+
+fit0 <- lm(tt ~ segment - 1, data = train)
+rmse(fit0, test)
+
+fit1 <- lm(tt ~ segment * dow - 1, data = train)
+rmse(fit1, test)
+
+fit2 <- lm(tt ~ segment + segment*saturday + segment*sunday - 1, data = train)
+rmse(fit2, test)
+
+
+## spline models
+library(splines)
+sfit0 <- lm(tt ~ bs(time, intercept = TRUE):segment - 1, data = train)
+summary(sfit0)
+rmse(sfit0, test)
 
 
 
 
-
-
-
-# tu0s <- tu0 %>% ungroup() %>%
-#     group_by(vehicle_id, route_id, trip_id, stop_sequence) %>%
-#     summarize(
-#         arr = min(time),
-#         dep = max(time),
-#         dwell = dep - arr
-#     ) %>%
-#     do((.) %>%
-#         arrange(stop_sequence) %>%
-#         mutate(travel_time = c(0, .$arr[-1] - .$dep[-n()]))
-#     )
-# ## arr time at 'next' stop - dep time at 'this' stop
-
-# ggplot(tu0s, aes(trip_id, travel_time)) +
-#     geom_point()
-
-# trs <- tu0s %>% group_by(vehicle_id, route_id, trip_id) %>%
-#     summarize(
-#         time = min(arr),
-#         trip_time = sum(travel_time),
-#         n_stops = n(),
-#         min_stop = min(stop_sequence),
-#         max_stop = max(stop_sequence)
-#     ) 
-
-# ## only those with full obs [trip_id -> stop_count]
-# library(RSQLite)
-# library(dbplyr)
-# tids <- unique(trs$trip_id)
-# con <- dbConnect(SQLite(), "fulldata.db")
-# stopn <- con %>% tbl("stop_times") %>% 
-#     filter(trip_id %in% tids) %>%
-#     group_by(trip_id) %>%
-#     summarize(n = n()) %>%
-#     collect()
-# dbDisconnect(con)
-
-# stopn <- structure(stopn$n, .Names = stopn$trip_id)
-# trs2 <- trs %>% filter(min_stop == 1 & max_stop == stopn[trip_id])
-
-# ggplot(trs, aes(time, trip_time/60)) + geom_point()
-
-
-# ## can we map each observed segment to a road_segment ???
