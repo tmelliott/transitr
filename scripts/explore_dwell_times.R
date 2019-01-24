@@ -388,10 +388,12 @@ alldata <- smry2 %>%
     mutate(
         date = factor(date),
         dow = factor(dow),
+        dayofweek = factor(format(as.Date(date), '%a'), 
+            levels = c('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')),
         week = factor(week),
         saturday = as.numeric(dow == 6),
         sunday = as.numeric(dow == 7)
-    )
+    ) #%>% filter(segment == '4691')
 train <- alldata %>% filter(week == 1)
 test <- alldata %>% filter(week == 2)
 
@@ -399,7 +401,7 @@ rmse <- function(fit, data)
     mean((predict(fit, newdata = data) - data$tt)^2, na.rm = TRUE)
 
 
-fit0 <- lm(tt ~ segment - 1, data = train)
+fit0 <- lm(tt ~ 1, data = train)
 rmse(fit0, test)
 
 fit1 <- lm(tt ~ segment * dow - 1, data = train)
@@ -411,10 +413,82 @@ rmse(fit2, test)
 
 ## spline models
 library(splines)
-sfit0 <- lm(tt ~ bs(time, intercept = TRUE):segment - 1, data = train)
-summary(sfit0)
-rmse(sfit0, test)
+fitSpline <- function(i, j)
+    lm(speed ~ bs(time, intercept = TRUE, degree = i):segment + 
+        bs(time, intercept = TRUE, degree = j):weekend:segment - 1, data = train)
+
+RMSE <- expand.grid(i = 1:20, j = 1:15)
+RMSE$rmse <- apply(RMSE, 1, function(x) {
+    rmse(fitSpline(x["i"], x["j"]), test)
+})
+ggplot(RMSE, aes(i, j, size = log(rmse))) + geom_point()
+
+RMSE[which.min(RMSE$rmse), ]
+sfit <- fitSpline(5, 2)
+summary(sfit)
+test %>% mutate(speed.pred = predict(sfit, newdata = test)) %>%
+    ggplot(aes(time, speed.pred*3.6)) + 
+    geom_point(aes(y = speed*3.6), data = train, col = 'gray', size = 0.5) +
+    geom_point(aes(y = speed*3.6), data = test, col = 'orangered', size = 0.5) +
+    geom_path(aes(group = date), colour = 'steelblue') +
+    facet_grid(segment~dayofweek, scales = "free_y") +
+    xlab("Time") + 
+    ylab("Speed (m/s)") + #ylim(0, 100) +
+    scale_x_datetime(label = function(x) format(x, '%H:%M'))
+    # ylab("Travel time (min)") +
 
 
+## lag model
+alldata <- alldata %>% mutate(time_index = time %>% as.factor %>% as.integer)
+
+alldata.lag <- alldata %>%
+    filter(time_index > 1) %>%
+    mutate(time_index_lag = time_index - 1) %>%
+    left_join(
+        alldata %>% select(date, segment, time_index, tt, speed),
+        by = c('date', 'segment', 'time_index_lag' = 'time_index'),
+        suffix = c("", ".lag")
+    )
 
 
+train.lag <- alldata.lag %>% filter(week == 1)
+test.lag <- alldata.lag %>% filter(week == 2)
+
+ggplot(train.lag, aes(time, tt - tt.lag)) +
+    geom_point() +
+    facet_grid(segment~dayofweek, scales = "free_y") +
+    scale_x_datetime(label = function(x) format(x, '%H:%M'))
+
+
+fitLagSpline <- function(i, j)
+    lm(I(tt - tt.lag) ~ bs(time, degree = i, intercept = TRUE):segment +
+        bs(time, degree = j, intercept = TRUE):weekend:segment - 1, data = train.lag)
+
+RMSE <- expand.grid(i = 1:10, j = 1:5)
+RMSE$rmse <- apply(RMSE, 1, function(x) {
+    rmse(fitLagSpline(x["i"], x["j"]), test.lag)
+})
+ggplot(RMSE, aes(i, j, size = rmse)) + geom_point()
+
+RMSE[which.min(RMSE$rmse), ]
+lfit <- fitLagSpline(8, 3)
+summary(lfit)
+
+test.lag %>% mutate(tt.pred = predict(lfit, newdata = test.lag)) %>%
+    ggplot(aes(time, (tt.pred)/60)) + 
+    geom_point(aes(y = (tt - tt.lag)/60), data = train.lag, col = 'gray', size = 0.5) +
+    geom_path(aes(y = (tt.pred)/60, group = date), 
+        data = train.lag %>% mutate(tt.pred = predict(lfit, train.lag)), col = 'gray') +
+    geom_point(aes(y = (tt - tt.lag)/60), col = 'orangered', size = 0.5) +
+    # geom_path(col = 'orangered') +
+    facet_grid(segment~dayofweek, scales = "free_y") +
+    xlab("Time") + 
+    ylab("Travel Time (min)") + 
+    scale_x_datetime(label = function(x) format(x, '%H:%M'))
+    # ggplot(aes(time, speed.pred*3.6)) + 
+    # geom_point(aes(y = speed*3.6), data = train, col = 'gray', size = 0.5) +
+    # geom_point(aes(y = speed*3.6), data = test, col = 'orangered', size = 0.5) +
+    # ylab("Travel time (min)") +
+
+
+predict(fit, test.lag %>% mutate(tt.lag = 0))
