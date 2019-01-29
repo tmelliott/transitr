@@ -15,9 +15,10 @@ namespace Gtfs {
     {
         if (!valid () || complete ()) return;
 
-
+#if VERBOSE == 2
         Timer timer;
         std::cout << "\n- vehicle " << _vehicle_id << " - predicting etas";
+#endif
 
         // std::cout << "\n\n Segment information ...";
         auto segments = _trip->shape ()->segments ();
@@ -39,7 +40,9 @@ namespace Gtfs {
         //         << ": distance = " << stops.at (j).distance;
         // }
 
+#if VERBOSE == 2
         std::cout << "\n    --- Particle ETAs ...";
+#endif
         for (auto p = _state.begin (); p != _state.end (); ++p) 
         {
             p->predict_etas (rng);
@@ -51,13 +54,16 @@ namespace Gtfs {
             //         << p->get_departure_time (l);
             // }
 
+#if VERBOSE == 2
             std::cout << "\n    => ";
             for (auto eta : p->get_arrival_times ()) {
                 if (eta <= _timestamp) std::cout << "*, ";
                 else std::cout << ((eta - _timestamp)) << ", ";
             }
+#endif
         }
 
+#if VERBOSE == 2
         std::cout << "\n\n    --- Particle travel times ...";
         // get travel time for each stop
         int L = _trip->shape ()->segments ().size ();
@@ -69,6 +75,7 @@ namespace Gtfs {
                 std::cout << p.get_travel_time_prediction (l) << ", ";
             }
         }
+#endif
 
         /**
          * Now, we assume the particles have taken into account any correlation
@@ -80,6 +87,7 @@ namespace Gtfs {
         // auto stops = _trip->stops ();
         int M = stops.size ();
         
+#if VERBOSE == 2
         std::cout << std::setprecision (0) << std::fixed;
         std::cout << "\n\n  >> E(B) vector: [";
         for (auto b : _tt_state) std::cout << " " << b << " ";
@@ -91,15 +99,18 @@ namespace Gtfs {
         }
         
         std::cout << "\n\n  >> generate observation of B (stop-stop travel times) and estimate of R\n";
+#endif
         std::vector<double> tt_obs (M, 0.0);
         std::vector<std::vector<double> > tt_r (M, std::vector<double> (M, 0.0));
 
         double cov_lj;
-        std::cout << "  > curtime = " << _timestamp << "\n";
-        std::cout << "  > curstop = " << _current_stop << "\n";
+        // std::cout << "  > curtime = " << _timestamp << "\n";
+        // std::cout << "  > curstop = " << _current_stop << "\n";
         for (int l=0; l<M; l++)
         {
+#if VERBOSE == 2
             std::cout << "\n STOP " << l << ": ";
+#endif
             tt_obs.at (l) = std::accumulate(_state.begin (), _state.end (), 0.0,
                                             [&](double d, Particle& p) {
                                                 int dt;
@@ -109,7 +120,7 @@ namespace Gtfs {
                                                     // this stop is behind this particle
                                                     dt = 0;
                                                 }
-                                                if (l == p.get_stop_index () + 1)
+                                                else if (l == p.get_stop_index () + 1)
                                                 {
                                                     // it's the next stop for this particle
                                                     dt = p.get_arrival_time (l) - _timestamp;
@@ -122,13 +133,17 @@ namespace Gtfs {
                                                     //     << p.get_departure_time (l - 1) << " = ) ";
                                                 }
                                                 if (dt < 0) dt = 0;
+#if VERBOSE == 2
                                                 std::cout << std::setw (5) << dt << ", ";
+#endif
                                                 return d + dt;
                                             });
             tt_obs.at (l) /= (double)_state.size ();
         }
+#if VERBOSE == 2
         std::cout << "\n\n Z vector: [";
         for (auto z : tt_obs) std::cout << " " << z << " ";
+#endif
 
         for (int l=0; l<M; l++) {
             for (int j=0; j<M; j++)
@@ -170,6 +185,7 @@ namespace Gtfs {
             }
         }
 
+#if VERBOSE == 2
         std::cout << "]\n R matrix: ";
         for (auto br : tt_r)
         {
@@ -177,26 +193,155 @@ namespace Gtfs {
             for (auto bc : br) std::cout << std::setw(9) << std::round (bc) << "  ";
         }
         std::cout << "\n ---------\n";
-        
 
         std::cout << "\n Now update the travel time estimates' state ...\n";
+#endif
+        int tt_delta;
         if (_tt_time == 0)
         {
             _tt_state = tt_obs;
             _tt_cov = tt_r;
+            tt_delta = 0;
         }
         else
         {
-            int tt_delta = _timestamp - _tt_time;
-            std::cout << " -> " << tt_delta << " seconds ... \n";
+            tt_delta = _timestamp - _tt_time;
+        }
+        
+        if (tt_delta > 0)
+        {
+#if VERBOSE == 2
+            std::cout << " -> ETA delta: " << tt_delta << " seconds ... \n";
+#endif
+
+            // we need to work on the submatrix (exclude passed stops)
+            int min_i = 0;
+            while (_tt_state.at (min_i) == 0 && min_i < M-1) min_i++;
+            M -= min_i;
+
+            // std::cout << "From stop " << min_i << " (M = " << M << ")\n";
+
+            // --- Predict equations
+            // Convert B to (column) vector
+            Eigen::VectorXd Bmat (M);
+            for (int i=0; i<M; i++) Bmat (i) = _tt_state.at (i+min_i);
+            // std::cout << "\n Bhat = \n" << Bmat;
+
+            // Convert P to a matrix
+            Eigen::MatrixXd Pmat (M, M);
+            for (int i=0; i<M; i++)
+                for (int j=0; j<M; j++)
+                    Pmat (i ,j) = _tt_cov.at (i+min_i).at (j+min_i);
+            // std::cout << "\n P = \n" << Pmat;
+
             // construct F matrix
-            std::cout << "\n  >> F (transition) matrix:";
+            Eigen::MatrixXd F (M, M);
+            F.setZero ();
+            for (int i=0; i<M; i++)
+            {
+                if (tt_delta == 0) F (i, i) = 1;
+                if (Bmat(i) <= 1e-6) F (i, i) = 1;
+                F (i, i) = fmin(1, fmax(0, 1 - (double)tt_delta / Bmat (i)));
+            }
+            // std::cout << "\n F = \n" << F;
             
+            // Identity matrix
+            Eigen::MatrixXd I (M, M);
+            I = Eigen::MatrixXd::Identity (M, M);
+
+            // Predict Bhat
+            Eigen::VectorXd Bhat (M);
+            Bhat = F * Bmat;
+            // std::cout << "\n Bhat = \n" << Bhat;
+
+            // Predict Phat 
+            Eigen::MatrixXd Phat (M, M);
+            Phat = F * Pmat * F.transpose () + I * tt_delta;
+            // std::cout << "\n Phat = \n" << Phat;
+
+
+            // --- Update equations
+            // Convert Z to (column) vector
+            Eigen::VectorXd Z (M);
+            for (int i=0; i<M; i++) Z (i) = tt_obs.at (i+min_i);
+            // std::cout << "\n Z = \n" << Z;
+
+            // Convert R to matrix
+            Eigen::MatrixXd R (M, M);
+            for (int i=0; i<M; i++)
+                for (int j=0; j<M; j++)
+                    R (i, j) = tt_r.at (i+min_i).at (j+min_i);
+            // std::cout << "\n R = \n" << R;
+
+            
+            // Measurement matrix
+            Eigen::MatrixXd H = I;
+
+            // Innovation residual
+            Eigen::VectorXd resid_y = Z - H * Bhat;
+            // std::cout << "\n yresid = \n" << resid_y;
+
+            // Innovation covariance
+            Eigen::MatrixXd S = R + H * Phat * H.transpose ();
+            // std::cout << "\n S = \n" << S;
+
+            // Kalman gain
+            Eigen::MatrixXd K = Phat * H.transpose () * S.inverse ();
+            // std::cout << "\n K = \n" << K;
+
+            // Updated state estimate
+            Bhat = Bhat + K * resid_y;
+            // std::cout << "\n Bhat = \n" << Bhat;
+
+            // Update state covariance
+            Phat = (I - K * H) * Phat * (I - K * H).transpose () +
+                K * R * K.transpose ();
+            // std::cout << "\n Phat = \n" << Phat;
+
+            // Save state
+            int Mx = stops.size ();
+            for (int i=0; i<Mx; i++)
+            {
+                _tt_state.at (i) = (i < min_i) ? 0 : Bhat (i - min_i);
+            }
+#if VERBOSE == 2
+            std::cout << "\n\n New state vector: [";
+            for (auto z : _tt_state) std::cout << " " << z << " ";
+            std::cout << "]";
+#endif
+
+            for (int i=0; i<Mx; i++)
+            {
+                for (int j=0; j<Mx; j++)
+                {
+                    _tt_cov.at (i).at (j) = (i < min_i || j < min_i) ? 0 : Phat (i-min_i, j-min_i);
+                }
+            }
+#if VERBOSE == 2
+            std::cout << "]\n with covariance matrix: ";
+            for (auto br : _tt_cov)
+            {
+                std::cout << "\n  ";
+                for (auto bc : br) std::cout << std::setw(9) << std::round (bc) << "  ";
+            }
+            std::cout << "\n\n";
+#endif
+            
+
         }
 
 
         _tt_time = _timestamp;
         std::cout << std::setprecision (6);
+
+        // Place arrival times into vector
+        // int tsum = 0;
+        // for (int i=0; i<stops.size (); i++)
+        // {
+        //     if (_tt_state.at (i) == 0) _stop_arrival_times.at (i) = 0;
+        //     tsum += _tt_state.at (i); // no dwell time model
+        //     _stop_arrival_times.at (i) = tsum;
+        // }
 
 #if VERBOSE == 2
         std::cout << "\n   (" << timer.cpu_seconds () << "ms)\n";
@@ -209,65 +354,27 @@ namespace Gtfs {
         int M (stops.size ());
         etavector etas;
         etas.resize (M);
+        
         if (!valid ()) return etas;
         // std::cout << "\n Vehicle " << _vehicle_id << " =============================";
+        
         std::vector<uint64_t> etam;
-        std::vector<double> wts;
         etam.reserve (_state.size ());
-        wts.reserve (_state.size ());
-        double sumwt;
+
+        double tsum = 0.0;
         for (int i=0; i<M; ++i)
         {
-            // need to center each particle's arrival time
-            // std::cout << "\n   [" << i << "]: ";
-            int tarr = 0;
-            int ni = 0;
-            etam.clear ();
-            wts.clear ();
-
-            for (auto p = _state.begin (); p != _state.end (); ++p)
-            {
-                // std::cout << p->get_arrival_time (i) << ", ";
-                if (p->get_arrival_time (i) > 0)
-                {
-                    tarr += p->get_weight () * (p->get_arrival_time (i) - _timestamp);
-                    etam.push_back (p->get_arrival_time (i));
-                    wts.push_back (p->get_weight ());
-                }
-            }
-            if (wts.size () != _N) continue;
-            sumwt = std::accumulate (wts.begin (), wts.end (), 0.0);
-            if (sumwt < 0.9) continue;
-
             etas.at (i).stop_id = stops.at (i).stop->stop_id ();
-            etas.at (i).estimate = _timestamp + tarr;
+            etas.at (i).estimate = 0;
+            tsum += fmax (0, _tt_state.at (i));
+            if (tsum <= 0) continue;
+            
+            etas.at (i).estimate = _timestamp + tsum;
+
+            // --- calculate the marginal quantiles ...
             // generate quantiles [0, 5, 50, 95, 100] -> [0, 50, 500, 950, 999]
-            std::sort (etam.begin (), etam.end ());
-            etas.at (i).quantiles.emplace_back (0.0, etam.front ());
-            int qi = 0;
-            double cwt = 0.0;
-            while (cwt <= 0.05 * sumwt && qi < wts.size ())
-            {
-                cwt += wts.at (qi);
-                qi++;
-                // std::cout << ".";
-            }
-            etas.at (i).quantiles.emplace_back (5.0, etam.at (qi));
-            while (cwt <= 0.5 * sumwt && qi < wts.size ())
-            {
-                cwt += wts.at (qi);
-                qi++;
-                // std::cout << ".";
-            }
-            etas.at (i).quantiles.emplace_back (50.0, etam.at (qi));
-            while (cwt <= 0.95 * sumwt && qi < wts.size ())
-            {
-                cwt += wts.at (qi);
-                qi++;
-                // std::cout << ".";
-            }
-            etas.at (i).quantiles.emplace_back (95.0, etam.at (qi));
-            etas.at (i).quantiles.emplace_back (100.0, etam.back ());
+            // etas.at (i).quantiles.emplace_back (95.0, etam.at (qi));
+            // etas.at (i).quantiles.emplace_back (100.0, etam.back ());
         }
         return etas;
     }
@@ -388,76 +495,6 @@ namespace Gtfs {
             si++;
         }
 
-        return;
-
-        
-        // double dcur = distance;
-        // double dnext;
-        // uint64_t t0 = vehicle->timestamp ();
-        // // std::cout << t0 << " > ";
-        // int etat, tt_total = 0;
-        // // double vel;
-        // // vel = segments->at (l).segment->sample_speed (rng);
-        // // if (vel == 0.0 && speed >= 0.0) vel = speed;
-        // // // std::cout << "\n        P: stop " << (stop_index+1) << "/" << M
-        // // //     << ", segment " << (l+1) << "/" << L;
-        // // while (vel <= 0 || vel > 30)
-        // // {
-        // //     vel = rng.rnorm () * 8.0 + 15.0;
-        // // }
-
-        // // -------------------------------- FOR NOW! update in future
-        // ttpred.resize (L, 0);
-
-        // std::cout << "\n";
-        // while (si < M-1)
-        // {
-        //     std::cout << " | si = " << si << " -> ";
-        //     si++; // `next` stop index
-        //     std::cout << si << ", ";
-        //     dnext = stops->at (si).distance;
-        //     etat = 0;
-        //     // std::cout << " [";
-        //     while (next_segment_d <= dnext && l < L-1)
-        //     {
-        //         std::cout << " l = " << l << " -> ";
-        //         // time to get to end of segment
-        //         ttpred.at (l) += (next_segment_d - dcur) / vel + 0.5; // 0.5 for integer rounding
-        //         etat += ttpred.at (l);
-        //         tt_total += ttpred.at (l);
-        //         dcur = next_segment_d;
-        //         l++;
-        //         std::cout << l << ", ";
-        //         next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
-        //         vel = segments->at (l).segment->sample_speed (rng, tt_total);
-        //         if (vel == 0.0 && speed >= 0.0) vel = speed;
-        //         while (vel <= 0.0 || vel > 30)
-        //         {
-        //             vel = rng.rnorm () * 8.0 + 15.0;
-        //         }
-        //         // std::cout << vel << "; ";
-        //     }
-        //     // std::cout << "] ";
-        //     ttpred.at (l) += (dnext - dcur) / vel + 0.5;
-        //     etat += (dnext - dcur) / vel + 0.5;
-        //     tt_total += (dnext - dcur) / vel + 0.5;
-        //     t0 += etat;
-        //     dcur = dnext;
-        //     at.at (si) = t0;
-        //     // and add some dwell time
-        //     if (rng.runif () < vehicle->pr_stop ())
-        //     {
-        //         t0 += vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
-        //     }
-        //     dt.at (si) = t0;
-        //     // std::cout << "(" << m << ") " << at.at (m) << ", ";
-        // }
-        // // last segment
-        // std::cout << l << "..." << ttpred.at (l) << " ... ";
-        // if (l < L-1)
-        // {
-        //     std::cout << " not finished...";
-        // }
     }
 
 }

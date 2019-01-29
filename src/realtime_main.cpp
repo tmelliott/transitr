@@ -219,20 +219,20 @@ void run_realtime_model (List nw)
         timer.report ("predicting ETAs");
 
         // Write vehicles to (new) feed
-// #if SIMULATION
-//         std::ostringstream outputname_t;
-//         outputname_t << "etas/etas";
-//         if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ()) 
-//         {
-//             outputname_t << "_" << rtfeed.feed ()->header ().timestamp ();
-//         }
-//         outputname_t << ".pb";
-//         std::string oname (outputname_t.str ());
-//         write_vehicles (&vehicles, oname);
-// #endif
-//         write_vehicles (&vehicles, outputname);
+#if SIMULATION
+        std::ostringstream outputname_t;
+        outputname_t << "etas/etas";
+        if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ()) 
+        {
+            outputname_t << "_" << rtfeed.feed ()->header ().timestamp ();
+        }
+        outputname_t << ".pb";
+        std::string oname (outputname_t.str ());
+        write_vehicles (&vehicles, oname);
+#endif
+        write_vehicles (&vehicles, outputname);
 
-//         timer.report ("writing ETAs to protobuf feed");
+        timer.report ("writing ETAs to protobuf feed");
 
         gtfs.close_connection (true);
         timer.end ();

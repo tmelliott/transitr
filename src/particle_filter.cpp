@@ -963,8 +963,9 @@ namespace Gtfs {
         double lX2 = 2 * (ld - log (sigma));
         // log pdf of lX2 ~ Exp(2)
         log_likelihood = log (0.5) - 0.5 * exp(lX2);
-
+#if VERBOSE == 2
         if (vehicle->get_n () < 20) std::cout << " => d(h(x), y) = " << exp (ld) << "m";
+#endif
     }
 
     void Particle::calculate_likelihood (Event& e, double error)
