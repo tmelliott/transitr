@@ -691,7 +691,7 @@ namespace Gtfs {
         std::vector<StopTime>* stops;
         stops = &(vehicle->trip ()->stops ());
         int M (stops->size ());
-        // stop_index = find_stop_index (distance, stops);
+        stop_index = find_stop_index (distance, stops);
         // std::cout << " [M=" << M << ",m=" << stop_index << "], ";
         if (stop_index == M-1) 
         {

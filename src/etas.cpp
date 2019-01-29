@@ -15,48 +15,60 @@ namespace Gtfs {
     {
         if (!valid () || complete ()) return;
 
-#if VERBOSE == 2
+
         Timer timer;
         std::cout << "\n- vehicle " << _vehicle_id << " - predicting etas";
 
-        std::cout << "\n\n Segment information ...";
+        // std::cout << "\n\n Segment information ...";
         auto segments = _trip->shape ()->segments ();
-        for (int l = 0; l < segments.size (); l++)
-        {
-            std::cout << "\n  - " << l
-                << ": tt=" << segments.at (l).segment->travel_time ()
-                << " (" << segments.at (l).segment->uncertainty ()
-                << ")";
-        }
+        // for (int l = 0; l < segments.size (); l++)
+        // {
+        //     std::cout << "\n  - " << l << ":"
+        //         // << " distance = " << segments.at (l).distance
+        //         // << ", length = " << segments.at (l).segment->length () << ", "
+        //         << " tt=" << segments.at (l).segment->travel_time ()
+        //         << " (" << segments.at (l).segment->uncertainty ()
+        //         << ")";
+        // }
 
-#endif
+        auto stops = _trip->stops ();
+        // std::cout << "\n\n Stop information ...";
+        // for (auto j = 0; j < stops.size (); j++)
+        // {
+        //     std::cout << "\n  - " << j
+        //         << ": distance = " << stops.at (j).distance;
+        // }
+
+        std::cout << "\n    --- Particle ETAs ...";
         for (auto p = _state.begin (); p != _state.end (); ++p) 
         {
             p->predict_etas (rng);
-#if VERBOSE == 2
-            std::cout << "\n       => ";
+            // std::cout << "\n  --- stops:";
+            // for (int l = 0; l < stops.size (); l++)
+            // {
+            //     std::cout << "\n     [" << l << "]:"
+            //         << p->get_arrival_time (l) << ", "
+            //         << p->get_departure_time (l);
+            // }
+
+            std::cout << "\n    => ";
             for (auto eta : p->get_arrival_times ()) {
                 if (eta <= _timestamp) std::cout << "*, ";
                 else std::cout << ((eta - _timestamp)) << ", ";
             }
-#endif
-            // std::cout << "\n VERSUS ... ";
-            // for (int i=0; i<p->get_arrival_times ().size (); ++i) 
-            //     std::cout << p->get_arrival_time (i) << ",";
         }
 
-        std::cout << "\n  --- travel times ...";
+        std::cout << "\n\n    --- Particle travel times ...";
         // get travel time for each stop
         int L = _trip->shape ()->segments ().size ();
         for (auto& p : _state)
         {
-            std::cout << "\n    > ";
-            for (int l=p.get_segment_index (); l<L; l++)
+            std::cout << "\n    => ";
+            for (int l=0; l<L; l++)
             {
                 std::cout << p.get_travel_time_prediction (l) << ", ";
             }
         }
-
 
         /**
          * Now, we assume the particles have taken into account any correlation
@@ -65,43 +77,51 @@ namespace Gtfs {
          * Simply need to compute B and Cov matrix for travel times (for this vehicle)
          */
         
-        auto stops = _trip->stops ();
+        // auto stops = _trip->stops ();
         int M = stops.size ();
         
         std::cout << std::setprecision (0) << std::fixed;
-        // std::cout << "\n\n E(B) vector: [";
-        // for (auto b : _tt_state) std::cout << " " << b << " ";
-        // std::cout << "]\n Var(B) matrix: ";
-        // for (auto br : _tt_cov)
-        // {
-        //     std::cout << "\n  ";
-        //     for (auto bc : br) std::cout << std::setw(9) << std::round (bc) << "  ";
-        // }
-        // std::cout << "\n ---------\n";
+        std::cout << "\n\n  >> E(B) vector: [";
+        for (auto b : _tt_state) std::cout << " " << b << " ";
+        std::cout << "]\n  >> Var(B) matrix: ";
+        for (auto br : _tt_cov)
+        {
+            std::cout << "\n  ";
+            for (auto bc : br) std::cout << std::setw(9) << std::round (bc) << "  ";
+        }
         
-        std::cout << "\n >> generate observation of B (Z) and estimate of R\n";
+        std::cout << "\n\n  >> generate observation of B (stop-stop travel times) and estimate of R\n";
         std::vector<double> tt_obs (M, 0.0);
         std::vector<std::vector<double> > tt_r (M, std::vector<double> (M, 0.0));
 
         double cov_lj;
-        std::cout << " > curtime = " << _timestamp << "\n";
-        for (int l=_current_stop+1; l<M; l++)
+        std::cout << "  > curtime = " << _timestamp << "\n";
+        std::cout << "  > curstop = " << _current_stop << "\n";
+        for (int l=0; l<M; l++)
         {
             std::cout << "\n STOP " << l << ": ";
             tt_obs.at (l) = std::accumulate(_state.begin (), _state.end (), 0.0,
                                             [&](double d, Particle& p) {
                                                 int dt;
-                                                if (l == _current_stop + 1)
+                                                // std::cout << "[" << p.get_stop_index () << "]";
+                                                if (l <= p.get_stop_index ())
                                                 {
+                                                    // this stop is behind this particle
+                                                    dt = 0;
+                                                }
+                                                if (l == p.get_stop_index () + 1)
+                                                {
+                                                    // it's the next stop for this particle
                                                     dt = p.get_arrival_time (l) - _timestamp;
                                                 }
                                                 else 
                                                 {
                                                     dt = p.get_arrival_time (l) - p.get_departure_time (l - 1);
-                                                    std::cout << "("
-                                                        << p.get_arrival_time (l) << " - "
-                                                        << p.get_departure_time (l - 1) << " = ) ";
+                                                    // std::cout << "("
+                                                    //     << p.get_arrival_time (l) << " - "
+                                                    //     << p.get_departure_time (l - 1) << " = ) ";
                                                 }
+                                                if (dt < 0) dt = 0;
                                                 std::cout << std::setw (5) << dt << ", ";
                                                 return d + dt;
                                             });
@@ -110,13 +130,17 @@ namespace Gtfs {
         std::cout << "\n\n Z vector: [";
         for (auto z : tt_obs) std::cout << " " << z << " ";
 
-        for (int l=_current_stop+1; l<M; l++) {
-            for (int j=_current_stop+1; j<M; j++)
+        for (int l=0; l<M; l++) {
+            for (int j=0; j<M; j++)
             {
                 cov_lj = std::accumulate(_state.begin (), _state.end (), 0.0,
                                          [&](double d, Particle& p) {
+                                            if (l <= p.get_stop_index () || 
+                                                j <= p.get_stop_index () ||
+                                                p.get_arrival_time (l) == 0) return d;
+                                            
                                             double xi, yi;
-                                            if (l == _current_stop + 1)
+                                            if (l == p.get_stop_index () + 1)
                                             {
                                                 xi = p.get_arrival_time (l) - _timestamp;
                                             }
@@ -129,7 +153,7 @@ namespace Gtfs {
                                             {
                                                 yi = xi;
                                             }
-                                            else if (j == _current_stop + 1)
+                                            else if (j == p.get_stop_index () + 1)
                                             {
                                                 yi = p.get_arrival_time (j) - _timestamp;
                                             }
@@ -165,6 +189,9 @@ namespace Gtfs {
         {
             int tt_delta = _timestamp - _tt_time;
             std::cout << " -> " << tt_delta << " seconds ... \n";
+            // construct F matrix
+            std::cout << "\n  >> F (transition) matrix:";
+            
         }
 
 
@@ -259,6 +286,7 @@ namespace Gtfs {
         ttpred.resize (L, 0);
 
         // current segment is partial
+        // std::cout << "\n\n   --- step 1: travel times from segment " << segment_index << "\n";
         ttpred.at (segment_index) = (distance - segments->at (segment_index).distance) / speed + 0.5;
         // store cumlative travel time for forecasting ahead
         int tcum = ttpred.at (segment_index);
@@ -270,6 +298,8 @@ namespace Gtfs {
                 // something from [5, 25]
                 ttpred.at (l) = segments->at (l).segment->length () / (rng.runif () * 20.0 + 15.0);
             }
+            // std::cout << "   [" << std::setw(2) << l << "] "
+            //     << std::setw (5) << ttpred.at (l);
             tcum += ttpred.at (l);
         }
 
@@ -295,43 +325,63 @@ namespace Gtfs {
         // if (vehicle_at_stop) then add dwell time for stop (stop_index)
         
         double v;
+        // std::cout << "\n\n   --- step 2: stop arrival(/departure) predictions (last stop = " 
+        //     << stop_index << ")\n";
+        // std::cout << " (start at " << t0 << ")";
         while (si < M)
         {
             etat = 0;
             l = li;
             li = find_segment_index (stops->at (si).distance, segments);
 
+            // std::cout << "\n   [" << std::setw (2) << si << "]";
             if (l == li)
             {
+                // std::cout << "A ";
                 // both stops in the same segment
                 v = (l == segment_index) ? speed : segments->at (l).segment->length () / ttpred.at (l);
                 etat = (stops->at (si).distance - dcur) / v + 0.5;
+                // std::cout << (stops->at (si).distance - dcur) << "m @ "
+                //     << v << "m/s -> "
+                //     << etat << "s";
             }
             else 
             {
+                // std::cout << "B ["
+                //     << l << "-" << li << "] ";
                 // stops in different segments
                 // first, rest of segment (l)
                 v = (l == segment_index) ? speed : segments->at (l).segment->length () / ttpred.at (l);
                 // using segment length avoids l+1 being out of index
-                etat += (segments->at (l).segment->length () - dcur + segments->at (l).distance) / v + 0.5;
+                etat += (segments->at (l).distance + segments->at (l).segment->length () - dcur) / v + 0.5;
 
+                // std::cout << (segments->at (l).distance + segments->at (l).segment->length () - dcur)
+                //     << "m @ " << v << "m/s -> "
+                //     << etat << "s";
                 // then any intermediate segments
-                for (int j=l+1; j<li-1; j++)
+                for (int j=l+1; j<li; j++)
                 {
                     etat += ttpred.at (j);
+                    // std::cout << " + " << ttpred.at (j);
                 }
 
                 // then beginning bit of segment (li)
-                if (segments->at (li).distance < stops->at (si).distance)
-                {
-                    v = segments->at (li).segment->length () / ttpred.at (li);
-                    etat += (stops->at (si).distance - segments->at (li).distance) / v + 0.5;
-                }
+                // if (segments->at (li).distance < stops->at (si).distance)
+                // {
+                // }
+                v = segments->at (li).segment->length () / ttpred.at (li);
+                etat += (stops->at (si).distance - segments->at (li).distance) / v + 0.5;
+                // std::cout << " + "
+                //     << (stops->at (si).distance - segments->at (li).distance)
+                //     << "m @ " << v << "m/s -> "
+                //     << (stops->at (si).distance - segments->at (li).distance) / v + 0.5
+                //     << "s";
             }
 
             dcur = stops->at (si).distance;
             t0 += etat;
             at.at (si) = t0;
+            // std::cout << " = " << etat << " -> " << t0;
             // add dwell time 
             t0 += 0;
             dt.at (si) = t0;

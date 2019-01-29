@@ -3,5 +3,7 @@
 
 #include "gtfs.h"
 
+#include "eigen3/Eigen/Dense"
+
 
 #endif
