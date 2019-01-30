@@ -156,9 +156,12 @@ void run_realtime_model (List nw)
 #endif
         #pragma omp parallel for num_threads(params.n_core)
         for (unsigned i=0; i<vehicles.bucket_count (); ++i)
-        {       
+        {
             for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
             {
+// #if VERBOSE > 1
+//                 if (v->second.trip ()->route ()->route_short_name () != "928") continue;
+// #endif
                 v->second.mutate (rngs.at (omp_get_thread_num ()), &gtfs);
             }
         }
@@ -212,7 +215,9 @@ void run_realtime_model (List nw)
         {
             for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
             {
-                if (v->second.trip ()->route ()->route_short_name () != "NX1") continue;
+#if VERBOSE > 1
+                if (v->second.trip ()->route ()->route_short_name () != "928") continue;
+#endif
                 v->second.predict_etas (rngs.at (omp_get_thread_num ()));
             }
         }

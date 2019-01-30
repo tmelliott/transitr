@@ -113,7 +113,10 @@ namespace Gtfs {
     int Segment::sample_travel_time (RNG& rng, int delta)
     {
         if (!loaded) load ();
-        if (_uncertainty == 0 || _travel_time == 0) return 0.0;
+        if (_uncertainty == 0 || _travel_time == 0) 
+        {
+            return _length / fmax(5.0, rng.rnorm () * 10.0 + 30.0);
+        }
 
         auto x = predict (delta);
 

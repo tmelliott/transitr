@@ -145,9 +145,15 @@ namespace Gtfs {
         for (auto z : tt_obs) std::cout << " " << z << " ";
 #endif
 
-        for (int l=0; l<M; l++) {
+        for (int l=0; l<M; l++) 
+        {
             for (int j=0; j<M; j++)
             {
+                // if (l != j)
+                // {
+                //     tt_r.at (l).at (j) = 0;
+                //     continue;
+                // }
                 cov_lj = std::accumulate(_state.begin (), _state.end (), 0.0,
                                          [&](double d, Particle& p) {
                                             if (l <= p.get_stop_index () || 
@@ -207,16 +213,16 @@ namespace Gtfs {
         {
             tt_delta = _timestamp - _tt_time;
         }
-        
+
         if (tt_delta > 0)
         {
 #if VERBOSE == 2
             std::cout << " -> ETA delta: " << tt_delta << " seconds ... \n";
 #endif
 
-            // we need to work on the submatrix (exclude passed stops)
+            // we need to work on the submatrix (exclude passed stops BASED ON THE DATA (not the state))
             int min_i = 0;
-            while (_tt_state.at (min_i) == 0 && min_i < M-1) min_i++;
+            while (tt_obs.at (min_i) == 0 && min_i < M-1) min_i++;
             M -= min_i;
 
             // std::cout << "From stop " << min_i << " (M = " << M << ")\n";
@@ -225,14 +231,14 @@ namespace Gtfs {
             // Convert B to (column) vector
             Eigen::VectorXd Bmat (M);
             for (int i=0; i<M; i++) Bmat (i) = _tt_state.at (i+min_i);
-            // std::cout << "\n Bhat = \n" << Bmat;
+            std::cout << "\n Bhat = \n" << Bmat;
 
             // Convert P to a matrix
             Eigen::MatrixXd Pmat (M, M);
             for (int i=0; i<M; i++)
                 for (int j=0; j<M; j++)
                     Pmat (i ,j) = _tt_cov.at (i+min_i).at (j+min_i);
-            // std::cout << "\n P = \n" << Pmat;
+            std::cout << "\n P = \n" << Pmat;
 
             // construct F matrix
             Eigen::MatrixXd F (M, M);
@@ -243,7 +249,7 @@ namespace Gtfs {
                 if (Bmat(i) <= 1e-6) F (i, i) = 1;
                 F (i, i) = fmin(1, fmax(0, 1 - (double)tt_delta / Bmat (i)));
             }
-            // std::cout << "\n F = \n" << F;
+            std::cout << "\n F = \n" << F;
             
             // Identity matrix
             Eigen::MatrixXd I (M, M);
@@ -252,12 +258,12 @@ namespace Gtfs {
             // Predict Bhat
             Eigen::VectorXd Bhat (M);
             Bhat = F * Bmat;
-            // std::cout << "\n Bhat = \n" << Bhat;
+            std::cout << "\n Bhat = \n" << Bhat;
 
             // Predict Phat 
             Eigen::MatrixXd Phat (M, M);
-            Phat = F * Pmat * F.transpose () + I * tt_delta;
-            // std::cout << "\n Phat = \n" << Phat;
+            Phat = F * Pmat * F.transpose () + I * (2 * tt_delta);
+            std::cout << "\n Phat = \n" << Phat;
 
 
             // --- Update equations
@@ -279,7 +285,7 @@ namespace Gtfs {
 
             // Innovation residual
             Eigen::VectorXd resid_y = Z - H * Bhat;
-            // std::cout << "\n yresid = \n" << resid_y;
+            std::cout << "\n yresid = \n" << resid_y;
 
             // Innovation covariance
             Eigen::MatrixXd S = R + H * Phat * H.transpose ();
@@ -287,16 +293,16 @@ namespace Gtfs {
 
             // Kalman gain
             Eigen::MatrixXd K = Phat * H.transpose () * S.inverse ();
-            // std::cout << "\n K = \n" << K;
+            std::cout << "\n K = \n" << K;
 
             // Updated state estimate
             Bhat = Bhat + K * resid_y;
-            // std::cout << "\n Bhat = \n" << Bhat;
+            std::cout << "\n Bhat = \n" << Bhat;
 
             // Update state covariance
             Phat = (I - K * H) * Phat * (I - K * H).transpose () +
                 K * R * K.transpose ();
-            // std::cout << "\n Phat = \n" << Phat;
+            std::cout << "\n Phat = \n" << Phat;
 
             // Save state
             int Mx = stops.size ();
@@ -324,24 +330,37 @@ namespace Gtfs {
                 std::cout << "\n  ";
                 for (auto bc : br) std::cout << std::setw(9) << std::round (bc) << "  ";
             }
+            std::cout << "\n\n --- the correlation matrix for this looks like ... ";
+            for (int i=0; i<Mx; i++)
+            {
+                std::cout << "\n  ";
+                for (int j=0; j<Mx; j++)
+                {
+                    if (j == i) 
+                    {
+                        std::cout << std::setw (9) << "1  ";
+                    } 
+                    else if (_tt_cov.at (i).at (j) == 0)
+                    {
+                        std::cout << std::setw (9) << "0  ";
+                    }
+                    else
+                    {
+                        std::cout << std::setw(9)
+                            << (_tt_cov.at (i).at (j) / 
+                                pow (_tt_cov.at (i).at (i), 0.5) / 
+                                pow (_tt_cov.at (j).at (j), 0.5)) << "  ";
+                    }
+                }
+            }
             std::cout << "\n\n";
 #endif
             
 
         }
 
-
         _tt_time = _timestamp;
         std::cout << std::setprecision (6);
-
-        // Place arrival times into vector
-        // int tsum = 0;
-        // for (int i=0; i<stops.size (); i++)
-        // {
-        //     if (_tt_state.at (i) == 0) _stop_arrival_times.at (i) = 0;
-        //     tsum += _tt_state.at (i); // no dwell time model
-        //     _stop_arrival_times.at (i) = tsum;
-        // }
 
 #if VERBOSE == 2
         std::cout << "\n   (" << timer.cpu_seconds () << "ms)\n";
@@ -356,25 +375,33 @@ namespace Gtfs {
         etas.resize (M);
         
         if (!valid ()) return etas;
-        // std::cout << "\n Vehicle " << _vehicle_id << " =============================";
-        
-        std::vector<uint64_t> etam;
-        etam.reserve (_state.size ());
 
-        double tsum = 0.0;
+        double tsum, tvar;
         for (int i=0; i<M; ++i)
         {
             etas.at (i).stop_id = stops.at (i).stop->stop_id ();
             etas.at (i).estimate = 0;
-            tsum += fmax (0, _tt_state.at (i));
-            if (tsum <= 0) continue;
             
-            etas.at (i).estimate = _timestamp + tsum;
+            // it should be of the time the vehicle ETAs were last updated 
+            // (which should always be the same time as the vehicle's timestamp ...)
+            tsum = 0.0;
+            tvar = 0.0;
+            for (int j=0; j<i; j++)
+            {
+                // don't let travel times fall below 0 ... 
+                tsum += _tt_state.at (j);
+                for (int k=0; k<i; k++)
+                {
+                    tvar += _tt_cov.at (j).at (k);
+                }
+            }
+            if (tsum <= 0) continue;
 
-            // --- calculate the marginal quantiles ...
-            // generate quantiles [0, 5, 50, 95, 100] -> [0, 50, 500, 950, 999]
-            // etas.at (i).quantiles.emplace_back (95.0, etam.at (qi));
-            // etas.at (i).quantiles.emplace_back (100.0, etam.back ());
+            etas.at (i).estimate = _tt_time + tsum;
+
+            // for now just the 95% credible interval
+            etas.at (i).quantiles.emplace_back (0.025, _tt_time + (tsum - 2 * pow(tvar, 0.5)));
+            etas.at (i).quantiles.emplace_back (0.975, _tt_time + (tsum + 2 * pow(tvar, 0.5)));
         }
         return etas;
     }

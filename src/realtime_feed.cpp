@@ -252,12 +252,12 @@ void write_vehicles (Gtfs::vehicle_map* vehicles, std::string& file)
             stu->set_stop_sequence (si+1);
             transit_network::TimePrediction* tpi = stu->MutableExtension(transit_network::eta);
             tpi->set_estimate (etas.at (si).estimate);
-            // for (auto q : etas.at (si).quantiles)
-            // {
-            //     transit_network::Quantile* qi = tpi->add_quantiles ();
-            //     qi->set_quantile (q.quantile);
-            //     qi->set_value (q.time);
-            // }
+            for (auto q : etas.at (si).quantiles)
+            {
+                transit_network::Quantile* qi = tpi->add_quantiles ();
+                qi->set_quantile (q.quantile);
+                qi->set_value (q.time);
+            }
         }
 
     }

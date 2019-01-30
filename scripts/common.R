@@ -47,8 +47,8 @@ loadsim <- function(sim, time) {
                             function(x) ifelse(x$value == 0, NA, x$value))
                         if (length(qs) != length(quantiles)) return(integer(length(quantiles)))
                         qs
-                    }) %>% t %>% as.tibble
-                    names(qs) <- paste0("q", quantiles)
+                    }) %>% t %>% as_tibble
+                    names(qs) <- paste0("q", round(quantiles, 4))
                     xdf <- bind_cols(xdf, qs)
                 }
                 xdf
