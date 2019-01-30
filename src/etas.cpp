@@ -205,7 +205,13 @@ namespace Gtfs {
         int tt_delta;
         if (_tt_time == 0)
         {
-            _tt_state = tt_obs;
+            // this here will need to be fixed up though
+            double tsum = 0;
+            for (int i=0; i<M; i++)
+            {
+                tsum += tt_obs.at (i);
+                _tt_state.at (i) = tsum;
+            }
             _tt_cov = tt_r;
             tt_delta = 0;
         }
@@ -227,6 +233,8 @@ namespace Gtfs {
 
             // std::cout << "From stop " << min_i << " (M = " << M << ")\n";
 
+            Eigen::IOFormat decimalMatFmt (2, 0, ", ", "\n", "[", "]");
+
             // --- Predict equations
             // Convert B to (column) vector
             Eigen::VectorXd Bmat (M);
@@ -245,15 +253,23 @@ namespace Gtfs {
             F.setZero ();
             for (int i=0; i<M; i++)
             {
+                // if no time has passed, we shouldn't *actually* be getting here!
                 if (tt_delta == 0) F (i, i) = 1;
-                if (Bmat(i) <= 1e-6) F (i, i) = 1;
-                F (i, i) = fmin(1, fmax(0, 1 - (double)tt_delta / Bmat (i)));
+                // if current estimate is LESS THAN ZERO, prediction should also be 0
+                else if (Bmat(i) <= 1e-6) F (i, i) = 0;
+                else F (i, i) = fmin(1, fmax(0, 1 - (double)tt_delta / Bmat (i)));
             }
-            std::cout << "\n F = \n" << F;
+            std::cout << "\n F = \n" << F.format (decimalMatFmt);
             
             // Identity matrix
             Eigen::MatrixXd I (M, M);
             I = Eigen::MatrixXd::Identity (M, M);
+
+            // System noise matrix (variability/second)
+            Eigen::MatrixXd Q = I;
+            for (int i=0; i<M; i++) Q (i, i) = tt_delta * 0.5;
+            std::cout << "\n Q = \n" << Q.format (decimalMatFmt);
+            
 
             // Predict Bhat
             Eigen::VectorXd Bhat (M);
@@ -262,7 +278,7 @@ namespace Gtfs {
 
             // Predict Phat 
             Eigen::MatrixXd Phat (M, M);
-            Phat = F * Pmat * F.transpose () + I * (2 * tt_delta);
+            Phat = F * Pmat * F.transpose () + Q;
             std::cout << "\n Phat = \n" << Phat;
 
 
@@ -282,9 +298,15 @@ namespace Gtfs {
             
             // Measurement matrix
             Eigen::MatrixXd H = I;
+            // lower diagonal is -1's
+            for (int i=1; i<M; i++)
+                for (int j=0; j<i; j++)
+                    H (i, j) = -1;
+            std::cout << "\n Measurement matrix H = \n" << H;
 
             // Innovation residual
             Eigen::VectorXd resid_y = Z - H * Bhat;
+            std::cout << "\n HBhat = \n" << (H * Bhat);
             std::cout << "\n yresid = \n" << resid_y;
 
             // Innovation covariance
@@ -293,7 +315,7 @@ namespace Gtfs {
 
             // Kalman gain
             Eigen::MatrixXd K = Phat * H.transpose () * S.inverse ();
-            std::cout << "\n K = \n" << K;
+            std::cout << "\n K = \n" << K.format (decimalMatFmt);
 
             // Updated state estimate
             Bhat = Bhat + K * resid_y;
@@ -339,7 +361,7 @@ namespace Gtfs {
                     if (j == i) 
                     {
                         std::cout << std::setw (9) << "1  ";
-                    } 
+                    }
                     else if (_tt_cov.at (i).at (j) == 0)
                     {
                         std::cout << std::setw (9) << "0  ";
