@@ -41,7 +41,7 @@ namespace Gtfs {
         // }
 
 #if VERBOSE == 2
-        std::cout << "\n    --- Particle ETAs ...";
+        if (_N < 20) std::cout << "\n    --- Particle ETAs ...";
 #endif
         for (auto p = _state.begin (); p != _state.end (); ++p) 
         {
@@ -55,24 +55,30 @@ namespace Gtfs {
             // }
 
 #if VERBOSE == 2
-            std::cout << "\n    => ";
-            for (auto eta : p->get_arrival_times ()) {
-                if (eta <= _timestamp) std::cout << "*, ";
-                else std::cout << ((eta - _timestamp)) << ", ";
+            if (_N < 20)
+            {
+                std::cout << "\n    => ";
+                for (auto eta : p->get_arrival_times ()) {
+                    if (eta <= _timestamp) std::cout << "*, ";
+                    else std::cout << ((eta - _timestamp)) << ", ";
+                }
             }
 #endif
         }
 
 #if VERBOSE == 2
-        std::cout << "\n\n    --- Particle travel times ...";
-        // get travel time for each stop
-        int L = _trip->shape ()->segments ().size ();
-        for (auto& p : _state)
+        if (_N < 20)
         {
-            std::cout << "\n    => ";
-            for (int l=0; l<L; l++)
+            std::cout << "\n\n    --- Particle travel times ...";
+            // get travel time for each stop
+            int L = _trip->shape ()->segments ().size ();
+            for (auto& p : _state)
             {
-                std::cout << p.get_travel_time_prediction (l) << ", ";
+                std::cout << "\n    => ";
+                for (int l=0; l<L; l++)
+                {
+                    std::cout << p.get_travel_time_prediction (l) << ", ";
+                }
             }
         }
 #endif
@@ -109,7 +115,7 @@ namespace Gtfs {
         for (int l=0; l<M; l++)
         {
 #if VERBOSE == 2
-            std::cout << "\n STOP " << l << ": ";
+            if (_N < 20) std::cout << "\n STOP " << l << ": ";
 #endif
             tt_obs.at (l) = std::accumulate(_state.begin (), _state.end (), 0.0,
                                             [&](double d, Particle& p) {
@@ -134,7 +140,7 @@ namespace Gtfs {
                                                 }
                                                 if (dt < 0) dt = 0;
 #if VERBOSE == 2
-                                                std::cout << std::setw (5) << dt << ", ";
+                                                if (_N < 20) std::cout << std::setw (5) << dt << ", ";
 #endif
                                                 return d + dt;
                                             });
@@ -206,11 +212,21 @@ namespace Gtfs {
         if (_tt_time == 0)
         {
             // this here will need to be fixed up though
-            double tsum = 0;
+            double tsum = 0, rsum;
             for (int i=0; i<M; i++)
             {
                 tsum += tt_obs.at (i);
                 _tt_state.at (i) = tsum;
+
+                for (int j=0; j<M; j++)
+                {
+                    // cell (i,j) is the sum of the sub-matrix [0:i,0:j]
+                //     rsum = 0.0;
+                //     for (int ii=0; ii<=i; ii++)
+                //         for (int jj=0; jj<=j; jj++)
+                //             rsum += tt_r.at (ii).at (jj);
+                    _tt_cov.at (i).at (j) = (int)(i == j) * 1000;
+                }
             }
             _tt_cov = tt_r;
             tt_delta = 0;
@@ -267,7 +283,7 @@ namespace Gtfs {
 
             // System noise matrix (variability/second)
             Eigen::MatrixXd Q = I;
-            for (int i=0; i<M; i++) Q (i, i) = tt_delta * 0.5;
+            for (int i=0; i<M; i++) Q (i, i) = tt_delta;
             std::cout << "\n Q = \n" << Q.format (decimalMatFmt);
             
 
@@ -300,8 +316,7 @@ namespace Gtfs {
             Eigen::MatrixXd H = I;
             // lower diagonal is -1's
             for (int i=1; i<M; i++)
-                for (int j=0; j<i; j++)
-                    H (i, j) = -1;
+                    H (i, i-1) = -1;
             std::cout << "\n Measurement matrix H = \n" << H;
 
             // Innovation residual
@@ -377,11 +392,11 @@ namespace Gtfs {
             }
             std::cout << "\n\n";
 #endif
-            
+        
 
         }
-
         _tt_time = _timestamp;
+
         std::cout << std::setprecision (6);
 
 #if VERBOSE == 2
@@ -406,21 +421,25 @@ namespace Gtfs {
             
             // it should be of the time the vehicle ETAs were last updated 
             // (which should always be the same time as the vehicle's timestamp ...)
-            tsum = 0.0;
-            tvar = 0.0;
-            for (int j=0; j<i; j++)
-            {
-                // don't let travel times fall below 0 ... 
-                tsum += _tt_state.at (j);
-                for (int k=0; k<i; k++)
-                {
-                    tvar += _tt_cov.at (j).at (k);
-                }
-            }
+            // tsum = 0.0;
+            // tvar = 0.0;
+            // for (int j=0; j<i; j++)
+            // {
+            //     tsum += _tt_state.at (j);
+            //     for (int k=0; k<i; k++)
+            //     {
+            //         tvar += _tt_cov.at (j).at (k);
+            //     }
+            // }
+
+
+            double tsum, tvar;
+            tsum = _tt_state.at (i);
             if (tsum <= 0) continue;
 
+             // this probably need to account for covariances too
+            tvar = _tt_cov.at (i).at (i);
             etas.at (i).estimate = _tt_time + tsum;
-
             // for now just the 95% credible interval
             etas.at (i).quantiles.emplace_back (0.025, _tt_time + (tsum - 2 * pow(tvar, 0.5)));
             etas.at (i).quantiles.emplace_back (0.975, _tt_time + (tsum + 2 * pow(tvar, 0.5)));

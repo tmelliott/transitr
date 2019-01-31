@@ -29,6 +29,11 @@ public:
     int seconds () const;
 };
 
+inline int operator-(const Time& lhs, const Time& rhs)
+{
+    return lhs.seconds () - rhs.seconds ();
+}
+
 inline bool operator==(const Time& lhs, const Time& rhs)
 {
     return lhs.seconds () == rhs.seconds ();

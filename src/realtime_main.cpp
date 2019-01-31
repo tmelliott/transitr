@@ -216,7 +216,7 @@ void run_realtime_model (List nw)
             for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
             {
 #if VERBOSE > 1
-                if (v->second.trip ()->route ()->route_short_name () != "928") continue;
+                if (v->second.trip ()->route ()->route_short_name () != "982") continue;
 #endif
                 v->second.predict_etas (rngs.at (omp_get_thread_num ()));
             }

@@ -1,5 +1,7 @@
 source("scripts/common.R")
 
+options(width = 120)
+
 library(RSQLite)
 library(dbplyr)
 
@@ -85,19 +87,22 @@ eta <- function(sim, ta, ts, sched) {
     config <- jsonlite::read_json(file.path("simulations", sim, "config.json"))
     
     etatime <- as.POSIXct(as.numeric(ts), origin = "1970-01-01")
-    etadata <- loadsim(sim, as.integer(ts)) %>%
-        mutate(q5 = q0.025, q95 = q0.975) %>%
+    etadata <- loadsim(sim, as.integer(ts)) %>% 
+        filter(trip_id == ta$trip_id[1]) %>% print %>%
+        mutate(q5 = q0.025, q95 = q0.975) %>% 
         filter(time > timestamp)
+    
     # names(etadata)[7] <- "q5"
     # names(etadata)[8] <- "q95"
 
     # cat(" 3 ------\n")
-    # print(etadata)
+    print(etadata)
     # cat(" 4 ------\n")
     # print(unique(etadata$trip_id))
     # cat(" 5 ------\n")
     # print(ta$trip_id[1])
-    etadata <- etadata %>% filter(trip_id == ta$trip_id[1])
+    # etadata <- etadata %>% filter(trip_id == ta$trip_id[1])
+    # print(etadata)
     # cat(" 6 ------\n")
     # print(etadata %>% select(timestamp, stop_sequence, time))
     

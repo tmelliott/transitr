@@ -281,6 +281,7 @@ get_all_etas <- function() {
 # etas <- get_all_etas()
 
 ## just one simulation
+options(width = 120)
 
 etas <- loadsim("sim000", gsub("etas_|.pb", "", tail(list.files("simulations/sim000/etas", pattern = ".pb"), 1))) %>%
     filter(time > timestamp) %>%
@@ -305,7 +306,35 @@ ggplot(trip, aes(eta/60, stop_sequence)) +
 
 
 load("simulations/arrivaldata.rda")
-etas <- get_etas("sim000")
+etas <- get_etas("sim000") %>% filter(!is.na(time)) %>%
+    filter(time > timestamp) %>%
+    mutate(
+        timestamp = as.integer(timestamp),
+        time = as.integer(time),
+        eta = time - timestamp,
+        lower = q0.025 - timestamp,
+        upper = q0.975 - timestamp,
+    ) %>%
+    select(vehicle_id, trip_id, route_id, timestamp, stop_sequence, time, eta, lower, upper) %>%
+    filter(!is.na(time) & lower > 0 & upper > 0) %>%
+    filter(abs(time - timestamp) < 2*60*60) %>%
+    group_by(trip_id, stop_sequence) %>%
+    do({
+        (.) %>% mutate(tarr = .$time[which.max(.$timestamp)])
+    }) %>%
+    ungroup() %>%
+    mutate(
+        t = as.POSIXct(timestamp, origin = "1970-01-01"),
+        t_lower = as.POSIXct(timestamp + lower, origin = "1970-01-01"),
+        t_upper = as.POSIXct(timestamp + upper, origin = "1970-01-01")
+    )
+
+t1 <- unique(etas$trip_id)[2]
+ggplot(etas %>% filter(trip_id == t1), aes(t)) +
+    geom_linerange(aes(
+        ymin = t_lower, ymax = t_upper), size = 0.5) +
+    facet_wrap(~stop_sequence) +
+    geom_abline(lty = 3, col = 'red')
 
 
 ## Baseline - schedule RMSE ~ time-until-arrival
