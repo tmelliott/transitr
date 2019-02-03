@@ -262,6 +262,7 @@ server <- function(input, output, session) {
     observeEvent(input$simnum, {
         ## config info
         conf <- readLines(file.path("simulations", input$simnum, "config.json"))
+        conf <- conf[!grepl("/\\*.+\\*/", conf)]
         output$simconfig <- renderPrint(jsonlite::prettify(conf))
 
         rv$hdir <- file.path("simulations", input$simnum, "history")

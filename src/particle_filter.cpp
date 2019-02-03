@@ -124,9 +124,22 @@ namespace Gtfs {
         _tt_state.clear ();
         _tt_cov.clear ();
 
-
         _segment_travel_times.resize (_trip->shape ()->segments ().size (), 0);
         _stop_arrival_times.resize (_trip->stops ().size (), 0);
+
+        // alright: initialize these using the schedule
+        int tcum = 0;
+        for (int i=0; i<_trip->stops ().size (); i++)
+        {
+            std::cout << "\n - stop " << std::setw(2) << i << ": " 
+                << _trip->stops ().at (i).arrival_time;
+            if (i > 0) 
+            {
+                tcum += _trip->stops ().at (i).arrival_time - 
+                    _trip->stops ().at (i-1).arrival_time;
+            }
+            std::cout << " (+" << tcum << " seconds)";
+        }
         _tt_state.resize (_trip->stops ().size (), 0.0);
         _tt_cov.resize (_trip->stops ().size (),
                         std::vector<double> (_trip->stops ().size (), 0.0));

@@ -215,20 +215,30 @@ namespace Gtfs {
             double tsum = 0, rsum;
             for (int i=0; i<M; i++)
             {
-                tsum += tt_obs.at (i);
+                if (tt_obs.at (i) == 0)
+                {
+
+                } 
+                else if (tsum == 0)
+                {
+                    // partial segment, so use particle speeds to set "prior"
+                    tsum += tt_obs.at (i);
+                }
+                else
+                {
+                    // use scheduled time difference between stops
+                    tsum += _trip->stops ().at (i).arrival_time - 
+                        _trip->stops ().at (i-1).arrival_time;
+                }
                 _tt_state.at (i) = tsum;
 
                 for (int j=0; j<M; j++)
                 {
-                    // cell (i,j) is the sum of the sub-matrix [0:i,0:j]
-                //     rsum = 0.0;
-                //     for (int ii=0; ii<=i; ii++)
-                //         for (int jj=0; jj<=j; jj++)
-                //             rsum += tt_r.at (ii).at (jj);
-                    _tt_cov.at (i).at (j) = (int)(i == j) * 1000;
+                    // 5-minute schedule deviation at each stop (variance)
+                    _tt_cov.at (i).at (j) = (int)(i == j) * 100.0 * i;
                 }
             }
-            _tt_cov = tt_r;
+            // _tt_cov = tt_r; // that can't have been good ... D=
             tt_delta = 0;
         }
         else

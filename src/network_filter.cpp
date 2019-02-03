@@ -16,7 +16,7 @@ namespace Gtfs {
         // else
         // {
         // }
-        Phat = _uncertainty + 2.0 * (double) delta / 60.0;
+        Phat = _uncertainty + delta; //2.0 * (double) delta / 60.0;
 
 
         return std::make_pair (xhat, Phat);
@@ -115,7 +115,7 @@ namespace Gtfs {
         if (!loaded) load ();
         if (_uncertainty == 0 || _travel_time == 0) 
         {
-            return _length / fmax(5.0, rng.rnorm () * 10.0 + 30.0);
+            return _length / (rng.rnorm () * 25.0 + 5.0); // [5, 30m/s]
         }
 
         auto x = predict (delta);
