@@ -1,0 +1,57 @@
+model {
+    for (i in 1:N) {
+        # each observation comes from distribution with
+        # segment-level measurement eror (r_s)
+        z[i] ~ dnorm(x[i], r_tau[s[i]])
+    }
+
+    for (j in 1:J) {
+        # values for this segment/date range from 
+        # Nj[j]:(Nj[j] + Ni[j])
+
+        x[Nj[j]] ~ dnorm(0, 1e-4)
+        xdot[Nj[j]] ~ dnorm(0, 1e-2)
+        for (i in (Nj[j] + 1):(Nj[j] + Ni[j] - 1)) {
+            x[i] <- x[i-1] + delta[i] * xdot[i]
+            xdot[i] ~ dnorm(xdot[i-1], ifelse(weekend[i] == 1, qw_tau[s[i]], q_tau[s[i]]))
+        }
+    }
+
+    for (s in 1:M) {
+        # measurement error
+        r_tau[s] ~ dgamma(0.00001, 0.00001)
+        r_sig[s] <- 1 / sqrt(r_tau[s])
+
+        # system noise - weekday
+        #log_q_sig[s] ~ dnorm(log_q, qtau)
+        #log_q_sig[s] <- log_q
+        #q_sig[s] <- exp(log_q_sig[s])
+        #q_tau[s] <- 1 / pow(q_sig[s], 2)
+        
+
+        # system noise - weekend
+        #log_qw_sig[s] ~ dnorm(log_q, qtau)
+        #log_qw_sig[s] <- log_qw
+        #qw_sig[s] <- exp(log_qw_sig[s])
+        #qw_tau[s] <- 1 / pow(qw_sig[s], 2)
+
+
+        q_tau[s] ~ dgamma(0.00001, 0.00001)
+        q_sig[s] <- 1 / sqrt(q_tau[s])
+        qw_tau[s] ~ dgamma(0.00001, 0.00001)
+        qw_sig[s] <- 1 / sqrt(qw_tau[s])
+    }
+
+    # population parameters
+    #log_q ~ dnorm(0, 1e-6)
+    #q <- exp(log_q)
+    #qtau ~ dgamma(0.001, 0.001)
+    #qsig <- 1 / sqrt(qtau)
+    
+    #log_qw ~ dnorm(0, 1e-6)
+    #qw <- exp(log_qw)
+    #qwtau ~ dgamma(0.001, 0.001)
+    #qwsig <- 1 / sqrt(qwtau)
+
+
+}

@@ -266,7 +266,7 @@ tu1r <- tu1 %>%
  
 ggplot(
     tu1r, 
-    aes(time, tt_center, colour = as.factor(dow))
+    aes(time, tt_center, colour = as.factor(week))
 ) + geom_point() + facet_grid(segment_index~weekend, scales = "free_y") +
     scale_x_datetime(label = function(x) format(x, '%H'))
 
@@ -333,7 +333,7 @@ jags.fit <-
 samps <- 
     coda.samples(
         jags.fit, 
-        c('x', 'r_sig', 'q', 'q_sig'), 
+        c('x', 'r_sig', 'q', 'qsig', 'q_sig'), 
         n.iter = 10000, 
         thin = 10
     )
@@ -341,6 +341,10 @@ samps <-
 samps %>% spread_draws(q) %>%
     ggplot(aes(.iteration, group = .chain, colour = .chain %>% as.factor)) +
     geom_path(aes(y = q))
+
+samps %>% spread_draws(qsig) %>%
+    ggplot(aes(.iteration, group = .chain, colour = .chain %>% as.factor)) +
+    geom_path(aes(y = qsig))
 
 egg::ggarrange(
     samps %>% spread_draws(q_sig[segment_index]) %>%
@@ -366,6 +370,7 @@ st <- samps %>% spread_draws(x[index])
 tu1r1 %>% 
     bind_cols(
         st %>% filter(.iteration == sample(900:999, 1) & .chain == 1)
+        # st %>% median_qi()
     ) %>%
     ggplot(aes(time, tt_center, colour = as.factor(dow))) + 
     geom_point() + 
@@ -387,13 +392,336 @@ dbDisconnect(con)
 
 tu1r1 %>% left_join(tsegs %>% select(trip_id, shape_road_sequence, length), 
     by = c("trip_id", "segment_index" = "shape_road_sequence")) %>%
-    select(segment_index, length) %>% distinct %>%
-    bind_cols(samps %>% spread_draws(q_sig[segment_index]) %>% median_qi()) %>%
-    ggplot(aes(length, q_sig)) + geom_point()
+    select(segment_index, length, travel_time) %>% distinct %>%
+    left_join(samps %>% spread_draws(q_sig[segment_index]) %>% median_qi()) %>%
+    ggplot(aes(travel_time, q_sig)) + geom_point()
 
+tu1r1 %>% left_join(tsegs %>% select(trip_id, shape_road_sequence, length), 
+    by = c("trip_id", "segment_index" = "shape_road_sequence")) %>%
+    select(segment_index, length, travel_time) %>% distinct %>%
+    left_join(samps %>% spread_draws(r_sig[segment_index]) %>% median_qi()) %>%
+    ggplot(aes(travel_time, r_sig)) + geom_point()
+
+qr.ests <- samps %>% spread_draws(q_sig[seg], r_sig[seg]) %>% median_qi()
 
 ## apply KF to second week with values of R and Q and calculate RMSE
+tu1r2 <- tu1r %>% filter(week == 2) %>% arrange(segment_index, time_from)
+test.data <- tu1r2 %>% 
+    mutate(
+        z = tt_center,
+        t = time,
+        s = segment_index,
+        ind = as.integer(as.factor(paste(segment_index, date))),
+        i = 1:n()
+    ) %>%
+    select(z, t, delta, s, weekend, ind, i)
 
+KF <- function(d, x0, p0, q, r) {
+    # ggplot(d, aes(t, z)) + geom_point() + 
+    #     geom_pointrange(aes(min(d$t), x0, ymin = x0 - p0, ymax = x0 + p0), 
+    #         data=NULL, col="red")
+    xhat <- numeric(nrow(d))
+    xhat.pred <- numeric(nrow(d))
+    p <- numeric(nrow(d))
+    p.pred <- numeric(nrow(d))
+
+    Q <- q^2
+    R <- r^2
+
+    for (i in seq_along(1:nrow(d))) {
+        # predict
+        if (i == 1) {
+            xhat.pred[i] <- x0
+            p.pred[i] <- p0
+        } else {
+            xhat.pred[i] <- xhat[i-1]
+            p.pred[i] <- p[i-1] + Q * d$delta[i]
+        }
+
+        # update
+        y <- d$z[i] - xhat.pred[i]
+        S <- R + p.pred[i]
+        K <- p.pred[i] / S
+        xhat[i] <- xhat.pred[i] + K * y
+        p[i] <- (1 - K) * p.pred[i] * (1 - K) + K * R * K
+    }
+    d <- d %>% mutate(
+        xhat = xhat,
+        xhat.pred = xhat.pred,
+        p = p,
+        p.pred = p.pred
+        )
+
+    # ggplot(d, aes(t)) +
+    #     geom_point(aes(y = z)) +
+    #     geom_pointrange(aes(y = xhat, ymin = xhat - p, ymax = xhat + p), colour = "blue") +
+    #     geom_pointrange(aes(y = xhat.pred, ymin = xhat.pred - p.pred, ymax = xhat.pred + p.pred), 
+    #         colour = "red")
+    d
+}
+
+test.results <- test.data %>% group_by(ind) %>%
+    do({
+        d <- (.)
+        x0 <- st %>% filter(index == d$i[1]) %>% pluck("x") %>% mean
+        p0 <- st %>% filter(index == d$i[1]) %>% pluck("x") %>% sd
+        q <- qr.ests %>% filter(seg == d$s[1]) %>% pluck("q_sig")
+        r <- qr.ests %>% filter(seg == d$s[1]) %>% pluck("r_sig")
+        KF(d, x0, p0, q, r)
+    })
+
+test.results %>% 
+    ggplot(aes(t, z, group = ind)) + 
+    geom_point() + 
+    geom_path(aes(t, xhat), col = "blue") +
+    geom_path(aes(t, xhat.pred), col = "red") +
+    facet_grid(s~weekend, scales = "free_y") +
+    scale_x_datetime(label = function(x) format(x, '%H'))
+
+# rmse
+with(test.results, z - xhat)^2 %>% mean
+with(test.results, z - xhat.pred)^2 %>% mean
+
+
+########### Model 2 (2nd order)
+
+jags.fit <- 
+    jags.model(
+        'scripts/model2.jags', 
+        jags.data,
+        n.adapt = 1000,
+        n.chains = 2
+    )
+
+samps <- 
+    coda.samples(
+        jags.fit, 
+        c('x', 'xdot', 'r_sig', 'q_sig', 'qw_sig'), 
+        n.iter = 10000, 
+        thin = 10
+    )
+
+# samps %>% spread_draws(q) %>%
+#     ggplot(aes(.iteration, group = .chain, colour = .chain %>% as.factor)) +
+#     geom_path(aes(y = q))
+
+# samps %>% spread_draws(qsig) %>%
+#     ggplot(aes(.iteration, group = .chain, colour = .chain %>% as.factor)) +
+#     geom_path(aes(y = qsig))
+
+egg::ggarrange(
+    nrow = 1,
+    samps %>% spread_draws(q_sig[segment_index]) %>%
+        ggplot(aes(.iteration, q_sig, group = .chain)) + 
+        facet_grid(segment_index~., scales = "free_y") + 
+        geom_path(),
+    samps %>% spread_draws(qw_sig[segment_index]) %>%
+        ggplot(aes(.iteration, qw_sig, group = .chain)) + 
+        facet_grid(segment_index~., scales = "free_y") + 
+        geom_path(),
+    samps %>% spread_draws(r_sig[segment_index]) %>%
+        ggplot(aes(.iteration, r_sig, group = .chain)) + 
+        facet_grid(segment_index~., scales = "free_y") + 
+        geom_path()
+)
+
+p <- samps %>%
+    spread_draws(r_sig[segment_index], q_sig[segment_index]) %>%
+    # median_qi() %>%
+    ggplot(aes(y = segment_index))
+
+p + stat_pointintervalh(aes(x = r_sig))
+p + stat_pointintervalh(aes(x = q_sig))
+
+st <- samps %>% spread_draws(x[index], xdot[index])
+
+pxx <- tu1r1 %>% 
+    bind_cols(
+        st %>% filter(.iteration == sample(900:999, 1) & .chain == 1)
+    ) %>% 
+    ggplot(aes(time, tt_center, colour = as.factor(dow))) + 
+    facet_grid(segment_index~weekend, scales = "free_y") +
+    scale_x_datetime(label = function(x) format(x, '%H'))
+
+egg::ggarrange(
+    nrow = 1,
+    pxx + geom_point() + geom_path(aes(time, x)),
+    pxx + geom_path(aes(time, xdot))
+)
+
+
+## segment lengths
+con <- dbConnect(SQLite(), "fulldata.db")
+tids <- unique(tu1r1$trip_id)
+tsegs <- con %>% tbl("trips") %>% 
+    filter(trip_id %in% tids) %>%
+    left_join(con %>% tbl("shape_segments")) %>%
+    left_join(con %>% tbl("road_segments") %>% select(road_segment_id, length)) %>%
+    select(trip_id, road_segment_id, shape_road_sequence, length) %>%
+    collect()
+dbDisconnect(con)
+
+tu1r1 %>% left_join(tsegs %>% select(trip_id, shape_road_sequence, length), 
+    by = c("trip_id", "segment_index" = "shape_road_sequence")) %>%
+    select(segment_index, length, travel_time) %>% distinct %>%
+    left_join(samps %>% spread_draws(q_sig[segment_index]) %>% median_qi()) %>%
+    ggplot(aes(travel_time, q_sig)) + geom_point()
+
+tu1r1 %>% left_join(tsegs %>% select(trip_id, shape_road_sequence, length), 
+    by = c("trip_id", "segment_index" = "shape_road_sequence")) %>%
+    select(segment_index, length, travel_time) %>% distinct %>%
+    left_join(samps %>% spread_draws(r_sig[segment_index]) %>% median_qi()) %>%
+    ggplot(aes(travel_time, r_sig)) + geom_point()
+
+qr.ests <- samps %>% spread_draws(q_sig[seg], r_sig[seg]) %>% median_qi()
+
+## apply KF to second week with values of R and Q and calculate RMSE
+tu1r2 <- tu1r %>% filter(week == 2) %>% arrange(segment_index, time_from)
+test.data2 <- tu1r2 %>% 
+    mutate(
+        z = tt_center,
+        t = time,
+        s = segment_index,
+        ind = as.integer(as.factor(paste(segment_index, date))),
+        i = 1:n()
+    ) %>%
+    select(z, t, delta, s, weekend, ind, i)
+
+KF2 <- function(d, x0, p0, q, r) {
+    # ggplot(d, aes(t, z)) + geom_point() + 
+    #     geom_pointrange(aes(min(d$t), x0, ymin = x0 - p0, ymax = x0 + p0), 
+    #         data=NULL, col="red")
+    xhat <- matrix(nrow = nrow(d), ncol = 2)
+    xhat.pred <- matrix(nrow = nrow(d), ncol = 2)
+    p <- matrix(nrow = nrow(d), ncol = 4)
+    p.pred <- matrix(nrow = nrow(d), ncol = 4)
+
+    Q <- diag(c(0, q^2))
+    R <- r^2
+    F <- function(delta) matrix(c(1, 0, ifelse(is.na(delta), 0, delta), 1), nrow = 2)
+    H <- rbind(c(1, 0))
+    I <- diag(2)
+
+    for (i in seq_along(1:nrow(d))) {
+        # predict
+        Fi <- F(d$delta[i])
+        if (i == 1) {
+            xhat.pred[i,] <- x0
+            p.pred[i,] <- p0
+            X <- t(xhat.pred[i, , drop = FALSE])
+            P <- matrix(p.pred[i, ], nrow = 2)
+        } else {
+            X <- Fi %*% X
+            P <- Fi %*% P %*% t(Fi) + Q
+            xhat.pred[i, ] <- c(X)
+            p.pred[i, ] <- c(P)
+        }
+
+        # update
+        y <- d$z[i] - H %*% X
+        S <- R + H %*% P %*% t(H)
+        K <- P %*% t(H) %*% solve(S)
+        X <- X + K %*% y
+        P <- (I - K %*% H) * P * t(I - K %*% H) + K %*% R %*% t(K)
+        xhat[i, ] <- c(X)
+        p[i, ] <- c(P)
+    }
+    d <- d %>% 
+        mutate(
+            x_hat = xhat[,1],
+            xd_hat = xhat[,2],
+            x_hat.pred = xhat.pred[,1],
+            xd_hat.pred = xhat.pred[,2],
+            p11 = p[,1],
+            p21 = p[,2],
+            p12 = p[,3],
+            p22 = p[,4],
+            p.pred11 = p.pred[,1],
+            p.pred21 = p.pred[,2],
+            p.pred12 = p.pred[,3],
+            p.pred22 = p.pred[,4]
+        )
+
+    # ggplot(d, aes(t)) +
+    #     geom_point(aes(y = z)) +
+    #     geom_pointrange(aes(y = xhat, ymin = xhat - p, ymax = xhat + p), colour = "blue") +
+    #     geom_pointrange(aes(y = xhat.pred, ymin = xhat.pred - p.pred, ymax = xhat.pred + p.pred), 
+    #         colour = "red")
+    d
+}
+
+test.results2 <- test.data2 %>% group_by(ind) %>%
+    do({
+        d <- (.)
+        x0 <- st %>% filter(index == d$i[1]) %>% ungroup %>% select(x, xdot) %>% colMeans
+        p0 <- st %>% filter(index == d$i[1]) %>% ungroup %>% select(x, xdot) %>% cov %>% c
+        q <- qr.ests %>% filter(seg == d$s[1]) %>% pluck("q_sig")
+        r <- qr.ests %>% filter(seg == d$s[1]) %>% pluck("r_sig")
+        KF2(d, x0, p0, q, r)
+    })
+
+ptt <- test.results2 %>% 
+    ggplot(aes(t, z, group = ind)) + 
+    facet_grid(s~weekend, scales = "free_y") +
+    scale_x_datetime(label = function(x) format(x, '%H'))
+
+egg::ggarrange(
+    nrow = 1,
+    ptt + geom_point() + 
+        geom_path(aes(t, x_hat), col = "blue") +
+        geom_path(aes(t, x_hat.pred), col = "red"),
+    ptt + geom_path(aes(t, xd_hat), col = "blue") +
+        geom_path(aes(t, xd_hat.pred), col = "red")
+)
+
+# rmse
+with(test.results2, z - x_hat)^2 %>% mean
+with(test.results2, z - x_hat.pred)^2 %>% mean
+
+
+pt1 <- test.results %>% 
+    ggplot(aes(t, group = ind)) + 
+    facet_grid(s~weekend, scales = "free_y") +
+    scale_x_datetime(label = function(x) format(x, '%H'))
+pt2 <- test.results2 %>%
+    ggplot(aes(t, group = ind)) +
+    facet_grid(s~weekend, scales = "free_y") +
+    scale_x_datetime(label = function(x) format(x, '%H'))
+
+pt1 + geom_linerange(aes(ymin = 0, ymax = xhat - xhat.pred))
+pt2 + geom_linerange(aes(ymin = 0, ymax = x_hat - x_hat.pred))
+
+pt1 + geom_linerange(aes(ymin = 0, ymax = z - xhat.pred))
+pt2 + geom_linerange(aes(ymin = 0, ymax = z - x_hat.pred))
+
+pt1 + geom_linerange(aes(ymin = 0, ymax = z - xhat))
+pt2 + geom_linerange(aes(ymin = 0, ymax = z - x_hat))
+
+test.results %>% 
+    ungroup() %>%
+    mutate(
+        err_obs_pred = abs(z - xhat.pred),
+        err_obs_est = abs(z - xhat),
+        err_est_pred = abs(xhat - xhat.pred)
+    ) %>%
+    gather(key = "type", value = "error", err_obs_pred, err_obs_est, err_est_pred) %>%
+    select(error, type) %>%
+    mutate(test = "test1") %>%
+    bind_rows(
+        test.results2 %>% 
+            ungroup() %>%
+            mutate(
+                err_obs_pred = abs(z - x_hat.pred),
+                err_obs_est = abs(z - x_hat),
+                err_est_pred = abs(x_hat - x_hat.pred)
+            ) %>%
+            gather(key = "type", value = "error", err_obs_pred, err_obs_est, err_est_pred) %>%
+            select(error, type) %>%
+            mutate(test = "test2")
+    ) %>%
+    ggplot(aes(test, error, fill = test)) +
+    facet_grid(~type) +
+    geom_violin() 
 
 
 
@@ -416,7 +744,7 @@ smry <- tu1r %>%
         time = as.POSIXct(period)
     )
 
-ggplot(smry %>% filter(segment_index == 18), 
+ggplot(smry %>% filter(segment_index == 1), 
     aes(time, tt/60, colour = as.factor(dow))) + 
     geom_point() +
     facet_grid(week~weekend) +
@@ -616,4 +944,56 @@ test.lag %>% mutate(tt.pred = predict(lfit, newdata = test.lag)) %>%
     # ylab("Travel time (min)") +
 
 
-predict(fit, test.lag %>% mutate(tt.lag = 0))
+###### NN model ...
+scaleX <- function(x) (x - min(x, na.rm = TRUE)) / diff(range(x, na.rm = TRUE)) * 2 - 1
+nn.data <- alldata %>%
+    inner_join(NX1segs %>% mutate(segment = as.factor(road_segment_id))) %>%
+    group_by(date, segment_index) %>%
+    do((.) %>% arrange(time) %>% mutate(speed_lag = c(NA, speed[-n()]))) %>%
+    ungroup() %>% group_by(date, time) %>%
+    do(
+        (.) %>% arrange(segment_index) %>%
+        mutate(
+            speed_prev_seg = c(NA, speed_lag[-n()]),
+            speed_next_seg = c(speed_lag[-1], NA)
+        )
+    ) %>%
+    ungroup() %>%
+    mutate(
+        time = scaleX(as.integer(time)),
+        speed = scaleX(speed),
+        speed_lag = scaleX(speed_lag),
+        speed_prev_seg = scaleX(speed_prev_seg),
+        speed_next_seg = scaleX(speed_next_seg)
+    )
+
+nn.data %>% 
+    ggplot(aes(time, speed, colour = week)) +
+    geom_point() +
+    facet_wrap(~segment_index)
+
+nn.data %>% 
+    ggplot(aes(speed, speed_next_seg, colour = dow)) + 
+    geom_point() +
+    facet_wrap(~segment_index, scales="free")
+
+nn.train <- nn.data %>% filter(week == 1)
+nn.test <- nn.data %>% filter(week == 2)
+
+nn2 <- nn.train %>% filter(!is.na(speed_lag) & !is.na(speed_prev_seg) & !is.na(speed_next_seg))
+library(neuralnet)
+fit.nn <- neuralnet(speed ~ time + weekend + #as.factor(segment_index) + dayofweek +
+    speed_lag + speed_prev_seg + speed_next_seg,
+    data = nn2, hidden = c(3), linear.output = TRUE)
+plot(fit.nn)
+
+nn.test %>% 
+    bind_cols(
+        speed_pred = compute(
+            fit.nn, 
+            nn.test %>% select(time, weekend, speed_lag, speed_prev_seg, speed_next_seg)
+        )$net.result
+    ) %>%
+    ggplot(aes(time)) + 
+    geom_point(aes(speed)) +
+    geom_point(aes(y = speed_pred), colour = "red")
