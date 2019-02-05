@@ -995,5 +995,6 @@ nn.test %>%
         )$net.result
     ) %>%
     ggplot(aes(time)) + 
-    geom_point(aes(speed)) +
-    geom_point(aes(y = speed_pred), colour = "red")
+    geom_point(aes(y = speed)) +
+    geom_point(aes(y = speed_pred), colour = "red") +
+    facet_grid(segment_index ~ weekend)
