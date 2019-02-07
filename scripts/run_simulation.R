@@ -27,6 +27,7 @@ if (dir.exists("modeleval")) unlink("modeleval", recursive = TRUE, force = TRUE)
 dir.create("modeleval")
 
 if (file.exists("segment_states.csv")) unlink("segment_states.csv")
+if (file.exists("segment_observations.csv")) unlink("segment_observations.csv")
 
 nw <- load_gtfs("../../fulldata.db", output = "etas.pb") %>%
     realtime_feed(c(sprintf("http://localhost:3000/%s/vehicle_positions", ca[1]), 

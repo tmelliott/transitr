@@ -2,6 +2,20 @@
 
 namespace Gtfs {
 
+    void Segment::update (par* params, Gtfs* gtfs)
+    {
+        if (!loaded) load ();
+        // set up the initial state of the segment
+        _system_noise = params->nw_system_noise;
+
+        // fetch prior from the database
+        // ...
+        
+        _travel_time = _length / 10.0;
+        _uncertainty = _travel_time; // m/s
+        min_tt = _length / max_speed;
+    }
+
     std::pair<double,double> Segment::predict (int delta)
     {
         // use current estimate and (historical) prior to predict future state
@@ -15,8 +29,7 @@ namespace Gtfs {
         // else
         // {
         // }
-        Phat = _uncertainty + 2.0 * (double) delta / 60.0;
-
+        Phat = _uncertainty + delta * _system_noise;
 
         return std::make_pair (xhat, Phat);
     }

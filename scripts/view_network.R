@@ -7,6 +7,11 @@ get_segments <- function(f = "segment_states.csv") {
         col_types = "iinn")
 }
 
+get_data <- function(f = "segment_observations.csv") {
+    read_csv(f, col_names = c("segment_id", "timestamp", "obs_tt", "est_error"),
+        col_types = "iinn")
+}
+
 get_segment_data <- function(routes) {
     con <- dbConnect(SQLite(), "fulldata.db")
     on.exit(dbDisconnect(con))
@@ -36,8 +41,10 @@ get_segment_data <- function(routes) {
     segments
 }
 
-view_segment_states <- function(f = "segment_states.csv", segment, n = 12, speed = FALSE) {
+view_segment_states <- function(f = "segment_states.csv", o, segment, n = 12, speed = FALSE) {
     data <- get_segments(f) %>% filter(timestamp > 0)
+    show.data <- !missing(o)
+    if (show.data) obs <- get_data(o) %>% filter(timestamp > 0)
     if (missing(segment)) {
         segment <- data %>% distinct %>% pluck("segment_id") %>% 
             table %>% sort %>% tail(n) %>% names
@@ -45,6 +52,11 @@ view_segment_states <- function(f = "segment_states.csv", segment, n = 12, speed
     data <- data %>% filter(segment_id %in% segment) %>% distinct %>%
         mutate(timestamp = as.POSIXct(timestamp, origin = "1970-01-01")) %>%
         arrange(timestamp)
+    if (show.data) {
+        obs <- obs %>% filter(segment_id %in% segment) %>% distinct %>%
+        mutate(timestamp = as.POSIXct(timestamp, origin = "1970-01-01")) %>%
+        arrange(timestamp)
+    }
 
     if (speed) {
         segdata <- get_segment_data() %>% select(road_segment_id, length)
@@ -52,17 +64,32 @@ view_segment_states <- function(f = "segment_states.csv", segment, n = 12, speed
             inner_join(segdata, by = c("segment_id" = "road_segment_id")) %>%
             mutate(speed = length / travel_time) %>%
             filter(speed < 35) %>%
-            mutate(speed = speed * 3.6, .y = speed, .e = sqrt(uncertainty * 3.6^2))
+            mutate(speed = speed * 3.6, .y = speed, .e = uncertainty * 3.6^2)
+        if (show.data)
+            obs <- obs %>%
+                inner_join(segdata, by = c("segment_id" = "road_segment_id")) %>%
+                mutate(speed = length / obs_tt) %>%
+                filter(speed < 35) %>%
+                mutate(speed = speed * 3.6, .y = speed, .e = sqrt(est_error * 3.6^2))
     } else {
-        data <- data %>% mutate(.y = travel_time, .e = sqrt(uncertainty))
+        data <- data %>% mutate(.y = travel_time, .e = uncertainty)
+        if (show.data)
+            obs <- obs %>% mutate(.y = obs_tt, .e = sqrt(est_error))
     }
+    yr <- extendrange(data$.y, f = 0.5)
     p <- ggplot(data, aes(timestamp, .y)) + 
         geom_linerange(aes(ymin = .y - .e, ymax = .y + .e),  color = 'gray') +
         geom_point() +
         xlab("Time") + 
         ylab(ifelse(speed, "Speed (km/h)", "Travel Time (seconds)")) +
         facet_wrap(~segment_id, scales = ifelse(speed, "fixed", "free_y"))
-    if (speed) p <- p + ylim(0, 100)
+    if (show.data)
+        p <- p + 
+            # geom_linerange(aes(ymin = .y - .e, ymax = .y + .e),  
+            #     data = obs,
+            #     color = 'pink', lwd = 0.5) +
+            geom_point(data = obs, colour = "red", cex = 0.5)
+    if (speed) p <- p + ylim(0, 100) else p <- p + ylim(yr[1], yr[2])
     p
 }
 
@@ -95,7 +122,8 @@ map_segments <- function(f = "segment_states.csv", t = max(data$timestamp)) {
 }
 
 
-view_segment_states("simulations/sim000/segment_states.csv", n = 20)
+view_segment_states("simulations/sim000/segment_states.csv", "simulations/sim000/segment_observations.csv", n = 20)
+view_segment_states("simulations/sim000/segment_states.csv", "simulations/sim000/segment_observations.csv", speed = TRUE, n = 20)
 view_segment_states("simulations/sim000/segment_states.csv", speed = TRUE, n = 20)
 
 map_segments("simulations/sim000/segment_states.csv")

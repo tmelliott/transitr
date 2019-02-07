@@ -68,11 +68,6 @@ void run_realtime_model (List nw)
     Gtfs::par params (pars);
     params.print ();
 
-    // Initialize an RNG
-    std::vector<RNG> rngs (params.n_core);
-    unsigned int _seed = (unsigned int) time (0);
-    for (int i=0; i<params.n_core; ++i) rngs.at (i).set_seed (_seed++);
-
     // Allow the program to be stopped gracefully    
     signal (SIGINT, intHandler);
     signal (SIGTERM, intHandler);
@@ -80,6 +75,22 @@ void run_realtime_model (List nw)
     if (params.save_timings) {
         timer.save_to ("timings.csv", "iteration,timestamp,nvehicles");
     }
+
+    // Initialize an RNG
+    std::vector<RNG> rngs (params.n_core);
+    unsigned int _seed = (unsigned int) time (0);
+    for (int i=0; i<params.n_core; ++i) rngs.at (i).set_seed (_seed++);
+
+    // Initialize network
+    #pragma omp parallel for num_threads (1)
+    for (unsigned l=0; l<gtfs.segments ().bucket_count (); ++l)
+    {
+        for (auto sl = gtfs.segments ().begin (l); sl != gtfs.segments ().end (l); ++sl)
+        {
+            sl->second.update (&params, &gtfs);
+        }
+    }
+
     int tries = 0;
     int iteration = 0;
     while (ongoing)
@@ -171,7 +182,6 @@ void run_realtime_model (List nw)
         {
             std::ofstream fout;
             fout.open ("segment_observations.csv", std::ofstream::app);
-            // fout << "segment_id,timestamp,travel_time,uncertainty\n";
             for (auto sl = gtfs.segments ().begin (); sl != gtfs.segments ().end (); ++sl)
             {
                 if (sl->second.get_data ().size () == 0) continue;
@@ -183,6 +193,17 @@ void run_realtime_model (List nw)
                         << ds.first << "," 
                         << ds.second << "\n";
                 }
+            }
+            fout.close ();
+
+            fout.open ("segment_states.csv", std::ofstream::app);
+            for (auto sl = gtfs.segments ().begin (); sl != gtfs.segments ().end (); ++sl)
+            {
+                if (sl->second.get_data ().size () == 0) continue;
+                fout << sl->second.segment_id () << ","
+                    << sl->second.timestamp () << ","
+                    << sl->second.travel_time () << "," 
+                    << sl->second.uncertainty () << "\n";
             }
             fout.close ();
         }
@@ -198,7 +219,6 @@ void run_realtime_model (List nw)
             }
         }
         timer.report ("updating network state");
-
         
         // Predict ETAs
         // #pragma omp parallel for num_threads(params.n_core)

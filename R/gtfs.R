@@ -75,6 +75,7 @@ load_gtfs <- function(db, output = "predictions.pb") {
                 arrival_error = 5.0,
                 departure_error = 5.0,
                 # network parameters
+                nw_system_noise = 0.001,
                 # other ...
                 save_timings = FALSE
             )
