@@ -2,7 +2,9 @@ model {
     for (i in 1:N) {
         # each observation comes from distribution with
         # segment-level measurement eror (r_s)
-        z[i] ~ dnorm(x[i], r_tau[s[i]])
+        z[i] ~ dnorm(x[i], ifelse(outlier[i] == 1, o_r_tau[s[i]], r_tau[s[i]]))
+        outlier[i] ~ dbin(pr_outlier[i], 1)
+        pr_outlier[i] ~ dbeta(0.001, 0.001)
     }
 
     for (j in 1:J) {
@@ -21,6 +23,7 @@ model {
         # measurement error
         r_tau[s] ~ dgamma(0.00001, 0.00001)
         r_sig[s] <- 1 / sqrt(r_tau[s])
+        o_r_tau[s] ~ dgamma(0.00001, 0.00001)
 
         # system noise - weekday
         #log_q_sig[s] ~ dnorm(log_q, qtau)
