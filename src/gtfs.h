@@ -83,6 +83,7 @@ namespace Gtfs
         float gps_error = 5.0;   // std. dev. of observation error
         float arrival_error = 5.0;
         float departure_error = 5.0;
+        float nw_system_noise = 0.001;
         bool save_timings = false;
         par () {}
         par (Rcpp::List parameters);
@@ -279,6 +280,7 @@ namespace Gtfs
         double max_speed = 100.0 * 1000 / 60 / 60; // 100kmh is the max speed of a bus (presumably)
         double min_tt = 0.0; // assuming vehicle traveling at max speed, this is the min time
         double min_err = 2.0; // minimum travel time measurement error
+        float _system_noise;
 
         // network state
         std::vector<std::pair<int, double> > _data; // new observations as vehicles traverse network
@@ -314,6 +316,7 @@ namespace Gtfs
         std::vector<std::pair<int, double> >& get_data ();
         void push_data (int time, double err, uint64_t ts);
         std::pair<double,double> predict (int delta);
+        void update (par* params, Gtfs* gtfs);
         void update (uint64_t now);
     };
 

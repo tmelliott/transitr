@@ -1277,13 +1277,6 @@ namespace Gtfs
 
         sqlite3_finalize (stmt);
         gtfs->close_connection ();
-
-        _travel_time = _length / 10.0;
-        _uncertainty = _travel_time / 2; // m/s
-
-        min_tt = _length / max_speed;
-        // min_err = sqrt (min_tt);
-
         loaded = true;
     }
 
@@ -1764,6 +1757,7 @@ namespace Gtfs
         Rcpp::NumericVector sigy = parameters["gps_error"];
         Rcpp::NumericVector siga = parameters["arrival_error"];
         Rcpp::NumericVector sigd = parameters["departure_error"];
+        Rcpp::NumericVector signwx = parameters["nw_system_noise"];
         Rcpp::LogicalVector tim = parameters["save_timings"];
 
         // set the parameters
@@ -1776,6 +1770,7 @@ namespace Gtfs
         gps_error = (float) sigy[0];
         arrival_error = (float) siga[0];
         departure_error = (float) sigd[0];
+        nw_system_noise = (float) signwx[0];
         save_timings = (bool) tim[0];
     }
 
@@ -1791,6 +1786,7 @@ namespace Gtfs
             << "\n - gps_error = " << gps_error
             << "\n - arrival_error = " << arrival_error
             << "\n - departure_error = " << departure_error
+            << "\n - nw_system_noise = " << nw_system_noise
             << "\n - save_timings = " << (save_timings ? "true" : "false")
             << "\n";
     }
