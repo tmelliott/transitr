@@ -13,32 +13,183 @@ namespace Gtfs {
 
     void Vehicle::predict_etas (RNG& rng)
     {
-        if (!valid () || complete ()) return;
+        if (!valid () || complete () || _delta == 0) return;
+
+        /**
+         * Predict arrival times for a vehicle using network state
+         * and current position.
+         *
+         * - network state gives full-segment travel times, which
+         *   can be summed to get arrival time
+         * - current position gives travel time of current segment,
+         *   which is estimated from particle fleet
+         */
 
 #if VERBOSE == 2
         Timer timer;
         std::cout << "\n- vehicle " << _vehicle_id << " - predicting etas";
 #endif
 
-        // std::cout << "\n\n Segment information ...";
         auto segments = _trip->shape ()->segments ();
-        // for (int l = 0; l < segments.size (); l++)
-        // {
-        //     std::cout << "\n  - " << l << ":"
-        //         // << " distance = " << segments.at (l).distance
-        //         // << ", length = " << segments.at (l).segment->length () << ", "
-        //         << " tt=" << segments.at (l).segment->travel_time ()
-        //         << " (" << segments.at (l).segment->uncertainty ()
-        //         << ")";
-        // }
-
         auto stops = _trip->stops ();
-        // std::cout << "\n\n Stop information ...";
-        // for (auto j = 0; j < stops.size (); j++)
-        // {
-        //     std::cout << "\n  - " << j
-        //         << ": distance = " << stops.at (j).distance;
-        // }
+        int M = stops.size ();
+        int L = segments.size ();
+
+        Eigen::IOFormat decimalMat (6, 0, ", ", "\n", "  [", "]");
+        Eigen::IOFormat ColVec (6, 0, ", ", "\n", "  [", "]");
+        Eigen::IOFormat tColVec (6, 0, " ", ", ", "", "", "  [", "]^T");
+
+        // Convert from state to proper ETAs
+        Eigen::MatrixXd H_eta (Eigen::MatrixXd::Zero (M, M));
+        for (int i=0; i<M; i++) for (int j=0; j<=i; j++) H_eta (i, j) = 1;
+
+        // Determine Z and R
+        Eigen::VectorXd Z_seg (L);
+        Eigen::MatrixXd R_seg (Eigen::MatrixXd::Zero (L, L));
+
+        for (int i=0; i<L; i++)
+        {
+            Z_seg (i) = segments.at (i).segment->travel_time ();
+            R_seg (i, i) = segments.at (i).segment->uncertainty () == 0 ?
+                segments.at (i).segment->travel_time () :
+                segments.at (i).segment->uncertainty ();
+        }
+#if VERBOSE == 2
+        std::cout << "\n\n * segment travel time estimates:";
+        std::cout << "\n\n  >> Z_seg:\n" << Z_seg.format (tColVec);
+        std::cout << "\n\n  >> R_seg:\n" << R_seg.format (decimalMat);
+#endif
+
+        // Convert them to STOP travel times
+        Eigen::MatrixXd H_seg (Eigen::MatrixXd::Zero (M, L));
+        int l = 0;
+        double d0, d1;
+        for (int j=1; j<M; j++)
+        {
+            // std::cout << "\n stop " << (j-1) << " to " << j << ": ";
+            // stop to end of current segment (should be ~0)
+            d0 = stops.at (j-1).distance;
+            d1 = stops.at (j).distance;
+            double seglen;
+            while (l < L)
+            {
+                // length of this segment * proportion in stop
+                seglen = segments.at (l).segment->length ();
+                if (segments.at (l).distance < d0)
+                {
+                    // remove length from segment start to stop
+                    seglen -= (d0 - segments.at (l).distance);
+                }
+                if (l < L && segments.at (l).distance + segments.at (l).segment->length () > d1)
+                {
+                    // remove end of segment
+                    seglen -= (segments.at (l).distance + segments.at (l).segment->length () - d1);
+                }
+                // std::cout << " -> " << (seglen / segments.at (l).segment->length ()) << " * seg[" << l << "]";
+
+                H_seg (j, l) = seglen / segments.at (l).segment->length ();
+
+                if (segments.at (l).distance + segments.at (l).segment->length () > d1) break;
+                l++;
+            }
+        }
+
+        Eigen::VectorXd Z (M);
+        Eigen::MatrixXd R (Eigen::MatrixXd::Zero (M, M));
+        Z = H_seg * Z_seg;
+        R = H_seg * R_seg * H_seg.transpose ();
+#if VERBOSE == 2
+        std::cout << "\n\n * inter-stop travel time estimates:";
+        std::cout << "\n\n  >> H_seg:\n" << H_seg.format (decimalMat);
+        std::cout << "\n\n  >> Z:\n" << Z.format (tColVec);
+        std::cout << "\n\n  >> R:\n" << R.format (decimalMat);
+        std::cout << "\n\n  >> delta: " << _delta << " seconds";
+#endif
+
+        // Current ETA state:
+        Eigen::VectorXd ETA_hat (M);
+        Eigen::MatrixXd ETA_var (Eigen::MatrixXd::Zero (M, M));
+        for (int i=0; i<M; i++) 
+        {
+            ETA_hat (i) = _tt_state.at (i);
+            for (int j=0; j<M; j++)
+            {
+                ETA_var (i ,j) = _tt_cov.at (i).at (j);
+            }
+        }
+        // ETA_hat (M) = Time (_timestamp - _delta) - stops.at (0).departure_time;
+        // also need a condiiton for "bus hasn't started yet" to add data on ETA[0]
+
+#if VERBOSE == 2
+        std::cout << "\n\n * initial state";
+        std::cout << "\n\n  >> E(ETA):\n" << ETA_hat.format (tColVec);
+        std::cout << "\n\n  >> Var(ETA):\n" << ETA_var.format (decimalMat);  
+        Eigen::VectorXd ETA_hat_original (ETA_hat);
+        Eigen::MatrixXd ETA_original (ETA_var);
+        std::cout << "\n\n  >> ETAs:\n" << (H_eta * ETA_hat).format (tColVec);
+#endif
+
+        // Compute F, H, Q
+        Eigen::MatrixXd I (Eigen::MatrixXd::Identity (M, M));
+        Eigen::MatrixXd F (I);
+        Eigen::MatrixXd H (I);
+        Eigen::MatrixXd Q (I);
+        Q = Q * _delta;
+#if VERBOSE == 2
+        std::cout << "\n\n * control matrices";
+        std::cout << "\n\n  >> F:\n" << F.format (decimalMat);
+        std::cout << "\n\n  >> H:\n" << H.format (decimalMat);
+        std::cout << "\n\n  >> Q:\n" << Q.format (decimalMat);
+#endif
+
+        // predicted state
+        ETA_hat = F * ETA_hat;
+        ETA_var = F * ETA_var * F.transpose () + Q;
+#if VERBOSE == 2
+        std::cout << "\n\n * predicted state";
+        std::cout << "\n\n  >> E(ETA):\n" << ETA_hat.format (tColVec);
+        std::cout << "\n\n  >> Var(ETA):\n" << ETA_var.format (decimalMat);
+        std::cout << "\n\n  >> ETAs:\n" << (H_eta * ETA_hat).format (tColVec);
+#endif
+
+        // updated state
+        auto y = Z - H * ETA_hat;
+        auto S = R + H * ETA_var * H.transpose ();
+        auto K = ETA_var * H.transpose () * S.inverse ();
+
+        ETA_hat += K * y;
+        ETA_var = (I - K * H) * ETA_var * (I - K * H).transpose () + K * R * K.transpose ();
+#if VERBOSE == 2
+        std::cout << "\n\n * updated state";
+        std::cout << "\n\n  >> E(ETA):\n" << ETA_hat.format (tColVec);
+        std::cout << "\n\n  >> Var(ETA):\n" << ETA_var.format (decimalMat);
+        std::cout << "\n\n >> ETAs:\n" << (H_eta * ETA_hat).format (tColVec);
+#endif
+
+        // update vehicle's state
+        for (int i=0; i<M; i++)
+        {
+            _tt_state.at (i) = ETA_hat (i);
+            for (int j=0; j<M; j++)
+            {
+                _tt_cov.at (i).at (j) = ETA_var (i, j);
+            }
+        }
+        _tt_time = _timestamp;
+
+#if VERBOSE == 2
+        std::cout << "\n\n ==> FINAL ETAs:";
+        int tarr = this->trip_start_time ().seconds ();
+        for (int i=0; i<M; i++)
+        {
+            tarr += ETA_hat (i);
+            std::cout << "\n   - stop " << std::setw(2) << (i+1) << ": "
+                << Time (tarr);
+        }
+#endif
+
+        return;
+
 
 #if VERBOSE == 2
         if (_N < 20) std::cout << "\n    --- Particle ETAs ...";
@@ -91,7 +242,7 @@ namespace Gtfs {
          */
         
         // auto stops = _trip->stops ();
-        int M = stops.size ();
+        // int M = stops.size ();
         
 #if VERBOSE == 2
         std::cout << std::setprecision (0) << std::fixed;
@@ -445,6 +596,8 @@ namespace Gtfs {
         if (!valid ()) return etas;
 
         double tsum, tvar;
+        // calculate the timestamp of the scheduled start time 
+        uint64_t t0 = _timestamp - (Time (_timestamp) - this->trip_start_time ());
         for (int i=0; i<M; ++i)
         {
             etas.at (i).stop_id = stops.at (i).stop->stop_id ();
@@ -465,15 +618,16 @@ namespace Gtfs {
 
 
             double tsum, tvar;
-            tsum = _tt_state.at (i);
+            tsum += _tt_state.at (i);
             if (tsum <= 0) continue;
 
-             // this probably need to account for covariances too
-            tvar = _tt_cov.at (i).at (i);
-            etas.at (i).estimate = _tt_time + tsum;
+            tvar = 0;
+            for (int j=0;j<=i;j++) for (int k=0; k<=i; k++) tvar += _tt_cov.at (j).at (k);
+            
+            etas.at (i).estimate = t0 + tsum;
             // for now just the 95% credible interval
-            etas.at (i).quantiles.emplace_back (0.025, _tt_time + (tsum - 2 * pow(tvar, 0.5)));
-            etas.at (i).quantiles.emplace_back (0.975, _tt_time + (tsum + 2 * pow(tvar, 0.5)));
+            etas.at (i).quantiles.emplace_back (0.025, t0 + (tsum - 2 * pow(tvar, 0.5)));
+            etas.at (i).quantiles.emplace_back (0.975, t0 + (tsum + 2 * pow(tvar, 0.5)));
         }
         return etas;
     }

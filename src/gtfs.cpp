@@ -842,6 +842,9 @@ namespace Gtfs
             }
         }
 
+        // set start time
+        _start_time = _stops.at (0).departure_time;
+
         loaded = true;
     }
 
@@ -907,6 +910,12 @@ namespace Gtfs
     float Trip::version () { 
         if (!loaded) load ();
         return _version; 
+    }
+
+    Time& Trip::start_time ()
+    {
+        if (!loaded) load ();
+        return _start_time;
     }
 
     Vehicle* Trip::vehicle ()
@@ -2181,6 +2190,11 @@ namespace Gtfs
     int Vehicle::current_stop ()
     {
         return _current_stop;
+    }
+
+    Time& Vehicle::trip_start_time ()
+    {
+        return _trip->start_time ();
     }
 
 

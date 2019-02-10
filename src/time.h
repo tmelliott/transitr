@@ -19,6 +19,7 @@ public:
     Time (int s);
     Time (int h, int m, int s);
     Time (std::string& t);
+    Time (uint64_t& t);
 
     // let you call Time::now () anywhere
     static Time now ();

@@ -205,6 +205,8 @@ namespace Gtfs
         std::string _trip_headsign;
         float _version;
 
+        Time _start_time;
+
         std::mutex load_mutex;
 
         Vehicle* _vehicle = nullptr;
@@ -229,6 +231,8 @@ namespace Gtfs
         bool direction_id ();
         std::string& trip_headsign ();
         float version ();
+
+        Time& start_time ();
 
         Vehicle* vehicle ();
         void assign_vehicle (Vehicle* vehicle);
@@ -620,6 +624,8 @@ namespace Gtfs
             std::vector<uint64_t>& stop_arrival_times ();
             uint64_t stop_arrival_time (int m);
             int current_stop ();
+
+            Time& trip_start_time (); // the time the trip started (using schedule)
     };
 
     class Particle {

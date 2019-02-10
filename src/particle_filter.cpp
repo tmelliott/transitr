@@ -127,25 +127,24 @@ namespace Gtfs {
         _segment_travel_times.resize (_trip->shape ()->segments ().size (), 0);
         _stop_arrival_times.resize (_trip->stops ().size (), 0);
 
-//         // alright: initialize these using the schedule
-//         int tcum = 0;
-//         for (int i=0; i<_trip->stops ().size (); i++)
-//         {
-// #if VERBOSE == 2
-//             std::cout << "\n - stop " << std::setw(2) << i << ": " 
-//                 << _trip->stops ().at (i).arrival_time;
-//             if (i > 0) 
-//             {
-//                 tcum += _trip->stops ().at (i).arrival_time - 
-//                     _trip->stops ().at (i-1).arrival_time;
-//             }
-//             std::cout << " (+" << tcum << " seconds)";
-//         }
-// #endif
+        // alright: initialize these using the schedule
         _tt_state.resize (_trip->stops ().size (), 0.0);
+        int tcum = 0;
         _tt_cov.resize (_trip->stops ().size (),
                         std::vector<double> (_trip->stops ().size (), 0.0));
         _tt_time = 0;
+        Time tstart = Time (_trip->stops ().at (0).departure_time);
+        for (int i=0; i<_trip->stops ().size (); i++)
+        {
+
+            _tt_state.at (i) = _trip->stops ().at (i).arrival_time - tstart;
+            _tt_cov.at (i).at (i) = _trip->stops ().at (i).arrival_time - tstart;
+            if (i > 0) 
+            {
+                _tt_state.at (i) -= _trip->stops ().at (i-1).arrival_time - tstart;
+                _tt_cov.at (i).at (i) -= _trip->stops ().at (i-1).arrival_time - tstart;
+            }
+        }
     }
 
     void Vehicle::mutate (RNG& rng, Gtfs* gtfs)
