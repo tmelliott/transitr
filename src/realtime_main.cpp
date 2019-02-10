@@ -1,4 +1,5 @@
 #include <vector>
+#include <iomanip>
 
 #include "realtime_feed.h"
 
@@ -114,7 +115,7 @@ void run_realtime_model (List nw)
         tries = 0;
         Rcout << "\n + loaded " 
             << rtfeed.n_vehicles () << " vehicle positions and "
-            << rtfeed.n_trip_updates () << " trip updates.\n";
+            << rtfeed.n_trip_updates () << " trip updates\n";
 
         {
             std::ostringstream tinfo;

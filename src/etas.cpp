@@ -265,14 +265,18 @@ namespace Gtfs {
             // Convert B to (column) vector
             Eigen::VectorXd Bmat (M);
             for (int i=0; i<M; i++) Bmat (i) = _tt_state.at (i+min_i);
+#if VERBOSE == 2
             std::cout << "\n Bhat = \n" << Bmat;
+#endif
 
             // Convert P to a matrix
             Eigen::MatrixXd Pmat (M, M);
             for (int i=0; i<M; i++)
                 for (int j=0; j<M; j++)
                     Pmat (i ,j) = _tt_cov.at (i+min_i).at (j+min_i);
+#if VERBOSE == 2
             std::cout << "\n P = \n" << Pmat;
+#endif
 
             // construct F matrix
             Eigen::MatrixXd F (M, M);
@@ -285,7 +289,9 @@ namespace Gtfs {
                 else if (Bmat(i) <= 1e-6) F (i, i) = 0;
                 else F (i, i) = fmin(1, fmax(0, 1 - (double)tt_delta / Bmat (i)));
             }
+#if VERBOSE == 2
             std::cout << "\n F = \n" << F.format (decimalMatFmt);
+#endif
             
             // Identity matrix
             Eigen::MatrixXd I (M, M);
@@ -294,19 +300,24 @@ namespace Gtfs {
             // System noise matrix (variability/second)
             Eigen::MatrixXd Q = I;
             for (int i=0; i<M; i++) Q (i, i) = tt_delta;
+#if VERBOSE == 2
             std::cout << "\n Q = \n" << Q.format (decimalMatFmt);
+#endif
             
 
             // Predict Bhat
             Eigen::VectorXd Bhat (M);
             Bhat = F * Bmat;
+#if VERBOSE == 2
             std::cout << "\n Bhat = \n" << Bhat;
+#endif
 
             // Predict Phat 
             Eigen::MatrixXd Phat (M, M);
             Phat = F * Pmat * F.transpose () + Q;
+#if VERBOSE == 2
             std::cout << "\n Phat = \n" << Phat;
-
+#endif
 
             // --- Update equations
             // Convert Z to (column) vector
@@ -327,12 +338,16 @@ namespace Gtfs {
             // lower diagonal is -1's
             for (int i=1; i<M; i++)
                     H (i, i-1) = -1;
+#if VERBOSE == 2
             std::cout << "\n Measurement matrix H = \n" << H;
+#endif
 
             // Innovation residual
             Eigen::VectorXd resid_y = Z - H * Bhat;
+#if VERBOSE == 2
             std::cout << "\n HBhat = \n" << (H * Bhat);
             std::cout << "\n yresid = \n" << resid_y;
+#endif
 
             // Innovation covariance
             Eigen::MatrixXd S = R + H * Phat * H.transpose ();
@@ -340,16 +355,22 @@ namespace Gtfs {
 
             // Kalman gain
             Eigen::MatrixXd K = Phat * H.transpose () * S.inverse ();
+#if VERBOSE == 2
             std::cout << "\n K = \n" << K.format (decimalMatFmt);
+#endif
 
             // Updated state estimate
             Bhat = Bhat + K * resid_y;
+#if VERBOSE == 2
             std::cout << "\n Bhat = \n" << Bhat;
+#endif
 
             // Update state covariance
             Phat = (I - K * H) * Phat * (I - K * H).transpose () +
                 K * R * K.transpose ();
+#if VERBOSE == 2
             std::cout << "\n Phat = \n" << Phat;
+#endif
 
             // Save state
             int Mx = stops.size ();

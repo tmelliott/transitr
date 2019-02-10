@@ -12,7 +12,8 @@ namespace Gtfs {
         // ...
         
         _travel_time = _length / 10.0;
-        _uncertainty = _travel_time; // m/s
+        _uncertainty = 0.0;
+        // _uncertainty = _travel_time; // m/s
         min_tt = _length / max_speed;
     }
 
@@ -22,15 +23,15 @@ namespace Gtfs {
         // use current estimate and (historical) prior to predict future state
         double xhat, Phat;
         xhat = _travel_time;
-        // Phat = _uncertainty + (double) delta * 2.0 / 60.0 / 30.0;
-        // if (delta > 60*10)
-        // {
-        //     Phat = _uncertainty + 10.0 * (double) delta / 60.0;
-        // }
-        // else
-        // {
-        // }
-        Phat = _uncertainty + delta * _system_noise;
+
+        if (_uncertainty > 0)
+        {
+            Phat = _uncertainty + delta * _system_noise;
+        }
+        else
+        {
+            Phat = _travel_time * 2.0;
+        }
 
         return std::make_pair (xhat, Phat);
     }
@@ -103,7 +104,7 @@ namespace Gtfs {
     double Segment::get_speed ()
     {
         if (!loaded) load ();
-        if (_uncertainty > 0 && _travel_time > 0)
+        if (_travel_time > 0)
         {
             return _length / _travel_time;
         }
@@ -112,7 +113,7 @@ namespace Gtfs {
     double Segment::get_speed (int delta)
     {
         if (!loaded) load ();
-        if (_uncertainty > 0 && _travel_time > 0)
+        if (_travel_time > 0)
         {
             auto x = predict (delta);
             return _length / x.first;
@@ -126,7 +127,7 @@ namespace Gtfs {
     int Segment::sample_travel_time (RNG& rng, int delta)
     {
         if (!loaded) load ();
-        if (_uncertainty == 0 || _travel_time == 0) 
+        if ( _travel_time == 0) 
         {
             return _length / (rng.rnorm () * 25.0 + 5.0); // [5, 30m/s]
         }
