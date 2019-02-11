@@ -51,7 +51,7 @@ namespace Gtfs {
         {
             Z_seg (i) = segments.at (i).segment->travel_time ();
             R_seg (i, i) = segments.at (i).segment->uncertainty () == 0 ?
-                segments.at (i).segment->travel_time () :
+                pow (segments.at (i).segment->travel_time (), 0.5) :
                 segments.at (i).segment->uncertainty ();
         }
 #if VERBOSE == 2
@@ -98,6 +98,7 @@ namespace Gtfs {
         Eigen::MatrixXd R (Eigen::MatrixXd::Zero (M, M));
         Z = H_seg * Z_seg;
         R = H_seg * R_seg * H_seg.transpose ();
+        R (0, 0) = 1e6;
 #if VERBOSE == 2
         std::cout << "\n\n * inter-stop travel time estimates:";
         std::cout << "\n\n  >> H_seg:\n" << H_seg.format (decimalMat);
@@ -165,6 +166,46 @@ namespace Gtfs {
         std::cout << "\n\n  >> Var(ETA):\n" << ETA_var.format (decimalMat);
         std::cout << "\n\n >> ETAs:\n" << (H_eta * ETA_hat).format (tColVec);
 #endif
+
+        // Now figure out how far into the trip the vehicle currently is,
+        // _ignorant of previous stops which could be wrong_.
+        _current_stop = find_stop_index (distance (), &stops);
+#if VERBOSE == 2
+        std::cout << "\n\n - current segment: " << (_current_stop + 1) << " of " << stops.size ();
+#endif
+        if (_current_stop == stops.size () - 1)
+        {
+#if VERBOSE == 2
+            std::cout << " ... well that's awkward, this vehicle has finished!";
+#endif
+        }
+        else
+        {
+            float pr = (distance () - stops.at (_current_stop).distance) /
+                (stops.at (_current_stop + 1).distance - stops.at (_current_stop).distance);
+#if VERBOSE == 2
+            std::cout << "\n - proportion of segment complete: ";
+            std::cout << pr;
+#endif
+            // now adjust ETAs ... 
+            int t_passed (Time (_timestamp) - trip_start_time ());
+#if VERBOSE == 2
+            std::cout << "\n - time since scheduled trip start: " << t_passed << "s\n";
+#endif
+            if (_current_stop > 0 || t_passed > 0)
+            {
+                for (int i=0; i<_current_stop; i++) t_passed -= ETA_hat (i);
+                t_passed -= pr * ETA_hat (_current_stop);
+                ETA_hat (0) = t_passed;
+            }
+#if VERBOSE == 2
+            std::cout << "\n\n * updated state (to get valid arrival time)";
+            std::cout << "\n\n  >> E(ETA):\n" << ETA_hat.format (tColVec);
+            std::cout << "\n\n  >> Var(ETA):\n" << ETA_var.format (decimalMat);
+            std::cout << "\n\n >> ETAs:\n" << (H_eta * ETA_hat).format (tColVec);
+#endif
+
+        }
 
         // update vehicle's state
         for (int i=0; i<M; i++)
@@ -595,6 +636,8 @@ namespace Gtfs {
         
         if (!valid ()) return etas;
 
+        int curstop = _current_stop;
+
         double tsum, tvar;
         // calculate the timestamp of the scheduled start time 
         uint64_t t0 = _timestamp - (Time (_timestamp) - this->trip_start_time ());
@@ -624,6 +667,7 @@ namespace Gtfs {
             tvar = 0;
             for (int j=0;j<=i;j++) for (int k=0; k<=i; k++) tvar += _tt_cov.at (j).at (k);
             
+            if (i <= curstop) continue;
             etas.at (i).estimate = t0 + tsum;
             // for now just the 95% credible interval
             etas.at (i).quantiles.emplace_back (0.025, t0 + (tsum - 2 * pow(tvar, 0.5)));

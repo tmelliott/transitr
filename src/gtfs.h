@@ -559,7 +559,8 @@ namespace Gtfs
             int resample_count = 0;
 
             std::vector<unsigned int> _segment_travel_times; // segment travel times
-            std::vector<uint64_t> _stop_arrival_times;     // stop arrival times
+            std::vector<uint64_t> _stop_arrival_times;       // stop arrival times
+            std::vector<uint64_t> _stop_departure_times;     // stop departure times
             int _current_segment;
             int _current_stop;
 
