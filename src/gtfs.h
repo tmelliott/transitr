@@ -677,6 +677,7 @@ namespace Gtfs
         bool bus_stop (uint64_t time, RNG& rng);
         bool behind_event (Event& e, double delta);
         void predict_etas (RNG& rng);
+        int calculate_stop_eta (int i, RNG& rng);
         
         void calculate_likelihood (latlng& y, std::vector<ShapePt>& path, double sigma);
         void calculate_likelihood (Event& e, double error);

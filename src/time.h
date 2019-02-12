@@ -62,7 +62,9 @@ inline bool operator>=(const Time& lhs, const Time& rhs)
 
 inline std::ostream& operator<<(std::ostream& os, const Time& t)
 {
-    os << t.hour () << ":" 
+    os 
+        << (t.hour () < 10 ? "0" : "")
+        << t.hour () << ":"
         << (t.minute () < 10 ? "0" : "")
         << t.minute () << ":" 
         << (t.second () < 10 ? "0" : "")

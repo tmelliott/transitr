@@ -121,29 +121,21 @@ namespace Gtfs {
         _current_stop = 0;
         _segment_travel_times.clear ();
         _stop_arrival_times.clear ();
+        _stop_departure_times.clear ();
         _tt_state.clear ();
         _tt_cov.clear ();
 
         _segment_travel_times.resize (_trip->shape ()->segments ().size (), 0);
         _stop_arrival_times.resize (_trip->stops ().size (), 0);
+        _stop_departure_times.resize (_trip->stops ().size (), 0);
 
         // alright: initialize these using the schedule
         _tt_state.resize (_trip->stops ().size (), 0.0);
-        int tcum = 0;
         _tt_cov.resize (_trip->stops ().size (),
                         std::vector<double> (_trip->stops ().size (), 0.0));
-        _tt_time = 0;
-        Time tstart = Time (_trip->stops ().at (0).departure_time);
         for (int i=0; i<_trip->stops ().size (); i++)
         {
-
-            _tt_state.at (i) = _trip->stops ().at (i).arrival_time - tstart;
-            _tt_cov.at (i).at (i) = _trip->stops ().at (i).arrival_time - tstart;
-            if (i > 0) 
-            {
-                _tt_state.at (i) -= _trip->stops ().at (i-1).arrival_time - tstart;
-                _tt_cov.at (i).at (i) -= _trip->stops ().at (i-1).arrival_time - tstart;
-            }
+            _tt_cov.at (i).at (i) = i * 30 + 300; // 5 min error + 30 seconds per stop
         }
     }
 
@@ -246,10 +238,13 @@ namespace Gtfs {
                 case EventType::arrival :
                     {
                         // this is tricky ...
+                        // _stop_arrival_times.at (e.stop_index) = e.timestamp;
+                        break;
                     }
                 case EventType::departure :
                     {
                         // no checks
+                        // _stop_departure_times.at (e.stop_index) = e.timestamp;
                         break;
                     }
             }
@@ -373,6 +368,15 @@ namespace Gtfs {
 
         _delta = e.timestamp - _timestamp;
         _timestamp = e.timestamp;
+
+        if (e.type == EventType::arrival)
+        {
+            _stop_arrival_times.at (e.stop_index) = e.timestamp;
+        }
+        if (e.type == EventType::departure)
+        {
+            _stop_departure_times.at (e.stop_index) = e.timestamp;
+        }
 
         // move the particles
         if (_complete || !valid () || _delta == 0) return;
