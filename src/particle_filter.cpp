@@ -135,7 +135,7 @@ namespace Gtfs {
                         std::vector<double> (_trip->stops ().size (), 0.0));
         for (int i=0; i<_trip->stops ().size (); i++)
         {
-            _tt_cov.at (i).at (i) = i * 30 + 300; // 5 min error + 30 seconds per stop
+            _tt_cov.at (i).at (i) = (i+1) * 30; // 5 min error + 30 seconds per stop
         }
     }
 

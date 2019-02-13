@@ -9,7 +9,124 @@
 
 
 namespace Gtfs {
+    void Trip::initialize_etas (RNG& rng)
+    {
+        if (!loaded) load ();
 
+        Eigen::IOFormat decimalMat (6, 0, ", ", "\n", "  [", "]");
+        Eigen::IOFormat ColVec (6, 0, ", ", "\n", "  [", "]");
+        Eigen::IOFormat tColVec (6, 0, " ", ", ", "", "", "  [", "]^T");
+
+        // first fetch segment travel times ...
+        auto& segments = _shape->segments ();
+        int L (segments.size ());
+        int M (_stops.size ());
+        Eigen::VectorXd segTT (L);
+        Eigen::MatrixXd VsegTT (Eigen::MatrixXd::Zero (L, L));
+        for (int l=0; l<L; l++)
+        {
+            // default *should* be the schedule ... ?
+            segTT (l) = segments.at (l).segment->travel_time ();
+            // we're going to allow for "no uncertainty estimate";
+            VsegTT (l, l) = segments.at (l).segment->uncertainty ();
+        }
+
+        // generate seg -> stop transformation matrix
+        Hseg = Eigen::MatrixXd::Zero (M, L);
+        int l = 0;
+        double d0, d1;
+        for (int j=1; j<M; j++)
+        {
+            d0 = _stops.at (j-1).distance;
+            d1 = _stops.at (j).distance;
+            double seglen;
+            while (l < L)
+            {
+                // length of this segment * proportion in stop
+                seglen = segments.at (l).segment->length ();
+                if (segments.at (l).distance < d0)
+                {
+                    // remove length from segment start to stop
+                    seglen -= (d0 - segments.at (l).distance);
+                }
+                if (l < L && segments.at (l).distance + segments.at (l).segment->length () > d1)
+                {
+                    // remove end of segment
+                    seglen -= (segments.at (l).distance + segments.at (l).segment->length () - d1);
+                }
+                // std::cout << " -> " << (seglen / segments.at (l).segment->length ()) << " * seg[" << l << "]";
+                Hseg (j, l) = seglen / segments.at (l).segment->length ();
+                if (segments.at (l).distance + segments.at (l).segment->length () > d1) break;
+                l++;
+            }
+        }
+
+        // transform segment tt -> stop tt
+        Eigen::VectorXd stopTT (M);
+        Eigen::MatrixXd VstopTT (M, M);
+        stopTT = Hseg * segTT;
+        VstopTT = Hseg * VsegTT * Hseg.transpose ();
+
+        // std::cout << "\n - segTT: \n" << segTT;
+        // std::cout << "\n - VsegTT: \n" << VsegTT;
+        // std::cout << "\n - Hseg: \n" << Hseg;
+        // std::cout << "\n - stopTT: \n" << stopTT;
+        // std::cout << "\n - VstopTT: \n" << VstopTT;
+
+        _etas.resize (_stops.size (), 0);
+        _eta_uncertainty.resize (_stops.size (), 0);
+        Time tarr = _stops.at (0).departure_time;
+        _etas.at (0) = tarr;
+        _eta_uncertainty.at (0) = 0;
+        for (int i=1; i<_stops.size (); i++)
+        {
+            tarr = Time (tarr.seconds () + stopTT  (i));
+            _etas.at (i) = tarr;
+            _eta_uncertainty.at (i) = 0;
+            for (int j=0; j<=i; j++)
+            {
+                _eta_uncertainty.at (i) += VstopTT (i, j);
+            }
+        }
+
+    }
+
+    void Trip::generate_etas (RNG& rng)
+    {
+        if (_etas.size () == 0) initialize_etas (rng);
+
+        /**
+         * Generate ETAs for a trip.
+         *
+         * If the trip is associated with a vehicle, use the vehicle's state
+         * to update the ETAs; otherwise just use network state;
+         */
+        
+        
+    }
+
+    void Trip::print_etas ()
+    {
+        if (_etas.size () == 0) return;
+        std::cout << "\n\n - ETAs for route "
+            << route ()->route_short_name ()
+            << " ("
+            << stops ().at (0).arrival_time
+            << ")\n"
+            << "              schedule       eta  delay  (error)";
+        for (int i=0; i<stops ().size (); i++)
+        {
+            std::cout << "\n   + stop "
+                << std::setw (2) << i << ": "
+                << stops ().at (i).arrival_time << "  "
+                << _etas.at (i) << "  "
+                << std::setw (5)
+                << (_etas.at (i) - stops ().at (i).arrival_time)
+                << "  ("
+                << _eta_uncertainty.at (i)
+                << ")";
+        }
+    }
 
     void Vehicle::predict_etas (RNG& rng)
     {
@@ -47,7 +164,7 @@ namespace Gtfs {
         {
             Z_seg (i) = segments.at (i).segment->travel_time ();
             R_seg (i, i) = segments.at (i).segment->uncertainty () == 0 ?
-                pow (segments.at (i).segment->travel_time (), 0.5) :
+                segments.at (i).segment->travel_time () :
                 segments.at (i).segment->uncertainty ();
         }
 
@@ -85,6 +202,12 @@ namespace Gtfs {
         // segment travel time between stops
         Eigen::VectorXd Z_stop (H_seg * Z_seg);
         Eigen::MatrixXd R_stop (H_seg * R_seg * H_seg.transpose ());
+#if VERBOSE == 2
+        std::cout << "\n - Z_seg\n" << Z_seg.format (tColVec);
+        std::cout << "\n - R_seg\n" << R_seg.format (decimalMat);
+        std::cout << "\n - Z_stop\n" << Z_stop.format (tColVec);
+        std::cout << "\n - R_stop\n" << R_stop.format (decimalMat);
+#endif
 
         // delay times
         Eigen::VectorXd Z (M);
@@ -93,8 +216,10 @@ namespace Gtfs {
         double tarrv = 0.0;
         _current_stop = find_stop_index (distance (), &stops);
 #if VERBOSE == 2
-        std::cout << "\n - current stop: " << _current_stop;
+        std::cout << "\n - current stop: " << _current_stop 
+            << " (of " << M << " stops)";
 #endif
+        double vel;
         for (int i=0; i<M; i++)
         {
             if (i <= _current_stop)
@@ -105,16 +230,24 @@ namespace Gtfs {
             // remaining time in current segment ...
             if (i == _current_stop + 1)
             {
-                double etai = 0.0, etav =0.0;
-                for (auto p : _state) etai += p.calculate_stop_eta (i, rng);
-                etai /= _state.size ();
-                for (auto p : _state) etav += pow (p.calculate_stop_eta (i, rng) - etai, 2);
-                etav /= _state.size () - 1;
-                etav = std::fmin (etai, etav); // variance can't be bigger than travel time ... (no point)
-
+                double etai, etav;
+                // velocity along this segment ...
+                std::vector<double> tarrs;
+                tarrs.reserve (_state.size ());
+                vel = (stops.at (i).distance - stops.at (i-1).distance) / Z_stop (i);
+                for (auto p : _state) tarrs.push_back (p.calculate_stop_eta (vel, i, rng));
+                etai = std::accumulate (tarrs.begin (), tarrs.end (), 0.0);
+                etai /= tarrs.size ();
+                // etav = std::accumulate (tarrs.begin (), tarrs.end (), 0.0,
+                //                         [&etai](double a, double b) {
+                //                             return a + pow (b - etai, 2);
+                //                         });
+                // etav /= tarrs.size () - 1;
+                // etav = std::fmin (etai, etav); // variance can't be bigger than travel time ... (no point)
+                etav = etai;
 #if VERBOSE == 2
-                std::cout << "\n curtime is " << Time (_timestamp);
-                std::cout << "\n\n >>>> ETA next stop: " << etai
+                std::cout << "\n - curtime is " << Time (_timestamp);
+                std::cout << "\n - ETA next stop: " << etai
                     << " (" << etav << ")";
 #endif
 
@@ -129,14 +262,25 @@ namespace Gtfs {
             else
             {
                 tarr += Z_stop (i-1);
-                tarrv += R_stop (i-1);
+                tarrv += R_stop (i-1, i-1);
+                std::cout << "\n - Then another " << Z_stop (i-1) << "s to stop " << i
+                    << " -> arrival time of " << Time (tarr);
             }
             
-            Z (i) = stops.at (i).arrival_time - Time (tarr);
+            Z (i) = Time (tarr) - stops.at (i).arrival_time;
             R (i, i) = tarrv;
         }
 
 #if VERBOSE == 2
+        std::cout << "\n\n  >>> ETAs: schedule  estimate  difference";
+        for (int i=_current_stop+1; i<M; i++)
+        {
+            std::cout 
+                << "\n  - stop " << i << ": "
+                << stops.at (i).arrival_time << "  "
+                << Time (stops.at (i).arrival_time.seconds () + Z (i)) << "  "
+                << (Time (stops.at (i).arrival_time.seconds () + Z (i)) - stops.at (i).arrival_time);
+        }
         std::cout << "\n\n * stop delay predictions:";
         std::cout << "\n\n  >> Z:\n" << Z.format (tColVec);
         std::cout << "\n\n  >> R:\n" << R.format (decimalMat);
@@ -162,7 +306,7 @@ namespace Gtfs {
         Eigen::MatrixXd H (I);
         for (int i=0; i<M; i++) for (int j=0; j<i; j++) H (i, j) = 1;
         Eigen::MatrixXd Q (I);
-        Q = Q * pow (_delta, 0.5);
+        Q = Q * 5;
 #if VERBOSE == 2
         std::cout << "\n\n * control matrices";
         std::cout << "\n\n  >> F:\n" << F.format (decimalMat);
@@ -703,12 +847,13 @@ namespace Gtfs {
         
         if (!valid ()) return etas;
 
-        int curstop = _current_stop;
+        int curstop = find_stop_index (distance(), &stops);
 
         double tsum, tvar;
         // calculate the timestamp of the scheduled start time 
-        uint64_t t0 = _timestamp;
-        for (int i=_current_stop+1; i<M; ++i)
+        Time t0 = Time (_timestamp);
+        int tx;
+        for (int i=curstop+1; i<M; ++i)
         {
             etas.at (i).stop_id = stops.at (i).stop->stop_id ();
             etas.at (i).estimate = 0;
@@ -728,22 +873,37 @@ namespace Gtfs {
 
 
             double tsum, tvar;
+            // this is the cumulative delay
             tsum += _tt_state.at (i);
-            if (tsum <= 0) continue;
+            // if (tsum <= 0) continue;
 
             tvar = 0;
             for (int j=0;j<=i;j++) for (int k=0; k<=i; k++) tvar += _tt_cov.at (j).at (k);
             
             if (i <= curstop) continue;
-            etas.at (i).estimate = t0 + tsum;
+            if (stops.at (i).arrival_time.seconds() + tsum < t0.seconds ()) continue;
+#if VERBOSE > 2
+            std::cout << "\n - stop " << i 
+                << ": delay = " << tsum;
+#endif
+            
+            // how many seconds until arrival
+            tx = Time (stops.at (i).arrival_time.seconds() + tsum) - t0;
+#if VERBOSE > 2
+            std::cout 
+                << "; ETA: " 
+                << Time (stops.at (i).arrival_time.seconds() + tsum)
+                << " -> " << tx << " seconds";
+#endif
+            etas.at (i).estimate = _timestamp + tx;
             // for now just the 95% credible interval
-            etas.at (i).quantiles.emplace_back (0.025, t0 + (tsum - 2 * pow(tvar, 0.5)));
-            etas.at (i).quantiles.emplace_back (0.975, t0 + (tsum + 2 * pow(tvar, 0.5)));
+            etas.at (i).quantiles.emplace_back (0.025, _timestamp + (tx - 2 * pow(tvar, 0.5)));
+            etas.at (i).quantiles.emplace_back (0.975, _timestamp + (tx + 2 * pow(tvar, 0.5)));
         }
         return etas;
     }
 
-    int Particle::calculate_stop_eta (int stop_index, RNG& rng)
+    int Particle::calculate_stop_eta (double vel, int stop_index, RNG& rng)
     {
         if (complete) return 0;
 
@@ -751,7 +911,7 @@ namespace Gtfs {
         if (stop_index >= vehicle->trip ()->stops ().size ()) return 0;
 
         double dstop = vehicle->trip ()->stops ().at (stop_index).distance;
-        return (dstop - distance) / speed;
+        return (dstop - distance) / vel;
     }
 
     void Particle::predict_etas (RNG& rng)

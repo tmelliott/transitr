@@ -1,5 +1,6 @@
 #include <vector>
 #include <iomanip>
+#include <iostream>
 
 #include "realtime_feed.h"
 
@@ -63,6 +64,8 @@ void run_realtime_model (List nw)
 
     // Create vehicle container
     Gtfs::vehicle_map vehicles;
+
+    Gtfs::trip_map* trips = &(gtfs.trips ());
 
     // Create parameter object
     List pars = nw["parameters"];
@@ -230,39 +233,56 @@ void run_realtime_model (List nw)
 #if VERBOSE > 0
         Rcout << "\n\n >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ETA Predictions\n";
 #endif
+        
         // Predict ETAs
+        uint64_t curtime (rtfeed.feed()->header ().timestamp ());
         #pragma omp parallel for num_threads(params.n_core)
-        for (unsigned i=0; i<vehicles.bucket_count (); ++i)
+        for (unsigned i=0; i<trips->bucket_count (); ++i)
         {
-            for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
+            for (auto trip = trips->begin (i); trip != trips->end (i); ++trip)
             {
-#if VERBOSE > 1
-                if (v->second.trip ()->route ()->route_short_name () != "NX1") continue;
-#endif
-                v->second.predict_etas (rngs.at (omp_get_thread_num ()));
+                if (trip->second.is_active (curtime))
+                {
+                    trip->second.generate_etas (rngs.at (omp_get_thread_num ()));
+                    trip->second.print_etas ();
+                }
             }
         }
-        timer.report ("predicting ETAs");
+        Rcout << "\n\n";
+
+//         for (unsigned i=0; i<vehicles.bucket_count (); ++i)
+//         {
+//             for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
+//             {
+// #if VERBOSE > 1
+//                 if (v->second.trip ()->route ()->route_short_name () != "NX1") continue;
+// #endif
+//                 v->second.predict_etas (rngs.at (omp_get_thread_num ()));
+//             }
+//         }
+//         timer.report ("predicting ETAs");
 
         // Write vehicles to (new) feed
-#if SIMULATION
-        std::ostringstream outputname_t;
-        outputname_t << "etas/etas";
-        if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ()) 
-        {
-            outputname_t << "_" << rtfeed.feed ()->header ().timestamp ();
-        }
-        outputname_t << ".pb";
-        std::string oname (outputname_t.str ());
-        write_vehicles (&vehicles, oname);
-#endif
-        write_vehicles (&vehicles, outputname);
+// #if SIMULATION
+//         std::ostringstream outputname_t;
+//         outputname_t << "etas/etas";
+//         if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ()) 
+//         {
+//             outputname_t << "_" << rtfeed.feed ()->header ().timestamp ();
+//         }
+//         outputname_t << ".pb";
+//         std::string oname (outputname_t.str ());
+//         write_vehicles (&vehicles, oname);
+// #endif
+//         write_vehicles (&vehicles, outputname);
 
-        timer.report ("writing ETAs to protobuf feed");
+        // timer.report ("writing ETAs to protobuf feed");
 
         gtfs.close_connection (true);
         timer.end ();
 
+        std::cout << "\nPress enter to continue ...";
+        getchar ();
         // std::this_thread::sleep_for (std::chrono::milliseconds (10 * 1000));
 
         iteration++;

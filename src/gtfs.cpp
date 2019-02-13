@@ -117,6 +117,7 @@ namespace Gtfs
             _trips.reserve (sqlite3_column_int (stmt, 0));
             sqlite3_finalize (stmt);
 
+            // ONLY trips running today 
             qry = "SELECT trip_id FROM trips";
             qrystr = qry.c_str ();
             if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
@@ -844,7 +845,7 @@ namespace Gtfs
 
         // set start time
         _start_time = _stops.at (0).departure_time;
-
+        
         loaded = true;
     }
 
@@ -873,6 +874,28 @@ namespace Gtfs
     {
         completed = true;
         _vehicle = nullptr;
+    }
+
+    bool Trip::is_active (uint64_t& t)
+    {
+        /**
+         * Returns TRUE if vehicle is not null ...
+         */
+        if (_vehicle != nullptr) return true;
+
+        /** 
+         * ... or if it is 30 mins before scheduled start
+         * and less than an hour since scheduled end.
+         */
+        Time t0 (t);
+        if (loaded)
+        {
+            if (stops ().front ().departure_time - t0 < 30*60) return false;
+            return t0 - stops ().back ().arrival_time < 60*60;
+        }
+
+        // if not loaded, currently unable to subset today's trips only
+        return false;
     }
 
     std::string& Trip::trip_id () { 
@@ -1903,6 +1926,7 @@ namespace Gtfs
             // }
         }
         _trip = trip;
+        _trip->assign_vehicle (this);
     }
 
     void Vehicle::update (const transit_realtime::VehiclePosition& vp,

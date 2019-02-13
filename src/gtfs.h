@@ -7,6 +7,8 @@
 #include <ctime>
 #include <mutex>
 
+#include "eigen3/Eigen/Dense"
+
 #include "geo.h"
 #include "time.h"
 #include "rng.h"
@@ -71,6 +73,7 @@ namespace Gtfs
     find_segment_index (double distance, std::vector<ShapeSegment>* segments);
 
     typedef std::unordered_map<std::string, Vehicle> vehicle_map;
+    typedef std::unordered_map<std::string, Trip> trip_map;
 
     struct par
     {
@@ -206,6 +209,9 @@ namespace Gtfs
         float _version;
 
         Time _start_time;
+        std::vector<Time> _etas; // ETA(i) = start_time + _etas.at (i)
+        std::vector<int> _eta_uncertainty;
+        Eigen::MatrixXd Hseg;   // transform segment travel times to stop tts
 
         std::mutex load_mutex;
 
@@ -221,6 +227,7 @@ namespace Gtfs
         void unload ();              // default is completed = false
         void unload (bool complete);
         void complete ();
+        bool is_active (uint64_t& t);
 
         std::string& trip_id ();
         Route* route ();
@@ -233,6 +240,11 @@ namespace Gtfs
         float version ();
 
         Time& start_time ();
+        uint64_t get_eta (int i);
+        void initialize_etas (RNG& rng);
+        void generate_etas (RNG& rng);
+
+        void print_etas ();
 
         Vehicle* vehicle ();
         void assign_vehicle (Vehicle* vehicle);
@@ -677,7 +689,7 @@ namespace Gtfs
         bool bus_stop (uint64_t time, RNG& rng);
         bool behind_event (Event& e, double delta);
         void predict_etas (RNG& rng);
-        int calculate_stop_eta (int i, RNG& rng);
+        int calculate_stop_eta (double vel, int i, RNG& rng);
         
         void calculate_likelihood (latlng& y, std::vector<ShapePt>& path, double sigma);
         void calculate_likelihood (Event& e, double error);
