@@ -649,6 +649,7 @@ namespace Gtfs
             int current_segment ();
             std::vector<uint64_t>& stop_arrival_times ();
             uint64_t stop_arrival_time (int m);
+            uint64_t stop_departure_time (int m);
             int current_stop ();
 
             Time& trip_start_time (); // the time the trip started (using schedule)

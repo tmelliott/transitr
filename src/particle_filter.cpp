@@ -823,23 +823,23 @@ namespace Gtfs {
         while (behind_event (e, delta))
         {
             // add system noise to acceleration to ensure speed remains in [0, vmax]
-            double accel_prop (-100.0);
-            double n = 0;
-            if (speed > vmax)
-            {
-                speed = rng.runif () * vmax;
-            }
-            while (speed + accel_prop < 0.0 || speed + accel_prop > vmax && n < 1000)
-            {
-                accel_prop = rng.rnorm () * vehicle->system_noise () * 
-                    (1.0 + (double)n / 100.0);
-                n++;
-                // if (accelerating > 0.0)
-                // {
-                //     accel_prop += acceleration;
-                //     accelerating--;
-                // }
-            }
+            // double accel_prop (-100.0);
+            // double n = 0;
+            // if (speed > vmax)
+            // {
+            //     speed = rng.runif () * vmax;
+            // }
+            // while (speed + accel_prop < 0.0 || speed + accel_prop > vmax && n < 1000)
+            // {
+            //     accel_prop = rng.rnorm () * vehicle->system_noise () * 
+            //         (1.0 + (double)n / 100.0);
+            //     n++;
+            //     // if (accelerating > 0.0)
+            //     // {
+            //     //     accel_prop += acceleration;
+            //     //     accelerating--;
+            //     // }
+            // }
 
             // double v = fmax (0, fmin (30, speed + acceleration));
             // double v = speed;
@@ -856,7 +856,11 @@ namespace Gtfs {
             //     speed = v;
             // }
 
-            speed += accel_prop;
+            {
+                double vel = speed + rng.rnorm () * vehicle->system_noise ();
+                while (vel <= 0 || vel > 30) vel = speed + rng.rnorm () * vehicle->system_noise ();
+                speed = vel;
+            }
             distance += speed;
             if (distance >= Dmax) complete = true;
             delta--;

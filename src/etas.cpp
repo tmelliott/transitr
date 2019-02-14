@@ -32,7 +32,6 @@ namespace Gtfs {
         if (!state_initialised)
         {
             initialize_etas (rng);
-            // just initialize
             return;
         }
 
@@ -44,15 +43,6 @@ namespace Gtfs {
             << ")\n";
 #endif
 
-        /**
-         * Generate ETAs for a trip.
-         *
-         * If the trip is associated with a vehicle, use the vehicle's state
-         * to update the ETAs; otherwise just use network state;
-         */
-        
-        // the current state
-        // int M = _stops.size ();
 #if VERBOSE > 1
         std::cout 
             << "\n\n   * My state is currently:\n"
@@ -63,40 +53,7 @@ namespace Gtfs {
 
         // load state observation
         auto obs = estimate_tt ();
-        // Eigen::VectorXd Z;
-        // Eigen::MatrixXd R;
         std::tie (B, E) = obs;
-
-// #if VERBOSE > 1
-//         std::cout 
-//             <<   "\n   * I observed the following travel times:\n"
-//             << Z.format (tColVec)
-//             << "\n\n     with covariance matrix:\n" 
-//             << R.format (decimalMat);
-// #endif
-
-
-//         // control matrices
-//         // F = Identity // therefore prediction is just B = B, P = P + Q
-//         // H = Identity
-//         // Q = Identity * 0.001 * delta
-//         Eigen::MatrixXd I (Eigen::MatrixXd::Identity (M, M));
-//         auto Q = I * pow (delta, 0.5);
-//         E = E + Q;
-// #if VERBOSE > 1
-//         std::cout 
-//             << "\n\n   * Predicted state after " << delta << " seconds is:\n"
-//             << B.format (tColVec)
-//             << "\n\n     with uncertainty matrix:\n" 
-//             << E.format (decimalMat);
-// #endif
-
-//         // updated state (this simplifies lots ....)
-//         auto y = Z - B;
-//         auto S = R + E;
-//         auto K = E * S.inverse ();
-//         B = B + K * y;
-//         E = (I - K) * E * (I - K).transpose () + K * R * K.transpose ();
 
 #if VERBOSE > 1
         std::cout 
@@ -122,13 +79,65 @@ namespace Gtfs {
         Time tarr = _stops.at (0).departure_time;
         etas.at (0) = tarr;
         eta_uncertainty.at (0) = 0;
-        for (int i=1; i<_stops.size (); i++)
+
+        int curstop (0);
+        if (_vehicle != nullptr && _vehicle->valid ())
         {
-            tarr = Time (tarr.seconds () + B  (i));
+            // going to offset ETAs ... 
+            curstop = find_stop_index (_vehicle->distance (), &(_stops));
+#if VERBOSE > 1
+            std::cout << "\n - vehicle for this trip last visited stop " << curstop;
+#endif
+
+            // most recent stop time ... ?
+            uint64_t st = 0;
+            while (curstop >= 0)
+            {
+                if (_vehicle->stop_departure_time (curstop) > 0)
+                {
+                    st = _vehicle->stop_departure_time (curstop);
+                    break;
+                }
+                if (_vehicle->stop_arrival_time (curstop) > 0)
+                {
+                    st = _vehicle->stop_arrival_time (curstop);
+                    break;
+                }
+                if (curstop == 0) break;
+                curstop--;
+            }
+            if (st > 0)
+            {
+#if VERBOSE > 1
+                std::cout << "\n - vehicle arrived at " << Time (st);
+#endif
+                tarr = Time (st);
+                etas.at (curstop) = tarr;
+                eta_uncertainty.at (curstop) = 0;
+            
+                // offset needs to be such that t0 + stt[1] + ... + stt[si-1] = st
+                // -> t0 = st - stt[si] - ... - stt[1]
+                // double stt = 0;
+                // for (int i=1; i<=si; i++) stt += B (i);
+                // std::cout << " -> adjustment of " << stt << " seconds";
+                // etas.at (0) = Time (Time (st) - (int)(stt + 0.5));
+            }
+
+            for (int i=0; i<curstop; i++)
+            {
+                etas.at (i) = Time (0);
+                eta_uncertainty.at (i) = 0;
+            }
+        }
+
+        for (int i=curstop+1; i<_stops.size (); i++)
+        {
+            tarr = Time (tarr.seconds () + B (i));
             etas.at (i) = tarr;
             eta_uncertainty.at (i) = 0;
-            for (int j=0; j<=i; j++) 
-                for (int k=0; k<=i; k++)
+            // only sum up uncertainty for upcoming stops
+            for (int j=curstop; j<=i; j++) 
+                for (int k=curstop; k<=i; k++)
                     eta_uncertainty.at (i) += E (j, k);
         }
 
@@ -154,47 +163,67 @@ namespace Gtfs {
             tsum += tt;
         }
 
-        /**
-         * If a vehicle is associated with this trip, use the vehicle's state
-         * to update the ETAs ... 
-         * This involves 
-         * - reducing state size (from L to L-curseg+1)
-         * - update H to be (M x L-curseg+1)
-         * - setting previous segments to 0 (there's no travel time associated with them),
-         * - taking a _partial_ travel time for the current segment,
-         * - and setting _start_time to now
-         */
-        if (_vehicle != nullptr)
-        {
-            // estimate "time remaining" for each particle in current segment (based on median segment)
-            int curseg (find_segment_index (_vehicle->distance (), &(_shape->segments ())));
-            std::cout << "\n - vehicle for this trip is on segment " << curseg;
+        // /**
+        //  * If a vehicle is associated with this trip, use the vehicle's state
+        //  * to update the ETAs ... 
+        //  * This involves 
+        //  * - reducing state size (from L to L-curseg+1)
+        //  * - update H to be (M x L-curseg+1)
+        //  * - setting previous segments to 0 (there's no travel time associated with them),
+        //  * - taking a _partial_ travel time for the current segment,
+        //  * - and setting _start_time to now
+        //  */
+        // if (_vehicle != nullptr)
+        // {
+        //     // estimate "time remaining" for each particle in current segment (based on median segment)
+        //     // int curseg (find_segment_index (_vehicle->distance (), &(_shape->segments ())));
+        //     int curstop (find_stop_index (_vehicle->distance (), &(_stops)));
+        //     std::cout << "\n - vehicle for this trip last visited stop " << curstop;
 
-            // then calculate time remaining in that segment for each particle (truncated to 0)
-            double etai, etav;
-            // velocity along this segment ...
-            std::vector<double> tarrs;
-            tarrs.reserve (_vehicle->state ()->size ());
-            double d = _shape->segments ().at (curseg).distance + _shape->segments ().at (curseg).segment->length ();
-            for (auto p =  _vehicle->state ()->begin (); p != _vehicle->state ()->end (); ++p) 
-            {
-                tarrs.push_back ((d - p->get_distance ()) / p->get_speed ());
-            }
-            etai = std::accumulate (tarrs.begin (), tarrs.end (), 0.0);
-            etai /= tarrs.size ();
-            etav = std::accumulate (tarrs.begin (), tarrs.end (), 0.0,
-                                    [&etai](double a, double b) {
-                                        return a + pow (b - etai, 2);
-                                    });
-            etav /= tarrs.size () - 1;
-            // etav = std::fmin (etai, etav); // variance can't be bigger than travel time ... (no point)
+        //     // most recent stop time ... ?
+        //     int si = curstop;
+        //     uint64_t st = 0;
+        //     while (si >= 0)
+        //     {
+        //         if (_vehicle->stop_departure_time (si) > 0)
+        //         {
+        //             st = _vehicle->stop_departure_time (si);
+        //             break;
+        //         }
+        //         if (_vehicle->stop_arrival_time (si) > 0)
+        //         {
+        //             st = _vehicle->stop_arrival_time (si);
+        //         }
+        //         si--;
+        //     }
+        //     if (st > 0) std::cout << "\n - vehicle arrived at " << Time (st);
+
+        //     // then calculate time remaining in that segment for each particle (truncated to 0)
+        //     // double etai, etav;
+        //     // // velocity along this segment ...
+        //     // std::vector<double> tarrs;
+        //     // tarrs.reserve (_vehicle->state ()->size ());
+        //     // double d = _shape->segments ().at (curseg).distance + _shape->segments ().at (curseg).segment->length ();
+        //     // for (auto p =  _vehicle->state ()->begin (); p != _vehicle->state ()->end (); ++p) 
+        //     // {
+        //     //     tarrs.push_back ((d - p->get_distance ()) / p->get_speed ());
+        //     // }
+        //     // etai = std::accumulate (tarrs.begin (), tarrs.end (), 0.0);
+        //     // etai /= tarrs.size ();
+        //     // etav = std::accumulate (tarrs.begin (), tarrs.end (), 0.0,
+        //     //                         [&etai](double a, double b) {
+        //     //                             return a + pow (b - etai, 2);
+        //     //                         });
+        //     // etav /= tarrs.size () - 1;
+        //     // // etav = std::fmin (etai, etav); // variance can't be bigger than travel time ... (no point)
             
-            std::cout << "\n - time to end of segment " 
-                << etai << " s ("
-                << etav << ")";
+        //     // std::cout << "\n - time to end of segment " 
+        //     //     << etai << " s ("
+        //     //     << etav << ")";
 
-            // then adjust ETAs
-        }
+        //     // then adjust ETAs
+            
+        // }
         
 
         // generate seg -> stop transformation matrix
@@ -284,6 +313,7 @@ namespace Gtfs {
 
         for (int i=0; i<stops ().size (); i++)
         {
+            if (eta.at (i).seconds () == 0) continue;
             std::cout << "\n   + stop "
                 << std::setw (2) << i << ": "
                 << stops ().at (i).arrival_time << "  "

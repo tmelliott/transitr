@@ -2217,7 +2217,17 @@ namespace Gtfs
     }
     uint64_t Vehicle::stop_arrival_time (int m)
     {
+        if (m < 0) m = 0;
+        if (m >= _stop_arrival_times.size ()) 
+            m = _stop_arrival_times.size () - 1;
         return _stop_arrival_times.at (m);
+    }
+    uint64_t Vehicle::stop_departure_time (int m)
+    {
+        if (m < 0) m = 0;
+        if (m >= _stop_departure_times.size ()) 
+            m = _stop_departure_times.size () - 1;
+        return _stop_departure_times.at (m);
     }
     int Vehicle::current_stop ()
     {

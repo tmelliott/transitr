@@ -247,7 +247,9 @@ void run_realtime_model (List nw)
                     if (trip->second.route ()->route_short_name () != "NX1") continue;
 #endif
                     trip->second.update_etas (curtime, rngs.at (omp_get_thread_num ()));
-                    // trip->second.print_etas ();
+#if VERBOSE > 1
+                    trip->second.print_etas ();
+#endif
                 }
             }
         }
@@ -300,8 +302,8 @@ void run_realtime_model (List nw)
         gtfs.close_connection (true);
         timer.end ();
 
-        std::cout << "\nPress enter to continue ...";
-        getchar ();
+        // std::cout << "\nPress enter to continue ...";
+        // getchar ();
         // std::this_thread::sleep_for (std::chrono::milliseconds (10 * 1000));
 
         iteration++;
