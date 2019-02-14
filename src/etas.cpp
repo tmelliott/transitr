@@ -115,7 +115,6 @@ namespace Gtfs {
         {
             return std::make_pair (etas, eta_uncertainty);
         }
-        
 
         // calculate ETAs
         etas.resize (_stops.size (), 0);
@@ -154,6 +153,49 @@ namespace Gtfs {
             VsegTT (l, l) = ttvar;
             tsum += tt;
         }
+
+        /**
+         * If a vehicle is associated with this trip, use the vehicle's state
+         * to update the ETAs ... 
+         * This involves 
+         * - reducing state size (from L to L-curseg+1)
+         * - update H to be (M x L-curseg+1)
+         * - setting previous segments to 0 (there's no travel time associated with them),
+         * - taking a _partial_ travel time for the current segment,
+         * - and setting _start_time to now
+         */
+        if (_vehicle != nullptr)
+        {
+            // estimate "time remaining" for each particle in current segment (based on median segment)
+            int curseg (find_segment_index (_vehicle->distance (), &(_shape->segments ())));
+            std::cout << "\n - vehicle for this trip is on segment " << curseg;
+
+            // then calculate time remaining in that segment for each particle (truncated to 0)
+            double etai, etav;
+            // velocity along this segment ...
+            std::vector<double> tarrs;
+            tarrs.reserve (_vehicle->state ()->size ());
+            double d = _shape->segments ().at (curseg).distance + _shape->segments ().at (curseg).segment->length ();
+            for (auto p =  _vehicle->state ()->begin (); p != _vehicle->state ()->end (); ++p) 
+            {
+                tarrs.push_back ((d - p->get_distance ()) / p->get_speed ());
+            }
+            etai = std::accumulate (tarrs.begin (), tarrs.end (), 0.0);
+            etai /= tarrs.size ();
+            etav = std::accumulate (tarrs.begin (), tarrs.end (), 0.0,
+                                    [&etai](double a, double b) {
+                                        return a + pow (b - etai, 2);
+                                    });
+            etav /= tarrs.size () - 1;
+            // etav = std::fmin (etai, etav); // variance can't be bigger than travel time ... (no point)
+            
+            std::cout << "\n - time to end of segment " 
+                << etai << " s ("
+                << etav << ")";
+
+            // then adjust ETAs
+        }
+        
 
         // generate seg -> stop transformation matrix
         Hseg = Eigen::MatrixXd::Zero (M, L);

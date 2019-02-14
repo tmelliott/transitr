@@ -2229,6 +2229,11 @@ namespace Gtfs
         return _trip->start_time ();
     }
 
+    std::vector<Particle>* Vehicle::state ()
+    {
+        return &_state;
+    };
+
 
 
     Particle::Particle (double d, double s, double a, Vehicle* v)

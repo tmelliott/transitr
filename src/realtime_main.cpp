@@ -300,8 +300,8 @@ void run_realtime_model (List nw)
         gtfs.close_connection (true);
         timer.end ();
 
-        // std::cout << "\nPress enter to continue ...";
-        // getchar ();
+        std::cout << "\nPress enter to continue ...";
+        getchar ();
         // std::this_thread::sleep_for (std::chrono::milliseconds (10 * 1000));
 
         iteration++;
