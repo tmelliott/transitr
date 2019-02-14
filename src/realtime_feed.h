@@ -42,6 +42,6 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
                     Gtfs::Gtfs* gtfs, Gtfs::par* params);
 
 void write_vehicles (Gtfs::vehicle_map* vehicles, std::string& file);
-
+void write_trip_updates (Gtfs::trip_map* trips, std::string& file);
 
 #endif

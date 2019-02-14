@@ -865,6 +865,8 @@ namespace Gtfs
         _block_id = "";
         _trip_headsign = "";
         _vehicle = nullptr;
+
+        state_initialised = false;
 #if VERBOSE > 0
         std::cout << " + Trip " << _trip_id << " is unloaded\n";
 #endif
@@ -896,6 +898,12 @@ namespace Gtfs
 
         // if not loaded, currently unable to subset today's trips only
         return false;
+    }
+
+    bool Trip::is_active ()
+    {
+        if (_vehicle != nullptr) return true;
+        return loaded && !completed;
     }
 
     std::string& Trip::trip_id () { 

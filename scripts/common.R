@@ -24,7 +24,7 @@ loadsim <- function(sim, time) {
                 stus <- e$trip_update$stop_time_update
                 if (length(stus) == 0) return(NULL)
                 xdf <- tibble(
-                    vehicle_id = e$trip_update$vehicle$id,
+                    # vehicle_id = e$trip_update$vehicle$id,
                     trip_id = e$trip_update$trip$trip_id,
                     route_id = e$trip_update$trip$route_id,
                     timestamp = as.POSIXct(time, origin = "1970-01-01"),

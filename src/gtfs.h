@@ -31,6 +31,11 @@
 namespace Gtfs 
 {
 
+    // matrix formatting
+    static const Eigen::IOFormat decimalMat (6, 0, ", ", "\n", "  [", "]");
+    static const Eigen::IOFormat ColVec (6, 0, ", ", "\n", "  [", "]");
+    static const Eigen::IOFormat tColVec (6, 0, " ", ", ", "", "", "  [", "]^T");
+
     struct ShapePt;
     struct ShapeSegment;
     struct StopTime;
@@ -209,9 +214,11 @@ namespace Gtfs
         float _version;
 
         Time _start_time;
-        std::vector<Time> _etas; // ETA(i) = start_time + _etas.at (i)
-        std::vector<int> _eta_uncertainty;
+        Eigen::VectorXd B;
+        Eigen::MatrixXd E;
         Eigen::MatrixXd Hseg;   // transform segment travel times to stop tts
+        uint64_t _ts;
+        bool state_initialised = false;
 
         std::mutex load_mutex;
 
@@ -228,6 +235,7 @@ namespace Gtfs
         void unload (bool complete);
         void complete ();
         bool is_active (uint64_t& t);
+        bool is_active ();
 
         std::string& trip_id ();
         Route* route ();
@@ -242,7 +250,10 @@ namespace Gtfs
         Time& start_time ();
         uint64_t get_eta (int i);
         void initialize_etas (RNG& rng);
-        void generate_etas (RNG& rng);
+        void update_etas (uint64_t& t, RNG& rng);
+        std::pair<Eigen::VectorXd, Eigen::MatrixXd> estimate_tt ();
+        std::pair<std::vector<Time>, std::vector<double> > calculate_etas ();
+        etavector get_etas ();
 
         void print_etas ();
 
@@ -332,6 +343,7 @@ namespace Gtfs
         std::vector<std::pair<int, double> >& get_data ();
         void push_data (int time, double err, uint64_t ts);
         std::pair<double,double> predict (int delta);
+        std::pair<double,double> predict (uint64_t t);
         void update (par* params, Gtfs* gtfs);
         void update (uint64_t now);
     };

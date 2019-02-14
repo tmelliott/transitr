@@ -13,22 +13,146 @@ namespace Gtfs {
     {
         if (!loaded) load ();
 
-        Eigen::IOFormat decimalMat (6, 0, ", ", "\n", "  [", "]");
-        Eigen::IOFormat ColVec (6, 0, ", ", "\n", "  [", "]");
-        Eigen::IOFormat tColVec (6, 0, " ", ", ", "", "", "  [", "]^T");
+        auto obs = estimate_tt ();
+        Eigen::VectorXd Z;
+        Eigen::MatrixXd R;
+        std::tie (Z, R) = obs;
 
+        // assign observations as the state
+        B = Z;
+        E = R;
+
+        state_initialised = true;
+    }
+
+    void Trip::update_etas (uint64_t& t, RNG& rng)
+    {
+        int delta = t - _ts;
+        _ts = t;
+        if (!state_initialised)
+        {
+            initialize_etas (rng);
+            // just initialize
+            return;
+        }
+
+#if VERBOSE > 1
+        std::cout << "\n\n *** ETA update for route "
+            << route ()->route_short_name ()
+            << " ("
+            << stops ().at (0).arrival_time
+            << ")\n";
+#endif
+
+        /**
+         * Generate ETAs for a trip.
+         *
+         * If the trip is associated with a vehicle, use the vehicle's state
+         * to update the ETAs; otherwise just use network state;
+         */
+        
+        // the current state
+        // int M = _stops.size ();
+#if VERBOSE > 1
+        std::cout 
+            << "\n\n   * My state is currently:\n"
+            << B.format (tColVec)
+            << "\n\n     with uncertainty matrix:\n" 
+            << E.format (decimalMat);
+#endif
+
+        // load state observation
+        auto obs = estimate_tt ();
+        // Eigen::VectorXd Z;
+        // Eigen::MatrixXd R;
+        std::tie (B, E) = obs;
+
+// #if VERBOSE > 1
+//         std::cout 
+//             <<   "\n   * I observed the following travel times:\n"
+//             << Z.format (tColVec)
+//             << "\n\n     with covariance matrix:\n" 
+//             << R.format (decimalMat);
+// #endif
+
+
+//         // control matrices
+//         // F = Identity // therefore prediction is just B = B, P = P + Q
+//         // H = Identity
+//         // Q = Identity * 0.001 * delta
+//         Eigen::MatrixXd I (Eigen::MatrixXd::Identity (M, M));
+//         auto Q = I * pow (delta, 0.5);
+//         E = E + Q;
+// #if VERBOSE > 1
+//         std::cout 
+//             << "\n\n   * Predicted state after " << delta << " seconds is:\n"
+//             << B.format (tColVec)
+//             << "\n\n     with uncertainty matrix:\n" 
+//             << E.format (decimalMat);
+// #endif
+
+//         // updated state (this simplifies lots ....)
+//         auto y = Z - B;
+//         auto S = R + E;
+//         auto K = E * S.inverse ();
+//         B = B + K * y;
+//         E = (I - K) * E * (I - K).transpose () + K * R * K.transpose ();
+
+#if VERBOSE > 1
+        std::cout 
+            << "\n\n   * New state:\n"
+            << B.format (tColVec)
+            << "\n\n     with uncertainty matrix:\n" 
+            << E.format (decimalMat);
+#endif
+    }
+
+    std::pair<std::vector<Time>, std::vector<double> > Trip::calculate_etas ()
+    {
+        std::vector<Time> etas; // ETA(i) = start_time + _etas.at (i)
+        std::vector<double> eta_uncertainty;
+        if (!state_initialised) 
+        {
+            return std::make_pair (etas, eta_uncertainty);
+        }
+        
+
+        // calculate ETAs
+        etas.resize (_stops.size (), 0);
+        eta_uncertainty.resize (_stops.size (), 0);
+        Time tarr = _stops.at (0).departure_time;
+        etas.at (0) = tarr;
+        eta_uncertainty.at (0) = 0;
+        for (int i=1; i<_stops.size (); i++)
+        {
+            tarr = Time (tarr.seconds () + B  (i));
+            etas.at (i) = tarr;
+            eta_uncertainty.at (i) = 0;
+            for (int j=0; j<=i; j++) 
+                for (int k=0; k<=i; k++)
+                    eta_uncertainty.at (i) += E (j, k);
+        }
+
+        return std::make_pair (etas, eta_uncertainty);
+    }
+
+    std::pair<Eigen::VectorXd, Eigen::MatrixXd> Trip::estimate_tt ()
+    {
         // first fetch segment travel times ...
         auto& segments = _shape->segments ();
         int L (segments.size ());
         int M (_stops.size ());
         Eigen::VectorXd segTT (L);
         Eigen::MatrixXd VsegTT (Eigen::MatrixXd::Zero (L, L));
+        double tt, ttvar;
+        double tsum = 0;
         for (int l=0; l<L; l++)
         {
-            // default *should* be the schedule ... ?
-            segTT (l) = segments.at (l).segment->travel_time ();
-            // we're going to allow for "no uncertainty estimate";
-            VsegTT (l, l) = segments.at (l).segment->uncertainty ();
+            // predict state in the future...?
+            std::tie (tt, ttvar) = segments.at (l).segment->predict (_ts + (int) round (tsum));
+            segTT (l) = tt;
+            VsegTT (l, l) = ttvar;
+            tsum += tt;
         }
 
         // generate seg -> stop transformation matrix
@@ -67,63 +191,65 @@ namespace Gtfs {
         stopTT = Hseg * segTT;
         VstopTT = Hseg * VsegTT * Hseg.transpose ();
 
-        // std::cout << "\n - segTT: \n" << segTT;
-        // std::cout << "\n - VsegTT: \n" << VsegTT;
-        // std::cout << "\n - Hseg: \n" << Hseg;
-        // std::cout << "\n - stopTT: \n" << stopTT;
-        // std::cout << "\n - VstopTT: \n" << VstopTT;
-
-        _etas.resize (_stops.size (), 0);
-        _eta_uncertainty.resize (_stops.size (), 0);
-        Time tarr = _stops.at (0).departure_time;
-        _etas.at (0) = tarr;
-        _eta_uncertainty.at (0) = 0;
-        for (int i=1; i<_stops.size (); i++)
-        {
-            tarr = Time (tarr.seconds () + stopTT  (i));
-            _etas.at (i) = tarr;
-            _eta_uncertainty.at (i) = 0;
-            for (int j=0; j<=i; j++)
-            {
-                _eta_uncertainty.at (i) += VstopTT (i, j);
-            }
-        }
-
+        return std::make_pair (stopTT, VstopTT);
     }
 
-    void Trip::generate_etas (RNG& rng)
-    {
-        if (_etas.size () == 0) initialize_etas (rng);
 
-        /**
-         * Generate ETAs for a trip.
-         *
-         * If the trip is associated with a vehicle, use the vehicle's state
-         * to update the ETAs; otherwise just use network state;
-         */
-        
-        
+    etavector Trip::get_etas ()
+    {
+        etavector etas;
+        if (!state_initialised) return etas;
+
+        int M (_stops.size ());
+        etas.resize (M);
+
+        std::vector<Time> eta;
+        std::vector<double> uncertainty;
+        std::tie (eta, uncertainty) = calculate_etas ();
+
+        // timestamp of trip start time
+        uint64_t t0 = _ts - (Time (_ts) - _start_time);
+        int tx;
+        double te;
+        for (int i=0; i<M; ++i)
+        {
+            etas.at (i).stop_id = _stops.at (i).stop->stop_id ();
+            
+            tx = (eta.at (i) - _start_time);
+            te = uncertainty.at (i);
+            etas.at (i).estimate = t0 + tx;
+            // for now just the 95% credible interval
+            etas.at (i).quantiles.emplace_back (0.025, t0 + (tx - 2 * pow(te, 0.5)));
+            etas.at (i).quantiles.emplace_back (0.975, t0 + (tx + 2 * pow(te, 0.5)));
+        }
+        return etas;
     }
 
     void Trip::print_etas ()
     {
-        if (_etas.size () == 0) return;
+        if (!state_initialised) return;
+
         std::cout << "\n\n - ETAs for route "
             << route ()->route_short_name ()
             << " ("
             << stops ().at (0).arrival_time
             << ")\n"
             << "              schedule       eta  delay  (error)";
+
+        std::vector<Time> eta;
+        std::vector<double> uncertainty;
+        std::tie (eta, uncertainty) = calculate_etas ();
+
         for (int i=0; i<stops ().size (); i++)
         {
             std::cout << "\n   + stop "
                 << std::setw (2) << i << ": "
                 << stops ().at (i).arrival_time << "  "
-                << _etas.at (i) << "  "
+                << eta.at (i) << "  "
                 << std::setw (5)
-                << (_etas.at (i) - stops ().at (i).arrival_time)
+                << (eta.at (i) - stops ().at (i).arrival_time)
                 << "  ("
-                << _eta_uncertainty.at (i)
+                << uncertainty.at (i)
                 << ")";
         }
     }

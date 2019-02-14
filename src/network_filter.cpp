@@ -30,10 +30,16 @@ namespace Gtfs {
         }
         else
         {
-            Phat = _travel_time * 2.0;
+            Phat = _travel_time;
         }
 
         return std::make_pair (xhat, Phat);
+    }
+
+    std::pair<double,double> Segment::predict (uint64_t t)
+    {
+        if (t <= _timestamp) return predict (0);
+        return predict ((int)(t - _timestamp));
     }
 
     void Segment::update (uint64_t now)

@@ -323,13 +323,16 @@ namespace Gtfs {
                         continue;
                     }
 
-                    err = std::accumulate (_state.begin (), _state.end (), 0.0,
-                                           [=](double a, Particle& p) {
-                                                return a + p.get_weight () * pow(p.get_travel_time (_current_segment) - tt, 2);
-                                           });
+                    // let error be fixed for the segment
+                    err = segs.at (_current_segment).segment->length () / 30;
 
-                    // if the error is effectively 0 ...
-                    if (err < 0.001) err = 10.0;
+                    // err = std::accumulate (_state.begin (), _state.end (), 0.0,
+                    //                        [=](double a, Particle& p) {
+                    //                             return a + p.get_weight () * pow(p.get_travel_time (_current_segment) - tt, 2);
+                    //                        });
+
+                    // // if the error is effectively 0 ...
+                    // if (err < 0.001) err = 10.0;
 
                     _segment_travel_times.at (_current_segment) = round (tt);
                     segs.at (_current_segment).segment->push_data (tt, err, _timestamp);
