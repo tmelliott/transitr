@@ -238,13 +238,13 @@ namespace Gtfs {
                 case EventType::arrival :
                     {
                         // this is tricky ...
-                        // _stop_arrival_times.at (e.stop_index) = e.timestamp;
+                        _trip->set_arrival_time (e.stop_index, e.timestamp);
                         break;
                     }
                 case EventType::departure :
                     {
                         // no checks
-                        // _stop_departure_times.at (e.stop_index) = e.timestamp;
+                        _trip->set_departure_time (e.stop_index, e.timestamp);
                         break;
                     }
             }

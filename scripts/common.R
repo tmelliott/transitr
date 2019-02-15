@@ -61,10 +61,10 @@ loadsim <- function(sim, time) {
     etas
 }
 
-all_sims <- function(sim) {
+all_sims <- function(sim, n = length(times)) {
     times <- gsub("etas_|\\.pb", "", list.files(file.path("simulations", sim, "etas"), ".pb")) %>%
         as.integer
-    do.call(bind_rows, pbapply::pblapply(times, function(t) loadsim(sim, t)))
+    do.call(bind_rows, pbapply::pblapply(times[1:n], function(t) loadsim(sim, t)))
 }
 
 library(RSQLite)

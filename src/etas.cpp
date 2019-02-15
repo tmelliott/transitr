@@ -80,54 +80,44 @@ namespace Gtfs {
         etas.at (0) = tarr;
         eta_uncertainty.at (0) = 0;
 
+        // most recent stop time ... ?
         int curstop (0);
-        if (_vehicle != nullptr && _vehicle->valid ())
+        uint64_t st = 0;
+        double err = 0;
+        for (int m=0; m<_stops.size (); m++)
         {
-            // going to offset ETAs ... 
-            curstop = find_stop_index (_vehicle->distance (), &(_stops));
-#if VERBOSE > 1
-            std::cout << "\n - vehicle for this trip last visited stop " << curstop;
-#endif
-
-            // most recent stop time ... ?
-            uint64_t st = 0;
-            while (curstop >= 0)
+            // std::cout << "\n - m = " << m;
+            if (_departure_times.at (m) > 0)
             {
-                if (_vehicle->stop_departure_time (curstop) > 0)
-                {
-                    st = _vehicle->stop_departure_time (curstop);
-                    break;
-                }
-                if (_vehicle->stop_arrival_time (curstop) > 0)
-                {
-                    st = _vehicle->stop_arrival_time (curstop);
-                    break;
-                }
-                if (curstop == 0) break;
-                curstop--;
+                st = _departure_times.at (m);
+                curstop = m;
+                err = 0;
+                continue;
             }
-            if (st > 0)
+            if (_arrival_times.at (m) > 0)
             {
-#if VERBOSE > 1
-                std::cout << "\n - vehicle arrived at " << Time (st);
-#endif
-                tarr = Time (st);
-                etas.at (curstop) = tarr;
-                eta_uncertainty.at (curstop) = 0;
-            
-                // offset needs to be such that t0 + stt[1] + ... + stt[si-1] = st
-                // -> t0 = st - stt[si] - ... - stt[1]
-                // double stt = 0;
-                // for (int i=1; i<=si; i++) stt += B (i);
-                // std::cout << " -> adjustment of " << stt << " seconds";
-                // etas.at (0) = Time (Time (st) - (int)(stt + 0.5));
+                st = _arrival_times.at (m);
+                curstop = m;
+                err = 30; // dwell time uncertainty baby! 
+                continue;
             }
 
-            for (int i=0; i<curstop; i++)
-            {
-                etas.at (i) = Time (0);
-                eta_uncertainty.at (i) = 0;
-            }
+        }
+
+        if (st > 0)
+        {
+            tarr = Time (st);
+            etas.at (curstop) = tarr;
+            eta_uncertainty.at (curstop) = err;
+#if VERBOSE > 1
+            std::cout << "\n - last stop update at stop " << curstop << " at " << tarr;
+#endif
+        }
+
+        for (int i=0; i<curstop; i++)
+        {
+            etas.at (i) = Time (0);
+            eta_uncertainty.at (i) = 0;
         }
 
         for (int i=curstop+1; i<_stops.size (); i++)

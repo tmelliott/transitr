@@ -845,6 +845,8 @@ namespace Gtfs
 
         // set start time
         _start_time = _stops.at (0).departure_time;
+        _arrival_times.resize (_stops.size (), 0);
+        _departure_times.resize (_stops.size (), 0);
         
         loaded = true;
     }
@@ -941,6 +943,17 @@ namespace Gtfs
     float Trip::version () { 
         if (!loaded) load ();
         return _version; 
+    }
+
+    void Trip::set_arrival_time (int m, uint64_t t)
+    {
+        if (m < 0 || m >= _arrival_times.size ()) return;
+        _arrival_times.at (m) = t;
+    }
+    void Trip::set_departure_time (int m, uint64_t t)
+    {
+        if (m < 0 || m >= _arrival_times.size ()) return;
+        _departure_times.at (m) = t;
     }
 
     Time& Trip::start_time ()

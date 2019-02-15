@@ -220,6 +220,9 @@ namespace Gtfs
         uint64_t _ts;
         bool state_initialised = false;
 
+        std::vector<uint64_t> _arrival_times;
+        std::vector<uint64_t> _departure_times;
+
         std::mutex load_mutex;
 
         Vehicle* _vehicle = nullptr;
@@ -246,6 +249,9 @@ namespace Gtfs
         bool direction_id ();
         std::string& trip_headsign ();
         float version ();
+
+        void set_arrival_time (int m, uint64_t t);
+        void set_departure_time (int m, uint64_t t);
 
         Time& start_time ();
         uint64_t get_eta (int i);
