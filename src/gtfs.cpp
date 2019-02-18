@@ -1811,6 +1811,7 @@ namespace Gtfs
         Rcpp::NumericVector siga = parameters["arrival_error"];
         Rcpp::NumericVector sigd = parameters["departure_error"];
         Rcpp::NumericVector signwx = parameters["nw_system_noise"];
+        Rcpp::NumericVector signwy = parameters["nw_measurement_error"];
         Rcpp::LogicalVector tim = parameters["save_timings"];
 
         // set the parameters
@@ -1824,6 +1825,7 @@ namespace Gtfs
         arrival_error = (float) siga[0];
         departure_error = (float) sigd[0];
         nw_system_noise = (float) signwx[0];
+        nw_measurement_error = (float) signwy[0];
         save_timings = (bool) tim[0];
     }
 
@@ -1840,6 +1842,7 @@ namespace Gtfs
             << "\n - arrival_error = " << arrival_error
             << "\n - departure_error = " << departure_error
             << "\n - nw_system_noise = " << nw_system_noise
+            << "\n - nw_measurement_error = " << nw_measurement_error
             << "\n - save_timings = " << (save_timings ? "true" : "false")
             << "\n";
     }

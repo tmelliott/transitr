@@ -13,7 +13,8 @@ Time::Time (int s)
 {
     if (s < 0)
     {
-        throw std::invalid_argument ("Seconds must be 0 or greater.");
+        std::cout << "\nSeconds must be 0 or greater...\n";
+        s = 0;
     }
     _seconds = s;
 }

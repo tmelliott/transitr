@@ -7,6 +7,7 @@ namespace Gtfs {
         if (!loaded) load ();
         // set up the initial state of the segment
         _system_noise = params->nw_system_noise;
+        _measurement_error = params->nw_measurement_error;
 
         // fetch prior from the database
         // ...
@@ -73,17 +74,29 @@ namespace Gtfs {
 #if VERBOSE > 0
             std::cout << "(";
 #endif
-            double I = std::accumulate (_data.begin (), _data.end (), 0.0, 
-                                        [](double a, std::pair<int, double>& b) {
-                                            return a + pow (b.second, -1);
-                                        });
-            double i = std::accumulate (_data.begin (), _data.end (), 0.0, 
-                                        [](double a, std::pair<int, double>& b) {
+            double err = _measurement_error;
+            double I = std::accumulate (
+                _data.begin (), 
+                _data.end (), 
+                0.0, 
+                [&err](double a, std::pair<int, double>& b) 
+                {
+                    return a + pow (fmin (err, fmax (b.second, b.first)), -1);
+                }
+            );
+            double i = std::accumulate (
+                _data.begin (), 
+                _data.end (), 
+                0.0, 
+                [&err](double a, std::pair<int, double>& b) 
+                {
 #if VERBOSE > 0
-                                            std::cout << b.first << ", " << b.second << " ; ";
+                    std::cout << b.first << ", " << b.second << " ; ";
 #endif
-                                            return a + (double) b.first * pow (b.second, -1);
-                                        });
+                    return a + (double) b.first * 
+                        pow (fmin (err, fmax (b.second, b.first)), -1);
+                }
+            );
 #if VERBOSE > 0
             std::cout << ") >> { "
                 << I << ", " << i << " } >> ";

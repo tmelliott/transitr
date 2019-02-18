@@ -92,6 +92,7 @@ namespace Gtfs
         float arrival_error = 5.0;
         float departure_error = 5.0;
         float nw_system_noise = 0.001;
+        float nw_measurement_error = 50;
         bool save_timings = false;
         par () {}
         par (Rcpp::List parameters);
@@ -314,6 +315,7 @@ namespace Gtfs
         double min_tt = 0.0; // assuming vehicle traveling at max speed, this is the min time
         double min_err = 2.0; // minimum travel time measurement error
         float _system_noise;
+        float _measurement_error;
 
         // network state
         std::vector<std::pair<int, double> > _data; // new observations as vehicles traverse network
