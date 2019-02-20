@@ -142,15 +142,23 @@ namespace Gtfs {
         int M (_stops.size ());
         Eigen::VectorXd segTT (L);
         Eigen::MatrixXd VsegTT (Eigen::MatrixXd::Zero (L, L));
-        double tt, ttvar;
+        
+        Eigen::Vector2d tt;
+        Eigen::Matrix2d ttvar;
         double tsum = 0;
         for (int l=0; l<L; l++)
         {
             // predict state in the future...?
-            std::tie (tt, ttvar) = segments.at (l).segment->predict (_ts + (int) round (tsum));
-            segTT (l) = tt;
-            VsegTT (l, l) = ttvar;
-            tsum += tt;
+            std::tie (tt, ttvar) = segments.at (l).segment->predict (0);
+#if VERBOSE > 1
+            std::cout << "\n -- segment " << l
+                << " after " << tsum << " seconds"
+                << " has travel time state " << tt.format (tColVec)
+                << "\n   with cov matrix\n" << ttvar.format (decimalMat);
+#endif
+            segTT (l) = tt (0);
+            VsegTT (l, l) = 50 + ttvar (0, 0);
+            tsum += tt (0);
         }
 
         // /**

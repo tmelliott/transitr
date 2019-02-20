@@ -1378,12 +1378,12 @@ namespace Gtfs
     double Segment::travel_time ()
     {
         if (!loaded) load ();
-        return _travel_time;
+        return _travel_time (0);
     }
     double Segment::uncertainty ()
     {
         if (!loaded) load ();
-        return _uncertainty;
+        return _uncertainty (0, 0);
     }
 
     std::vector<std::pair<int, double> >& Segment::get_data ()

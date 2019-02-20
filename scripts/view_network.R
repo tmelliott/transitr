@@ -85,7 +85,7 @@ view_segment_states <- function(f = "segment_states.csv", o, segment, n = 12, sp
         ylab(ifelse(speed, "Speed (km/h)", "Travel Time (seconds)")) +
         facet_wrap(~segment_id, scales = ifelse(speed, "fixed", "free_y"))
     if (show.data) {
-        yr <- extendrange(c(data$.y, obs$.y))
+        # yr <- extendrange(c(data$.y, obs$.y))
         p <- p + 
             # geom_linerange(aes(ymin = .y - .e, ymax = .y + .e),  
             #     data = obs,

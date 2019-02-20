@@ -35,6 +35,7 @@ namespace Gtfs
     static const Eigen::IOFormat decimalMat (6, 0, ", ", "\n", "  [", "]");
     static const Eigen::IOFormat ColVec (6, 0, ", ", "\n", "  [", "]");
     static const Eigen::IOFormat tColVec (6, 0, " ", ", ", "", "", "  [", "]^T");
+    static const Eigen::IOFormat inlineMat (6, 0, " ", ", ", "(", ")", "  [", "]");
 
     struct ShapePt;
     struct ShapeSegment;
@@ -321,8 +322,8 @@ namespace Gtfs
         std::vector<std::pair<int, double> > _data; // new observations as vehicles traverse network
         std::mutex data_mutex;
         uint64_t _timestamp = 0;
-        double _travel_time;
-        double _uncertainty;
+        Eigen::Vector2d _travel_time;
+        Eigen::Matrix2d _uncertainty;
 
     public:
         Segment (int id, Gtfs* gtfs);
@@ -350,8 +351,8 @@ namespace Gtfs
 
         std::vector<std::pair<int, double> >& get_data ();
         void push_data (int time, double err, uint64_t ts);
-        std::pair<double,double> predict (int delta);
-        std::pair<double,double> predict (uint64_t t);
+        std::pair<Eigen::Vector2d, Eigen::Matrix2d> predict (int delta);
+        std::pair<Eigen::Vector2d, Eigen::Matrix2d> predict (uint64_t t);
         void update (par* params, Gtfs* gtfs);
         void update (uint64_t now);
     };
