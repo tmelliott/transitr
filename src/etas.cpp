@@ -120,6 +120,15 @@ namespace Gtfs {
             eta_uncertainty.at (i) = 0;
         }
 
+        /**
+         * tarr is the arrival time at previous stop
+         * incremented by travel times between each stop
+         * plus the dwell times at stops
+         */
+        double pr_stop = 0.5;
+        double gamma = 10;
+        double dwell_time = 10;
+        double dwell_time_var = 5;
         for (int i=curstop+1; i<_stops.size (); i++)
         {
             tarr = Time (tarr.seconds () + B (i));
@@ -129,6 +138,17 @@ namespace Gtfs {
             for (int j=curstop; j<=i; j++) 
                 for (int k=curstop; k<=i; k++)
                     eta_uncertainty.at (i) += E (j, k);
+            
+            // and then add dwell time at that stop
+            if (i > curstop+1 && i < _stops.size () - 1)
+            {
+                tarr = Time (tarr.seconds () + pr_stop * (gamma + dwell_time));
+                eta_uncertainty.at (i) += 
+                    pr_stop * (
+                        (1 - pr_stop) * pow (gamma + dwell_time, 2) +
+                        pow(dwell_time_var, 2)
+                    );
+            }
         }
 
         return std::make_pair (etas, eta_uncertainty);
