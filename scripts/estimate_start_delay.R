@@ -4,21 +4,27 @@ source("scripts/common.R")
 load("simulations/arrivaldata.rda")
 load("tripupdates.rda")
 
-dep0 <- tripupdates %>% ungroup %>% 
-    mutate(date = as.Date(format(timestamp, "%Y-%m-%d"))) %>%
-    group_by(vehicle_id, date, trip_id) %>%
-    do({
-        x <- (.) %>% arrange(time) %>% mutate(dt = c(0, diff(stop_sequence)), n = n())
-        # if (all(x$n < 2)) return(NULL)
-        if (any(x$dt < 0)) {
-            ## need to choose the longest series /only/
-            x$ct <- cumsum(x$dt < 0)
-            x <- x %>% filter(x$ct == names(sort(table(x$ct), decreasing = TRUE))[1])
-            x <- x %>% select(-ct)
-        }
-        x %>% select(-dt)
-    }) %>%
-    ungroup() %>% filter(stop_sequence == 1 & dt >= 0) %>%
+if (file.exists("tus.rda")) {
+    tus <- tripupdates %>% ungroup %>% 
+        mutate(date = as.Date(format(timestamp, "%Y-%m-%d"))) %>%
+        group_by(vehicle_id, date, trip_id) %>%
+        do({
+            x <- (.) %>% arrange(time) %>% mutate(dt = c(0, diff(stop_sequence)), n = n())
+            # if (all(x$n < 2)) return(NULL)
+            if (any(x$dt < 0)) {
+                ## need to choose the longest series /only/
+                x$ct <- cumsum(x$dt < 0)
+                x <- x %>% filter(x$ct == names(sort(table(x$ct), decreasing = TRUE))[1])
+                x <- x %>% select(-ct)
+            }
+            x %>% select(-dt)
+        }) %>% ungroup()
+    save(tus, file = "tus.rda")
+} else {
+    load("tus.rda")
+}
+
+dep0 <- tus %>% filter(stop_sequence == 1 & dt >= 0) %>%
     select(-stop_sequence, -type)
 
 con <- dbConnect(SQLite(), "fulldata.db")
@@ -109,3 +115,88 @@ ggplot(deproute,
         "Median delays (with 25%% - 75%% quantiles): %.0f%% \"on time\"",
         mean(deps$delay > -60 & deps$delay < 5*60) * 100
     ))
+
+
+
+## And now some general stop dwell time stuff 
+
+if (!file.exists("dt.rda")) {
+    dt <- tus %>%
+        filter(type == "arrival") %>%
+        mutate(arrival = time) %>%
+        select(vehicle_id, trip_id, timestamp, stop_sequence, arrival) %>%
+        distinct() %>% 
+        full_join(
+            tripupdates %>% filter(type == "departure") %>% mutate(departure = time) %>%
+                select(vehicle_id, trip_id, stop_sequence, departure),
+            suffix = c(".arrival", ".departure")
+        ) %>%
+        arrange(vehicle_id, trip_id, stop_sequence) %>%
+        mutate(dwell = departure - arrival) %>% filter(!is.na(dwell)) %>%
+        filter(dwell >= 0 & dwell <= 1*60)
+    save(dt, file = "dt.rda")
+} else {
+    load("dt.rda")
+}
+
+## fetch stop IDs
+tids <- unique(dt$trip_id)
+con <- dbConnect(SQLite(), "fulldata.db")
+sts <- con %>% tbl("stop_times") %>% 
+    select(trip_id, stop_sequence, stop_id) %>%
+    filter(trip_id %in% tids) %>%
+    collect
+dbDisconnect(con)
+
+dts <- dt %>% 
+    inner_join(sts) %>%
+    mutate(
+        stop_id = as.factor(stop_id),
+        stopid = as.numeric(stop_id)
+    )
+
+hp <- ggplot(dts, aes(dwell)) + 
+    geom_histogram(binwidth = 1) + 
+    xlab("Dwell time (sec)") + ylab("Number of buses") 
+
+hp + geom_vline(aes(xintercept = x), 
+    data = tibble(x = c(9, 19, 27, 36, 45)), color = "orangered")
+
+hp + geom_vline(aes(xintercept = x), 
+    data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) 
+
+dts <- dts %>% 
+    mutate(
+        time = paste(
+            Sys.Date(),
+            format(timestamp, "%H:%M:%S")
+        ) %>% as.POSIXct(),
+        stop_id = gsub("-.*", "", stop_id)
+    )
+
+ggplot(dts, #[sample(nrow(dts), 10000), ], 
+    aes(time, dwell)) +
+    geom_hex()
+
+## can we fit a model?
+dts.sub <- dts %>%
+    filter(stop_id %in% unique(stop_id)[1:500])
+
+# ggplot(dts.sub, aes(time, dwell)) +
+#     geom_hex() + facet_wrap(~stop_id)
+
+library(broom)
+
+dfit <- lm(dwell ~ stop_id - 1, data = dts.sub)
+tidy(dfit) %>% 
+    bind_cols(confint_tidy(dfit)) %>%
+    mutate(stop = as.integer(as.factor(term))) %>%
+    ggplot(aes(estimate, stop) +
+    geom_segment(aes(
+        x = conf.low,
+        xend = conf.high,
+        yend = stop
+    )) +
+    geom_point() +
+    xlab("Dwell Time (seconds)") +
+    ylab("Stop")

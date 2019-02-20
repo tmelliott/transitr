@@ -139,16 +139,16 @@ namespace Gtfs {
                 for (int k=curstop; k<=i; k++)
                     eta_uncertainty.at (i) += E (j, k);
             
-            // and then add dwell time at that stop
-            if (i > curstop+1 && i < _stops.size () - 1)
-            {
-                tarr = Time (tarr.seconds () + pr_stop * (gamma + dwell_time));
-                eta_uncertainty.at (i) += 
-                    pr_stop * (
-                        (1 - pr_stop) * pow (gamma + dwell_time, 2) +
-                        pow(dwell_time_var, 2)
-                    );
-            }
+            // and then add dwell time at that stop -0-- nonono
+            // if (i > curstop+1 && i < _stops.size () - 1)
+            // {
+            //     tarr = Time (tarr.seconds () + pr_stop * (gamma + dwell_time));
+            //     eta_uncertainty.at (i) += 
+            //         pr_stop * (
+            //             (1 - pr_stop) * pow (gamma + dwell_time, 2) +
+            //             pow(dwell_time_var, 2)
+            //         );
+            // }
         }
 
         return std::make_pair (etas, eta_uncertainty);
@@ -300,16 +300,37 @@ namespace Gtfs {
         uint64_t t0 = _ts - (Time (_ts) - _start_time);
         int tx;
         double te;
+        double pr_stop = 0.5;
+        double gamma = 10;
+        double dwell_time = 20;
+        double dwell_time_var = 10;
+        double DWELLVAR = pr_stop * 
+            ((1 - pr_stop) * pow (gamma + dwell_time, 2) +
+             pow(dwell_time_var, 2));
+        double cdwellvar = 0.0;
         for (int i=0; i<M; ++i)
         {
+            if (eta.at (i) == 0) continue;
+
             etas.at (i).stop_id = _stops.at (i).stop->stop_id ();
             
             tx = (eta.at (i) - _start_time);
             te = uncertainty.at (i);
             etas.at (i).estimate = t0 + tx;
-            // for now just the 95% credible interval
+
+            /**
+             * What we do here is estimate mean and lower bound based on
+             * the assumption that the bus DOES NOT stop,
+             * and then calculate the UPPER bound assuming it DOES stop!
+             */
             etas.at (i).quantiles.emplace_back (0.025, t0 + (tx - 2 * pow(te, 0.5)));
-            etas.at (i).quantiles.emplace_back (0.975, t0 + (tx + 2 * pow(te, 0.5)));
+            etas.at (i).quantiles
+                .emplace_back (
+                    0.975, 
+                    t0 + (tx + dwell_time + gamma + 
+                          2 * pow(te + cdwellvar, 0.5))
+                );
+            cdwellvar += DWELLVAR;
         }
         return etas;
     }

@@ -1,5 +1,7 @@
 library(tidyverse)
 library(RProtoBuf)
+library(RSQLite)
+library(dbplyr)
 
 # curd <- setwd("src/vendor/protobuf")
 # readProtoFiles("gtfs-realtime.proto")
@@ -43,31 +45,6 @@ if (!file.exists("tripupdates.rda")) {
 # } else {
 #     load("vehiclepositions.rda")
 # }
-
-dt <- tripupdates %>%
-    filter(type == "arrival") %>%
-    mutate(arrival = time) %>%
-    select(vehicle_id, trip_id, timestamp, stop_sequence, arrival) %>%
-    distinct() %>% 
-    full_join(
-        tripupdates %>% filter(type == "departure") %>% mutate(departure = time) %>%
-            select(vehicle_id, trip_id, stop_sequence, departure),
-        # by = c("vehicle_id", "trip_id", "stop_sequence"),
-        suffix = c(".arrival", ".departure")
-    ) %>%
-    arrange(vehicle_id, trip_id, stop_sequence) %>%
-    mutate(dwell = departure - arrival) %>% filter(!is.na(dwell)) %>%
-    filter(dwell >= 0 & dwell <= 1*60)
-
-hp <- ggplot(dt, aes(dwell)) + 
-    geom_histogram(binwidth = 1) + 
-    xlab("Dwell time (sec)") + ylab("Number of buses") 
-
-hp + geom_vline(aes(xintercept = x), 
-    data = tibble(x = c(9, 19, 27, 36, 45)), color = "orangered")
-
-hp + geom_vline(aes(xintercept = x), 
-    data = tibble(x = 9*(1:6)), color = "steelblue", lty = 2) 
 
 
 ## how about the rate of vehicle updates?
