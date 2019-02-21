@@ -71,6 +71,7 @@ void run_realtime_model (List nw)
     List pars = nw["parameters"];
     Gtfs::par params (pars);
     params.print ();
+    gtfs.set_parameters (params);
 
     // Allow the program to be stopped gracefully    
     signal (SIGINT, intHandler);

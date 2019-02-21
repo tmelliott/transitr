@@ -125,10 +125,10 @@ namespace Gtfs {
          * incremented by travel times between each stop
          * plus the dwell times at stops
          */
-        double pr_stop = 0.5;
-        double gamma = 10;
-        double dwell_time = 10;
-        double dwell_time_var = 5;
+        double pr_stop = gtfs->parameters ()->pr_stop;
+        double gamma = gtfs->parameters ()->gamma;
+        double dwell_time = gtfs->parameters ()->dwell_time;
+        double dwell_time_var = gtfs->parameters ()->dwell_time_var;
         for (int i=curstop+1; i<_stops.size (); i++)
         {
             tarr = Time (tarr.seconds () + B (i));

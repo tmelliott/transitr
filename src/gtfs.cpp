@@ -366,6 +366,16 @@ namespace Gtfs
         }
     }
 
+    void Gtfs::set_parameters (par& params)
+    {
+        _parameters = params;
+    }
+
+    par* Gtfs::parameters ()
+    {
+        return &_parameters;
+    }
+
     std::unordered_map<std::string, Agency>& Gtfs::agencies ()
     {
         return _agencies;

@@ -222,7 +222,7 @@ namespace Gtfs
         Eigen::MatrixXd Hseg;   // transform segment travel times to stop tts
         uint64_t _ts;
         bool state_initialised = false;
-
+        
         std::vector<uint64_t> _arrival_times;
         std::vector<uint64_t> _departure_times;
 
@@ -474,6 +474,7 @@ namespace Gtfs
         std::string _dbname;
         time_t _startdate;
         sqlite3* _connection = nullptr;
+        par _parameters;
 
         std::mutex con_lock;
 
@@ -493,6 +494,8 @@ namespace Gtfs
         sqlite3* get_connection ();
         void close_connection ();
         void close_connection (bool sure);
+        void set_parameters (par& params);
+        par* parameters ();
         std::unordered_map<std::string, Agency>& agencies ();
         std::unordered_map<std::string, Route>& routes ();
         std::unordered_map<std::string, Trip>& trips ();
