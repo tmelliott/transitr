@@ -57,7 +57,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_transitr_shapes_df_to_list", (DL_FUNC) &_transitr_shapes_df_to_list, 1},
     {"_transitr_calculate_shape_distance", (DL_FUNC) &_transitr_calculate_shape_distance, 1},
     {"_transitr_run_realtime_model", (DL_FUNC) &_transitr_run_realtime_model, 1},
-    {"run_testthat_tests", (DL_FUNC) &run_testthat_tests, 0},
+    {"run_testthat_tests",                 (DL_FUNC) &run_testthat_tests,                 0},
     {NULL, NULL, 0}
 };
 

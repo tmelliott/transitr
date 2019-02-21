@@ -9,6 +9,7 @@ fulldata.db
 .gtfs_date
 *.pb
 *.rda
+*.zip
 
 config.json
 .running_pid

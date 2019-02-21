@@ -7,6 +7,8 @@
 #include <ctime>
 #include <mutex>
 
+#include "eigen3/Eigen/Dense"
+
 #include "geo.h"
 #include "time.h"
 #include "rng.h"
@@ -22,8 +24,18 @@
 #define VERBOSE 0
 #endif
 
+#ifndef SIMULATION
+#define SIMULATION 0
+#endif
+
 namespace Gtfs 
 {
+
+    // matrix formatting
+    static const Eigen::IOFormat decimalMat (6, 0, ", ", "\n", "  [", "]");
+    static const Eigen::IOFormat ColVec (6, 0, ", ", "\n", "  [", "]");
+    static const Eigen::IOFormat tColVec (6, 0, " ", ", ", "", "", "  [", "]^T");
+    static const Eigen::IOFormat inlineMat (6, 0, " ", ", ", "(", ")", "  [", "]");
 
     struct ShapePt;
     struct ShapeSegment;
@@ -67,6 +79,7 @@ namespace Gtfs
     find_segment_index (double distance, std::vector<ShapeSegment>* segments);
 
     typedef std::unordered_map<std::string, Vehicle> vehicle_map;
+    typedef std::unordered_map<std::string, Trip> trip_map;
 
     struct par
     {
@@ -74,12 +87,14 @@ namespace Gtfs
         int n_particles = 1000;
         float system_noise = 5;  // std. dev. of speed variance/second
         float pr_stop = 0.5;
-        float dwell_time = 10.0;
+        float dwell_time = 20.0;
+        float dwell_time_var = 10.0;
         float gamma = 5.0;
         float gps_error = 5.0;   // std. dev. of observation error
         float arrival_error = 5.0;
         float departure_error = 5.0;
         float nw_system_noise = 0.001;
+        float nw_measurement_error = 50;
         bool save_timings = false;
         par () {}
         par (Rcpp::List parameters);
@@ -201,6 +216,16 @@ namespace Gtfs
         std::string _trip_headsign;
         float _version;
 
+        Time _start_time;
+        Eigen::VectorXd B;
+        Eigen::MatrixXd E;
+        Eigen::MatrixXd Hseg;   // transform segment travel times to stop tts
+        uint64_t _ts;
+        bool state_initialised = false;
+        
+        std::vector<uint64_t> _arrival_times;
+        std::vector<uint64_t> _departure_times;
+
         std::mutex load_mutex;
 
         Vehicle* _vehicle = nullptr;
@@ -215,6 +240,8 @@ namespace Gtfs
         void unload ();              // default is completed = false
         void unload (bool complete);
         void complete ();
+        bool is_active (uint64_t& t);
+        bool is_active ();
 
         std::string& trip_id ();
         Route* route ();
@@ -225,6 +252,19 @@ namespace Gtfs
         bool direction_id ();
         std::string& trip_headsign ();
         float version ();
+
+        void set_arrival_time (int m, uint64_t t);
+        void set_departure_time (int m, uint64_t t);
+
+        Time& start_time ();
+        uint64_t get_eta (int i);
+        void initialize_etas (RNG& rng);
+        void update_etas (uint64_t& t, RNG& rng);
+        std::pair<Eigen::VectorXd, Eigen::MatrixXd> estimate_tt ();
+        std::pair<std::vector<Time>, std::vector<double> > calculate_etas ();
+        etavector get_etas ();
+
+        void print_etas ();
 
         Vehicle* vehicle ();
         void assign_vehicle (Vehicle* vehicle);
@@ -277,13 +317,14 @@ namespace Gtfs
         double min_tt = 0.0; // assuming vehicle traveling at max speed, this is the min time
         double min_err = 2.0; // minimum travel time measurement error
         float _system_noise;
+        float _measurement_error;
 
         // network state
         std::vector<std::pair<int, double> > _data; // new observations as vehicles traverse network
         std::mutex data_mutex;
         uint64_t _timestamp = 0;
-        double _travel_time;
-        double _uncertainty;
+        Eigen::Vector2d _travel_time;
+        Eigen::Matrix2d _uncertainty;
 
     public:
         Segment (int id, Gtfs* gtfs);
@@ -311,7 +352,8 @@ namespace Gtfs
 
         std::vector<std::pair<int, double> >& get_data ();
         void push_data (int time, double err, uint64_t ts);
-        std::pair<double,double> predict (int delta);
+        std::pair<Eigen::Vector2d, Eigen::Matrix2d> predict (int delta);
+        std::pair<Eigen::Vector2d, Eigen::Matrix2d> predict (uint64_t t);
         void update (par* params, Gtfs* gtfs);
         void update (uint64_t now);
     };
@@ -432,6 +474,7 @@ namespace Gtfs
         std::string _dbname;
         time_t _startdate;
         sqlite3* _connection = nullptr;
+        par _parameters;
 
         std::mutex con_lock;
 
@@ -451,6 +494,8 @@ namespace Gtfs
         sqlite3* get_connection ();
         void close_connection ();
         void close_connection (bool sure);
+        void set_parameters (par& params);
+        par* parameters ();
         std::unordered_map<std::string, Agency>& agencies ();
         std::unordered_map<std::string, Route>& routes ();
         std::unordered_map<std::string, Trip>& trips ();
@@ -521,6 +566,7 @@ namespace Gtfs
             float _systemnoise;
             float _prstop;
             float _dwelltime;
+            float _dwelltimevar;
             float _gamma;
 
             float _arrival_error = 5.0;
@@ -551,9 +597,15 @@ namespace Gtfs
             int resample_count = 0;
 
             std::vector<unsigned int> _segment_travel_times; // segment travel times
-            std::vector<uint64_t> _stop_arrival_times;     // stop arrival times
+            std::vector<uint64_t> _stop_arrival_times;       // stop arrival times
+            std::vector<uint64_t> _stop_departure_times;     // stop departure times
             int _current_segment;
             int _current_stop;
+
+            std::vector<double> _tt_state; // travel time state vector
+            std::vector<std::vector<double> > _tt_cov; // covariance matrix for travel time
+            uint64_t _tt_time; // time travel times were last updated
+
 
         public:
             Vehicle (std::string& id, par* params);
@@ -587,6 +639,7 @@ namespace Gtfs
             // statistics things
             void initialize (RNG& rng);
             void initialize (Event& e, RNG& rng);
+            std::vector<Particle>* state ();
             void mutate (RNG& rng, Gtfs* gtfs); // mutate state
             void mutate_to (Event& e, RNG& rng); // mutate state
             void select (RNG& rng); // select state (given data)
@@ -601,6 +654,7 @@ namespace Gtfs
             float system_noise ();
             float pr_stop ();
             float dwell_time ();
+            float dwell_time_var ();
             float gamma ();
             double arrival_error ();
             double departure_error ();
@@ -610,7 +664,10 @@ namespace Gtfs
             int current_segment ();
             std::vector<uint64_t>& stop_arrival_times ();
             uint64_t stop_arrival_time (int m);
+            uint64_t stop_departure_time (int m);
             int current_stop ();
+
+            Time& trip_start_time (); // the time the trip started (using schedule)
     };
 
     class Particle {
@@ -621,7 +678,9 @@ namespace Gtfs
         double acceleration = 0.0;
         int accelerating = 0.0;
         unsigned int stop_index = 0;
-        std::vector<int> tt; // segment travel times
+        unsigned int segment_index = 0;
+        std::vector<int> tt;      // segment travel times
+        std::vector<int> ttpred;  // predicted travel times
         std::vector<uint64_t> at; // stop arrival times
         std::vector<uint64_t> dt; // stop departure times
 
@@ -642,6 +701,7 @@ namespace Gtfs
         double get_speed ();
         double get_acceleration ();
         unsigned int get_stop_index ();
+        unsigned int get_segment_index ();
         double get_ll ();
         double get_weight ();
         std::vector<uint64_t>& get_arrival_times ();
@@ -652,11 +712,14 @@ namespace Gtfs
         std::vector<int>& get_travel_times ();
         void set_departure_time (int i, uint64_t t);
         int get_travel_time (int i);
+        int get_travel_time_prediction (int i);
 
         void travel (int delta, Event& e, RNG& rng);
         bool bus_stop (uint64_t time, RNG& rng);
         bool behind_event (Event& e, double delta);
         void predict_etas (RNG& rng);
+        int calculate_stop_eta (double vel, int i, RNG& rng);
+        // int calculate_segment_tt (double vel, int i, RNG& rng);
         
         void calculate_likelihood (latlng& y, std::vector<ShapePt>& path, double sigma);
         void calculate_likelihood (Event& e, double error);

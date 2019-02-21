@@ -31,7 +31,7 @@ if (file.exists("segment_observations.csv")) unlink("segment_observations.csv")
 
 nw <- load_gtfs("../../fulldata.db", output = "etas.pb") %>%
     realtime_feed(c(sprintf("http://localhost:3000/%s/vehicle_positions", ca[1]), 
-    # realtime_feed(c(sprintf("http://localhost:3000/%s/500/1100/vehicle_positions", ca[1]), 
+    # realtime_feed(c(sprintf("http://localhost:3000/%s/50/100/vehicle_positions", ca[1]), 
     # realtime_feed(c(sprintf("http://localhost:3000/%s/1538934818/minutes/0/vehicle_positions", ca[1]), 
                     sprintf("http://localhost:3000/%s/trip_updates", ca[1])),
                   response = "protobuf")

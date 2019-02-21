@@ -72,6 +72,15 @@ Time::Time (std::string& t)
     _seconds = sec;
 }
 
+Time::Time (uint64_t& t)
+{
+    // convert UNIX timestamp to a time object
+    std::time_t tx (t);
+    struct tm *t0 = localtime(&tx);
+    _seconds = t0->tm_hour * SECONDS_IN_HOUR + 
+        t0->tm_min * SECONDS_IN_MIN + t0->tm_sec;
+}
+
 Time Time::now ()
 {
     time_t t = time (0);

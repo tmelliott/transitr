@@ -121,10 +121,22 @@ namespace Gtfs {
         _current_stop = 0;
         _segment_travel_times.clear ();
         _stop_arrival_times.clear ();
-
+        _stop_departure_times.clear ();
+        _tt_state.clear ();
+        _tt_cov.clear ();
 
         _segment_travel_times.resize (_trip->shape ()->segments ().size (), 0);
         _stop_arrival_times.resize (_trip->stops ().size (), 0);
+        _stop_departure_times.resize (_trip->stops ().size (), 0);
+
+        // alright: initialize these using the schedule
+        _tt_state.resize (_trip->stops ().size (), 0.0);
+        _tt_cov.resize (_trip->stops ().size (),
+                        std::vector<double> (_trip->stops ().size (), 0.0));
+        for (int i=0; i<_trip->stops ().size (); i++)
+        {
+            _tt_cov.at (i).at (i) = (i+1) * 30; // 5 min error + 30 seconds per stop
+        }
     }
 
     void Vehicle::mutate (RNG& rng, Gtfs* gtfs)
@@ -226,10 +238,13 @@ namespace Gtfs {
                 case EventType::arrival :
                     {
                         // this is tricky ...
+                        _trip->set_arrival_time (e.stop_index, e.timestamp);
+                        break;
                     }
                 case EventType::departure :
                     {
                         // no checks
+                        _trip->set_departure_time (e.stop_index, e.timestamp);
                         break;
                     }
             }
@@ -308,13 +323,16 @@ namespace Gtfs {
                         continue;
                     }
 
-                    err = std::accumulate (_state.begin (), _state.end (), 0.0,
-                                           [=](double a, Particle& p) {
-                                                return a + p.get_weight () * pow(p.get_travel_time (_current_segment) - tt, 2);
-                                           });
+                    // let error be fixed for the segment
+                    err = segs.at (_current_segment).segment->length () / 30;
 
-                    // if the error is effectively 0 ...
-                    if (err < 0.001) err = 10.0;
+                    // err = std::accumulate (_state.begin (), _state.end (), 0.0,
+                    //                        [=](double a, Particle& p) {
+                    //                             return a + p.get_weight () * pow(p.get_travel_time (_current_segment) - tt, 2);
+                    //                        });
+
+                    // // if the error is effectively 0 ...
+                    // if (err < 0.001) err = 10.0;
 
                     _segment_travel_times.at (_current_segment) = round (tt);
                     segs.at (_current_segment).segment->push_data (tt, err, _timestamp);
@@ -354,6 +372,15 @@ namespace Gtfs {
         _delta = e.timestamp - _timestamp;
         _timestamp = e.timestamp;
 
+        if (e.type == EventType::arrival)
+        {
+            _stop_arrival_times.at (e.stop_index) = e.timestamp;
+        }
+        if (e.type == EventType::departure)
+        {
+            _stop_departure_times.at (e.stop_index) = e.timestamp;
+        }
+
         // move the particles
         if (_complete || !valid () || _delta == 0) return;
 #if VERBOSE > 0
@@ -371,6 +398,7 @@ namespace Gtfs {
                 std::cout << "\n      [" << p.get_distance () 
                     << ", " << p.get_speed ()
                     << ", " << (p.get_stop_index () + 1)
+                    << ", " << (p.get_segment_index () + 1)
                     << "]";
 #endif
             dbar += p.get_distance () * p.get_weight ();
@@ -641,97 +669,6 @@ namespace Gtfs {
         resample_count++;
     }
 
-    void Vehicle::predict_etas (RNG& rng)
-    {
-        if (!valid ()) return;
-
-#if VERBOSE == 2
-        Timer timer;
-        std::cout << "- vehicle " << _vehicle_id << " - predicting etas";
-#endif
-        for (auto p = _state.begin (); p != _state.end (); ++p) 
-        {
-            p->predict_etas (rng);
-            // std::cout << "\n";
-            // for (auto eta : p->get_arrival_times ()) std::cout << eta << ", ";
-            // std::cout << "\n VERSUS ... ";
-            // for (int i=0; i<p->get_arrival_times ().size (); ++i) 
-            //     std::cout << p->get_arrival_time (i) << ",";
-        }
-#if VERBOSE == 2
-        std::cout << " (" << timer.cpu_seconds () << "ms)\n";
-#endif
-    }
-
-    etavector Vehicle::get_etas ()
-    {
-        auto stops = _trip->stops ();
-        int M (stops.size ());
-        etavector etas;
-        etas.resize (M);
-        if (!valid ()) return etas;
-        // std::cout << "\n Vehicle " << _vehicle_id << " =============================";
-        std::vector<uint64_t> etam;
-        std::vector<double> wts;
-        etam.reserve (_state.size ());
-        wts.reserve (_state.size ());
-        double sumwt;
-        for (int i=0; i<M; ++i)
-        {
-            // need to center each particle's arrival time
-            // std::cout << "\n   [" << i << "]: ";
-            int tarr = 0;
-            int ni = 0;
-            etam.clear ();
-            wts.clear ();
-
-            for (auto p = _state.begin (); p != _state.end (); ++p)
-            {
-                // std::cout << p->get_arrival_time (i) << ", ";
-                if (p->get_arrival_time (i) > 0)
-                {
-                    tarr += p->get_weight () * (p->get_arrival_time (i) - _timestamp);
-                    etam.push_back (p->get_arrival_time (i));
-                    wts.push_back (p->get_weight ());
-                }
-            }
-            if (wts.size () != _N) continue;
-            sumwt = std::accumulate (wts.begin (), wts.end (), 0.0);
-            if (sumwt < 0.9) continue;
-
-            etas.at (i).stop_id = stops.at (i).stop->stop_id ();
-            etas.at (i).estimate = _timestamp + tarr;
-            // generate quantiles [0, 5, 50, 95, 100] -> [0, 50, 500, 950, 999]
-            std::sort (etam.begin (), etam.end ());
-            etas.at (i).quantiles.emplace_back (0.0, etam.front ());
-            int qi = 0;
-            double cwt = 0.0;
-            while (cwt <= 0.05 * sumwt && qi < wts.size ())
-            {
-                cwt += wts.at (qi);
-                qi++;
-                // std::cout << ".";
-            }
-            etas.at (i).quantiles.emplace_back (5.0, etam.at (qi));
-            while (cwt <= 0.5 * sumwt && qi < wts.size ())
-            {
-                cwt += wts.at (qi);
-                qi++;
-                // std::cout << ".";
-            }
-            etas.at (i).quantiles.emplace_back (50.0, etam.at (qi));
-            while (cwt <= 0.95 * sumwt && qi < wts.size ())
-            {
-                cwt += wts.at (qi);
-                qi++;
-                // std::cout << ".";
-            }
-            etas.at (i).quantiles.emplace_back (95.0, etam.at (qi));
-            etas.at (i).quantiles.emplace_back (100.0, etam.back ());
-        }
-        return etas;
-    }
-
     double Vehicle::distance ()
     {
         double distance = 0.0;
@@ -775,7 +712,7 @@ namespace Gtfs {
         std::vector<StopTime>* stops;
         stops = &(vehicle->trip ()->stops ());
         int M (stops->size ());
-        // if (stop_index == 0) stop_index = find_stop_index (distance, stops);
+        stop_index = find_stop_index (distance, stops);
         // std::cout << " [M=" << M << ",m=" << stop_index << "], ";
         if (stop_index == M-1) 
         {
@@ -791,8 +728,8 @@ namespace Gtfs {
         segments = &(vehicle->trip ()->shape ()->segments ());
         int L (segments->size ());
         // std::cout << " [L=" << L;
-        unsigned int l (find_segment_index (distance, segments));
-        // std::cout << ",l=" << l << "], ";
+        unsigned int l (segment_index);
+        // std::cout << ",l=" << l << " --> " << segment_index << "], ";
         double next_segment_d;
         next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
         
@@ -886,23 +823,23 @@ namespace Gtfs {
         while (behind_event (e, delta))
         {
             // add system noise to acceleration to ensure speed remains in [0, vmax]
-            double accel_prop (-100.0);
-            double n = 0;
-            if (speed > vmax)
-            {
-                speed = rng.runif () * vmax;
-            }
-            while (speed + accel_prop < 0.0 || speed + accel_prop > vmax && n < 1000)
-            {
-                accel_prop = rng.rnorm () * vehicle->system_noise () * 
-                    (1.0 + (double)n / 100.0);
-                n++;
-                // if (accelerating > 0.0)
-                // {
-                //     accel_prop += acceleration;
-                //     accelerating--;
-                // }
-            }
+            // double accel_prop (-100.0);
+            // double n = 0;
+            // if (speed > vmax)
+            // {
+            //     speed = rng.runif () * vmax;
+            // }
+            // while (speed + accel_prop < 0.0 || speed + accel_prop > vmax && n < 1000)
+            // {
+            //     accel_prop = rng.rnorm () * vehicle->system_noise () * 
+            //         (1.0 + (double)n / 100.0);
+            //     n++;
+            //     // if (accelerating > 0.0)
+            //     // {
+            //     //     accel_prop += acceleration;
+            //     //     accelerating--;
+            //     // }
+            // }
 
             // double v = fmax (0, fmin (30, speed + acceleration));
             // double v = speed;
@@ -919,7 +856,11 @@ namespace Gtfs {
             //     speed = v;
             // }
 
-            speed += accel_prop;
+            {
+                double vel = speed + rng.rnorm () * vehicle->system_noise ();
+                while (vel <= 0 || vel > 30) vel = speed + rng.rnorm () * vehicle->system_noise ();
+                speed = vel;
+            }
             distance += speed;
             if (distance >= Dmax) complete = true;
             delta--;
@@ -931,6 +872,7 @@ namespace Gtfs {
             {
                 // reaching intersection ... 
                 l++;
+                segment_index++;
                 tt.at (l) = 0;
                 next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
                 // vmax = rng.runif () < 0.5 ? 30.0 : 15.0;
@@ -994,10 +936,24 @@ namespace Gtfs {
         at.at (stop_index) = time;
 
         double u (rng.runif ());
-        if (u < vehicle->pr_stop ())
+        // if (u < vehicle->pr_stop ())
+        
+        /**
+         * let's try Thomas' idea of stopping probability being
+         * inversely proportional to speed
+         * [0, 30] -> [0.9, 0.1]
+         */
+        double pr = (30 - speed) / 30 * 0.8 + 0.1;
+        if (u < pr)
         {
             // bus stops
-            double dwell = vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
+            // dwell = vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
+            double dwell = -1;
+            while (dwell < 0)
+            {
+                dwell = vehicle->dwell_time () + vehicle->dwell_time_var () * rng.runif ();
+            }
+            dwell += vehicle->gamma ();
             dt.at (stop_index) = time + round (dwell);
             return true;
         }
@@ -1034,85 +990,6 @@ namespace Gtfs {
         }
     }
 
-    void Particle::predict_etas (RNG& rng)
-    {
-        // std::cout << "\n > ";
-        if (complete) return;
-        // std::cout << "| ";
-
-        // get STOPS
-        std::vector<StopTime>* stops;
-        if (!vehicle || !vehicle->trip ()) return;
-        stops = &(vehicle->trip ()->stops ());
-        int M (stops->size ());
-        if (M == 0) return;
-        at.clear ();
-        at.resize (M, 0);
-        stop_index = find_stop_index (distance, stops);
-        // std::cout << " @" << m << " > ";
-        if (stop_index == M-1) 
-        {
-            return;
-        }
-        double Dmax = stops->back ().distance;
-        
-        if (!vehicle->trip ()->shape ()) return;
-        std::vector<ShapeSegment>* segments;
-        segments = &(vehicle->trip ()->shape ()->segments ());
-        int L (segments->size ());
-        unsigned int l (find_segment_index (distance, segments));
-        double next_segment_d;
-        next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
-
-        double dcur = distance;
-        double dnext;
-        uint64_t t0 = vehicle->timestamp ();
-        // std::cout << t0 << " > ";
-        int etat, tt_total = 0;
-        double vel;
-        vel = segments->at (l).segment->sample_speed (rng);
-        if (vel == 0.0 && speed >= 0.0) vel = speed;
-        while (vel <= 0 || vel > 30)
-        {
-            vel = rng.rnorm () * 8.0 + 15.0;
-        }
-        while (stop_index < M-1)
-        {
-            stop_index++; // `next` stop index
-            dnext = stops->at (stop_index).distance;
-            etat = 0;
-            // std::cout << " [";
-            while (next_segment_d < dnext && l < L-1)
-            {
-                // time to get to end of segment
-                etat += (next_segment_d - dcur) / vel;
-                tt_total += (next_segment_d - dcur) / vel;
-                dcur = next_segment_d;
-                l++;
-                next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
-                vel = segments->at (l).segment->sample_speed (rng, tt_total);
-                if (vel == 0.0 && speed >= 0.0) vel = speed;
-                while (vel <= 0.0 || vel > 30)
-                {
-                    vel = rng.rnorm () * 8.0 + 15.0;
-                }
-                // std::cout << vel << "; ";
-            }
-            // std::cout << "] ";
-            etat += (dnext - dcur) / vel;
-            tt_total += (dnext - dcur) / vel;
-            at.at (stop_index) = t0 + etat; // makes no sense because speeds are noise
-            dcur = dnext;
-            // and add some dwell time
-            t0 = at.at (stop_index);
-            if (rng.runif () < vehicle->dwell_time ())
-            {
-                t0 += vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
-            }
-            // std::cout << "(" << m << ") " << at.at (m) << ", ";
-        }
-    }
-
     void
     Particle::calculate_likelihood (latlng& y, 
                                     std::vector<ShapePt>& path, 
@@ -1125,8 +1002,9 @@ namespace Gtfs {
         double lX2 = 2 * (ld - log (sigma));
         // log pdf of lX2 ~ Exp(2)
         log_likelihood = log (0.5) - 0.5 * exp(lX2);
-
+#if VERBOSE == 2
         if (vehicle->get_n () < 20) std::cout << " => d(h(x), y) = " << exp (ld) << "m";
+#endif
     }
 
     void Particle::calculate_likelihood (Event& e, double error)

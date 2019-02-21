@@ -1,0 +1,45 @@
+model {
+    for (i in 1:N) {
+        # each observation comes from distribution with
+        # segment-level measurement eror (r_s)
+        z[i] ~ dnorm(x[i], ifelse(outlier[i] == 1, o_r_tau[s[i]], r_tau[s[i]]))
+        outlier[i] ~ dbin(pr_outlier[i], 1)
+        pr_outlier[i] ~ dbeta(1e-3, 1e-3)
+    }
+
+    for (j in 1:J) {
+        # values for this segment/date range from 
+        # Nj[j]:(Nj[j] + Ni[j])
+
+        x[Nj[j]] ~ dnorm(0, 1e-4)
+        xdot[Nj[j]] ~ dnorm(0, 1e-2)
+        for (i in (Nj[j] + 1):(Nj[j] + Ni[j] - 1)) {
+            x[i] <- x[i-1] + delta[i] * xdot[i]
+            xdot[i] ~ dnorm(xdot[i-1], ifelse(weekend[i] == 1, qw_tau[s[i]], q_tau[s[i]]))
+        }
+    }
+
+    for (s in 1:M) {
+        # measurement error
+        r_tau[s] <- 1 / pow(r_sig[s], 2)
+        r_sig[s] ~ dnorm(gamma[1] + gamma[2] * len[s], irho)
+
+        # outliers have smaller precision
+        o_r_tau[s] ~ dgamma(1e-5, 1e-5)
+
+        # system noise (weekday)
+        q_tau[s] ~ dgamma(1e-5, 1e-5)
+        q_sig[s] <- 1 / sqrt(q_tau[s])
+
+        # system noise (weekend)
+        qw_tau[s] ~ dgamma(1e-5, 1e-5)
+        qw_sig[s] <- 1 / sqrt(qw_tau[s])
+    }
+
+    # population parameters
+    gamma[1] <- 0
+    gamma[2] ~ dgamma(1e-5, 1e-5)
+    irho ~ dgamma(1e-6, 1e-6)
+    rho <- 1 / sqrt(irho)
+
+}

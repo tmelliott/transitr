@@ -24,6 +24,9 @@ AC_OPENMP
 AC_DEFUN([AC_PROG_PKGCONFIG], [AC_CHECK_PROG(PKGCONFIG,pkg-config,yes)])
 AC_PROG_PKGCONFIG
 
+# PKG_CHECK_MODULES ([EIGEN], [eigen3])
+AC_CHECK_HEADER([eigen3/Eigen/Dense],,AC_MSG_ERROR([No eigen3 library]))
+
 ## use pkg-config for ProtoBuf settings
 ##
 if test x"${PKGCONFIG}" == x"yes"; then

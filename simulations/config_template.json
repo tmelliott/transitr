@@ -11,5 +11,7 @@
     "arrival_error": 5,
     "departure_error": 5,
     // network parameters ...
+    "nw_system_noise": 0.001,
+    "mw_measurement_error": 500,
     "save_timings": true
 }

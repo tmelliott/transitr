@@ -280,8 +280,62 @@ get_all_etas <- function() {
 
 # etas <- get_all_etas()
 
+## just one simulation
+options(width = 120)
+
+etas <- loadsim("sim000", gsub("etas_|.pb", "", tail(list.files("simulations/sim000/etas", pattern = ".pb"), 1))) %>%
+    filter(time > timestamp) %>%
+    mutate(
+        timestamp = as.integer(timestamp),
+        time = as.integer(time),
+        eta = time - timestamp,
+        lower = q0.025 - timestamp,
+        upper = q0.975 - timestamp,
+    ) %>%
+    select(vehicle_id, trip_id, route_id, timestamp, stop_sequence, time, eta, lower, upper) %>%
+    filter(!is.na(time) & lower > 0 & upper > 0) %>%
+    filter(abs(time - timestamp) < 60*60)
+
+ggplot(etas, aes(eta/60, stop_sequence)) + geom_point()
+
+## one trip ...
+trip <- etas %>% filter(trip_id == unique(etas$trip_id)[5])
+ggplot(trip, aes(eta/60, stop_sequence)) + 
+    geom_segment(aes(x = lower/60, xend = upper/60, yend = stop_sequence)) +
+    geom_point()
+
+
 load("simulations/arrivaldata.rda")
-etas <- get_etas("sim000")
+etas <- get_etas("sim000") %>% filter(!is.na(time)) %>%
+    filter(time > timestamp) %>%
+    mutate(
+        timestamp = as.integer(timestamp),
+        time = as.integer(time),
+        eta = time - timestamp,
+        lower = q0.025 - timestamp,
+        upper = q0.975 - timestamp,
+    ) %>%
+    select(vehicle_id, trip_id, route_id, timestamp, stop_sequence, time, eta, lower, upper) %>%
+    filter(!is.na(time) & lower > 0 & upper > 0) %>%
+    filter(abs(time - timestamp) < 2*60*60) %>%
+    group_by(trip_id, stop_sequence) %>%
+    do({
+        (.) %>% mutate(tarr = .$time[which.max(.$timestamp)])
+    }) %>%
+    ungroup() %>%
+    mutate(
+        t = as.POSIXct(timestamp, origin = "1970-01-01"),
+        t_lower = as.POSIXct(timestamp + lower, origin = "1970-01-01"),
+        t_upper = as.POSIXct(timestamp + upper, origin = "1970-01-01")
+    )
+
+t1 <- unique(etas$trip_id)[2]
+ggplot(etas %>% filter(trip_id == t1), aes(t)) +
+    geom_linerange(aes(
+        ymin = t_lower, ymax = t_upper), size = 0.5) +
+    facet_wrap(~stop_sequence) +
+    geom_abline(lty = 3, col = 'red')
+
 
 ## Baseline - schedule RMSE ~ time-until-arrival
 t1 <- arrivaldata %>% filter(trip_id == arrivaldata$trip_id[1]) %>% arrange(stop_sequence, type)
@@ -297,17 +351,17 @@ t1delay <- t1 %>% select(trip_id, stop_sequence, type, time) %>%
            schedule_time = as.time(schedule_time, format(time[1], "%Y-%m-%d")),
            delay = as.integer(time - schedule_time))
 
-schedETAs <- #lapply(seq_along(1:nrow(t1delay)), function(i) {
-    as.tibble(
+schedETAs <-
+    as_tibble(
         expand.grid(stop_sequence = 2:max(sched$stop_sequence),
                     time = t1delay$time[-1])) %>%
         left_join(t1delay %>% ungroup %>% select(time, delay), by = "time") %>%
         left_join(t1delay %>% ungroup %>% select(stop_sequence, schedule_time), by = "stop_sequence") %>%
         mutate(eta = schedule_time + delay)
-#})
+
 
 ggplot(schedETAs) + 
-    geom_point(aes(time, eta, colour = as.factor(stop_sequence)))
+    geom_point(aes(time, delay, colour = as.factor(stop_sequence)))
 
 
 arrdat <- arrivaldata %>% filter(type == "arrival") %>%
@@ -317,9 +371,24 @@ arrdat <- arrivaldata %>% filter(type == "arrival") %>%
 etasc <- etas %>% mutate(id = paste(trip_id, stop_sequence, sep = ":")) %>%
     inner_join(arrdat %>% select(id, time), by = "id", suffix = c("_estimated", "_actual"))
 
-ed <- etasc %>% filter(!is.na(q50) & !is.na(time_actual)) %>%
-    filter(time_actual >= timestamp & abs(q50 - as.numeric(time_actual)) < 60*60) %>%
-    mutate(in_pred_int = time_actual > q0 & time_actual < q100)
+    #  %>%
+    # inner_join(schedETAs %>% select())
+
+ed <- etasc %>% filter(!is.na(time_actual) & !is.na(time_estimated)) %>%
+    mutate(arrives_in = as.integer(time_actual - timestamp)) %>%
+    filter(arrives_in > 0 & arrives_in < 60*60) %>%
+    mutate(
+        eta = as.integer(time_estimated - timestamp),
+        eta_error = eta - arrives_in
+    )
+ # %>% filter(!is.na(q50) & !is.na(time_actual)) %>%
+ #    filter(time_actual >= timestamp & abs(q50 - as.numeric(time_actual)) < 60*60) %>%
+ #    mutate(in_pred_int = time_actual > q0 & time_actual < q100)
+
+ggplot(ed %>% filter(abs(eta_error) < 2*60*60 & stop_sequence < 10)) +
+    geom_histogram(aes(eta_error/60)) +
+    facet_wrap(~stop_sequence)
+    
 
 ggplot(ed %>% filter(time_actual - timestamp < 60*60)) + geom_bar(aes(in_pred_int))
 
