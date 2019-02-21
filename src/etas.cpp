@@ -590,7 +590,8 @@ namespace Gtfs {
         auto K = ETA_var * H.transpose () * S.inverse ();
 
         ETA_hat += K * y;
-        ETA_var = (I - K * H) * ETA_var * (I - K * H).transpose () + K * R * K.transpose ();
+        auto IKH = I - K * H;
+        ETA_var = IKH * ETA_var * IKH.transpose () + K * R * K.transpose ();
 #if VERBOSE == 2
         std::cout << "\n\n * updated state";
         std::cout << "\n\n  >> E(ETA):\n" << ETA_hat.format (tColVec);
@@ -1006,7 +1007,8 @@ namespace Gtfs {
 #endif
 
             // Update state covariance
-            Phat = (I - K * H) * Phat * (I - K * H).transpose () +
+            auto IKH = I - K * H;
+            Phat = IKH * Phat * IKH.transpose () +
                 K * R * K.transpose ();
 #if VERBOSE == 2
             std::cout << "\n Phat = \n" << Phat;
