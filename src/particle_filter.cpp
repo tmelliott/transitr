@@ -135,7 +135,7 @@ namespace Gtfs {
                         std::vector<double> (_trip->stops ().size (), 0.0));
         for (int i=0; i<_trip->stops ().size (); i++)
         {
-            _tt_cov.at (i).at (i) = i * 30 + 300; // 5 min error + 30 seconds per stop
+            _tt_cov.at (i).at (i) = (i+1) * 30; // 5 min error + 30 seconds per stop
         }
     }
 
@@ -238,13 +238,13 @@ namespace Gtfs {
                 case EventType::arrival :
                     {
                         // this is tricky ...
-                        // _stop_arrival_times.at (e.stop_index) = e.timestamp;
+                        _trip->set_arrival_time (e.stop_index, e.timestamp);
                         break;
                     }
                 case EventType::departure :
                     {
                         // no checks
-                        // _stop_departure_times.at (e.stop_index) = e.timestamp;
+                        _trip->set_departure_time (e.stop_index, e.timestamp);
                         break;
                     }
             }
@@ -323,13 +323,16 @@ namespace Gtfs {
                         continue;
                     }
 
-                    err = std::accumulate (_state.begin (), _state.end (), 0.0,
-                                           [=](double a, Particle& p) {
-                                                return a + p.get_weight () * pow(p.get_travel_time (_current_segment) - tt, 2);
-                                           });
+                    // let error be fixed for the segment
+                    err = segs.at (_current_segment).segment->length () / 30;
 
-                    // if the error is effectively 0 ...
-                    if (err < 0.001) err = 10.0;
+                    // err = std::accumulate (_state.begin (), _state.end (), 0.0,
+                    //                        [=](double a, Particle& p) {
+                    //                             return a + p.get_weight () * pow(p.get_travel_time (_current_segment) - tt, 2);
+                    //                        });
+
+                    // // if the error is effectively 0 ...
+                    // if (err < 0.001) err = 10.0;
 
                     _segment_travel_times.at (_current_segment) = round (tt);
                     segs.at (_current_segment).segment->push_data (tt, err, _timestamp);
@@ -820,23 +823,23 @@ namespace Gtfs {
         while (behind_event (e, delta))
         {
             // add system noise to acceleration to ensure speed remains in [0, vmax]
-            double accel_prop (-100.0);
-            double n = 0;
-            if (speed > vmax)
-            {
-                speed = rng.runif () * vmax;
-            }
-            while (speed + accel_prop < 0.0 || speed + accel_prop > vmax && n < 1000)
-            {
-                accel_prop = rng.rnorm () * vehicle->system_noise () * 
-                    (1.0 + (double)n / 100.0);
-                n++;
-                // if (accelerating > 0.0)
-                // {
-                //     accel_prop += acceleration;
-                //     accelerating--;
-                // }
-            }
+            // double accel_prop (-100.0);
+            // double n = 0;
+            // if (speed > vmax)
+            // {
+            //     speed = rng.runif () * vmax;
+            // }
+            // while (speed + accel_prop < 0.0 || speed + accel_prop > vmax && n < 1000)
+            // {
+            //     accel_prop = rng.rnorm () * vehicle->system_noise () * 
+            //         (1.0 + (double)n / 100.0);
+            //     n++;
+            //     // if (accelerating > 0.0)
+            //     // {
+            //     //     accel_prop += acceleration;
+            //     //     accelerating--;
+            //     // }
+            // }
 
             // double v = fmax (0, fmin (30, speed + acceleration));
             // double v = speed;
@@ -853,7 +856,11 @@ namespace Gtfs {
             //     speed = v;
             // }
 
-            speed += accel_prop;
+            {
+                double vel = speed + rng.rnorm () * vehicle->system_noise ();
+                while (vel <= 0 || vel > 30) vel = speed + rng.rnorm () * vehicle->system_noise ();
+                speed = vel;
+            }
             distance += speed;
             if (distance >= Dmax) complete = true;
             delta--;
@@ -929,10 +936,24 @@ namespace Gtfs {
         at.at (stop_index) = time;
 
         double u (rng.runif ());
-        if (u < vehicle->pr_stop ())
+        // if (u < vehicle->pr_stop ())
+        
+        /**
+         * let's try Thomas' idea of stopping probability being
+         * inversely proportional to speed
+         * [0, 30] -> [0.9, 0.1]
+         */
+        double pr = (30 - speed) / 30 * 0.8 + 0.1;
+        if (u < pr)
         {
             // bus stops
-            double dwell = vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
+            // dwell = vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
+            double dwell = -1;
+            while (dwell < 0)
+            {
+                dwell = vehicle->dwell_time () + vehicle->dwell_time_var () * rng.runif ();
+            }
+            dwell += vehicle->gamma ();
             dt.at (stop_index) = time + round (dwell);
             return true;
         }

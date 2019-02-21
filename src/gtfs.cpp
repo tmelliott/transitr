@@ -117,6 +117,7 @@ namespace Gtfs
             _trips.reserve (sqlite3_column_int (stmt, 0));
             sqlite3_finalize (stmt);
 
+            // ONLY trips running today 
             qry = "SELECT trip_id FROM trips";
             qrystr = qry.c_str ();
             if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
@@ -363,6 +364,16 @@ namespace Gtfs
             sqlite3_close (_connection);
             _connection = nullptr;
         }
+    }
+
+    void Gtfs::set_parameters (par& params)
+    {
+        _parameters = params;
+    }
+
+    par* Gtfs::parameters ()
+    {
+        return &_parameters;
     }
 
     std::unordered_map<std::string, Agency>& Gtfs::agencies ()
@@ -844,7 +855,9 @@ namespace Gtfs
 
         // set start time
         _start_time = _stops.at (0).departure_time;
-
+        _arrival_times.resize (_stops.size (), 0);
+        _departure_times.resize (_stops.size (), 0);
+        
         loaded = true;
     }
 
@@ -864,6 +877,8 @@ namespace Gtfs
         _block_id = "";
         _trip_headsign = "";
         _vehicle = nullptr;
+
+        state_initialised = false;
 #if VERBOSE > 0
         std::cout << " + Trip " << _trip_id << " is unloaded\n";
 #endif
@@ -873,6 +888,34 @@ namespace Gtfs
     {
         completed = true;
         _vehicle = nullptr;
+    }
+
+    bool Trip::is_active (uint64_t& t)
+    {
+        /**
+         * Returns TRUE if vehicle is not null ...
+         */
+        if (_vehicle != nullptr) return true;
+
+        /** 
+         * ... or if it is 30 mins before scheduled start
+         * and less than an hour since scheduled end.
+         */
+        Time t0 (t);
+        if (loaded)
+        {
+            if (stops ().front ().departure_time - t0 < 30*60) return false;
+            return t0 - stops ().back ().arrival_time < 60*60;
+        }
+
+        // if not loaded, currently unable to subset today's trips only
+        return false;
+    }
+
+    bool Trip::is_active ()
+    {
+        if (_vehicle != nullptr) return true;
+        return loaded && !completed;
     }
 
     std::string& Trip::trip_id () { 
@@ -910,6 +953,17 @@ namespace Gtfs
     float Trip::version () { 
         if (!loaded) load ();
         return _version; 
+    }
+
+    void Trip::set_arrival_time (int m, uint64_t t)
+    {
+        if (m < 0 || m >= _arrival_times.size ()) return;
+        _arrival_times.at (m) = t;
+    }
+    void Trip::set_departure_time (int m, uint64_t t)
+    {
+        if (m < 0 || m >= _arrival_times.size ()) return;
+        _departure_times.at (m) = t;
     }
 
     Time& Trip::start_time ()
@@ -1334,12 +1388,12 @@ namespace Gtfs
     double Segment::travel_time ()
     {
         if (!loaded) load ();
-        return _travel_time;
+        return _travel_time (0);
     }
     double Segment::uncertainty ()
     {
         if (!loaded) load ();
-        return _uncertainty;
+        return _uncertainty (0, 0);
     }
 
     std::vector<std::pair<int, double> >& Segment::get_data ()
@@ -1762,11 +1816,13 @@ namespace Gtfs
         Rcpp::NumericVector sigx = parameters["system_noise"];
         Rcpp::NumericVector prstop = parameters["pr_stop"];
         Rcpp::NumericVector dwell = parameters["dwell_time"];
+        Rcpp::NumericVector dwell_var = parameters["dwell_time_var"];
         Rcpp::NumericVector gam = parameters["gamma"];
         Rcpp::NumericVector sigy = parameters["gps_error"];
         Rcpp::NumericVector siga = parameters["arrival_error"];
         Rcpp::NumericVector sigd = parameters["departure_error"];
         Rcpp::NumericVector signwx = parameters["nw_system_noise"];
+        Rcpp::NumericVector signwy = parameters["nw_measurement_error"];
         Rcpp::LogicalVector tim = parameters["save_timings"];
 
         // set the parameters
@@ -1775,11 +1831,13 @@ namespace Gtfs
         system_noise = (float) sigx[0];
         pr_stop = (float) prstop[0];
         dwell_time = (float) dwell[0];
+        dwell_time_var = (float) dwell_var[0];
         gamma = (float) gam[0];
         gps_error = (float) sigy[0];
         arrival_error = (float) siga[0];
         departure_error = (float) sigd[0];
         nw_system_noise = (float) signwx[0];
+        nw_measurement_error = (float) signwy[0];
         save_timings = (bool) tim[0];
     }
 
@@ -1791,11 +1849,13 @@ namespace Gtfs
             << "\n - system_noise = " << system_noise
             << "\n - pr_stop = " << pr_stop
             << "\n - dwell_time = " << dwell_time
+            << "\n - dwell_time_var = " << dwell_time_var
             << "\n - gamma = " << gamma
             << "\n - gps_error = " << gps_error
             << "\n - arrival_error = " << arrival_error
             << "\n - departure_error = " << departure_error
             << "\n - nw_system_noise = " << nw_system_noise
+            << "\n - nw_measurement_error = " << nw_measurement_error
             << "\n - save_timings = " << (save_timings ? "true" : "false")
             << "\n";
     }
@@ -1845,6 +1905,7 @@ namespace Gtfs
         _systemnoise = params->system_noise;
         _prstop = params->pr_stop;
         _dwelltime = params->dwell_time;
+        _dwelltimevar = params->dwell_time_var;
         _gamma = params->gamma;
         _arrival_error = params->arrival_error;
         _departure_error = params->departure_error;
@@ -1903,6 +1964,7 @@ namespace Gtfs
             // }
         }
         _trip = trip;
+        _trip->assign_vehicle (this);
     }
 
     void Vehicle::update (const transit_realtime::VehiclePosition& vp,
@@ -2154,6 +2216,10 @@ namespace Gtfs
     {
         return _dwelltime;
     }
+    float Vehicle::dwell_time_var ()
+    {
+        return _dwelltimevar;
+    }
     float Vehicle::gamma ()
     {
         return _gamma;
@@ -2185,7 +2251,17 @@ namespace Gtfs
     }
     uint64_t Vehicle::stop_arrival_time (int m)
     {
+        if (m < 0) m = 0;
+        if (m >= _stop_arrival_times.size ()) 
+            m = _stop_arrival_times.size () - 1;
         return _stop_arrival_times.at (m);
+    }
+    uint64_t Vehicle::stop_departure_time (int m)
+    {
+        if (m < 0) m = 0;
+        if (m >= _stop_departure_times.size ()) 
+            m = _stop_departure_times.size () - 1;
+        return _stop_departure_times.at (m);
     }
     int Vehicle::current_stop ()
     {
@@ -2196,6 +2272,11 @@ namespace Gtfs
     {
         return _trip->start_time ();
     }
+
+    std::vector<Particle>* Vehicle::state ()
+    {
+        return &_state;
+    };
 
 
 

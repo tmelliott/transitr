@@ -29,6 +29,9 @@ before_install:
 after_success:
   - Rscript -e 'covr::codecov()'
 
+after_failure:
+  - cat /home/travis/build/tmelliott/transitr/transitr.Rcheck/00install.out
+
 notifications:
   email:
     on_success: change

@@ -96,7 +96,7 @@ eta <- function(sim, ta, ts, sched) {
     # names(etadata)[8] <- "q95"
 
     # cat(" 3 ------\n")
-    print(etadata)
+    # print(etadata)
     # cat(" 4 ------\n")
     # print(unique(etadata$trip_id))
     # cat(" 5 ------\n")
@@ -116,16 +116,21 @@ eta <- function(sim, ta, ts, sched) {
         sched2 <- sched %>% filter(stop_sequence > Slast$stop_sequence)
     else sched2 <- sched
     # print(etadata)
+    xl <- c(min(ta$time, sched$arrival_time), max(ta$time, sched$arrival_time))
     p <- ggplot(ta, aes(time, stop_sequence)) +
         geom_point(aes(colour = type)) +
         geom_point(aes(x = arrival_time), data = sched, color = "magenta", pch = 4) +
         geom_point(aes(x = arrival_time + delay), data = sched2, color = "magenta", pch = 2) +
         geom_vline(aes(xintercept = etatime), data = NULL, col = "red", lty = 3) + 
         ggtitle(sprintf("ETAs at %s", format(etatime, "%H:%M:%S"))) +
-        xlim(min(ta$time, sched$arrival_time), max(ta$time, sched$arrival_time))
+        xlim(xl[1], xl[2])
     print(etadata %>% select(stop_sequence, time, q5, q95))
     if (all(c("q5", "q95") %in% names(etadata))) {
-        p <- p + geom_segment(aes(x = astime(q5), xend = astime(q95), yend = stop_sequence), 
+        p <- p + geom_segment(aes(
+                x = pmax(xl[1], astime(q5)), 
+                xend = pmin(xl[2], astime(q95)), 
+                yend = stop_sequence
+            ), 
             data = etadata %>% filter(q5 > 0 & q95 > 0))
     }
     if ("q50" %in% names(etadata)) {

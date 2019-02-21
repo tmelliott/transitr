@@ -41,8 +41,9 @@ get_segment_data <- function(routes) {
     segments
 }
 
-view_segment_states <- function(f = "segment_states.csv", o, segment, n = 12, speed = FALSE) {
+view_segment_states <- function(f = "segment_states.csv", o, segment, n = 12, speed = FALSE, id) {
     data <- get_segments(f) %>% filter(timestamp > 0)
+    if (!missing(id)) data <- data %>% filter(segment_id %in% id)
     show.data <- !missing(o)
     if (show.data) obs <- get_data(o) %>% filter(timestamp > 0)
     if (missing(segment)) {
@@ -83,12 +84,14 @@ view_segment_states <- function(f = "segment_states.csv", o, segment, n = 12, sp
         xlab("Time") + 
         ylab(ifelse(speed, "Speed (km/h)", "Travel Time (seconds)")) +
         facet_wrap(~segment_id, scales = ifelse(speed, "fixed", "free_y"))
-    if (show.data)
+    if (show.data) {
+        # yr <- extendrange(c(data$.y, obs$.y))
         p <- p + 
             # geom_linerange(aes(ymin = .y - .e, ymax = .y + .e),  
             #     data = obs,
             #     color = 'pink', lwd = 0.5) +
             geom_point(data = obs, colour = "red", cex = 0.5)
+    }
     if (speed) p <- p + ylim(0, 100) else p <- p + ylim(yr[1], yr[2])
     p
 }
@@ -108,8 +111,8 @@ map_segments <- function(f = "segment_states.csv", t = max(data$timestamp)) {
                                      speed < 55 ~ "30-55 kmh",
                                      speed < 70 ~ "55-70 kmh",
                                      TRUE ~ "70+ kmh"))
-    
-    ggplot(data, aes(intersection_lon, intersection_lat, 
+
+    p <- ggplot(data, aes(intersection_lon, intersection_lat, 
                      xend = intersection_lon_end, yend = intersection_lat_end)) +
         geom_segment(data = segdata, colour = "black", alpha = 0.05) + 
         geom_segment(aes(color = speed)) +
@@ -119,12 +122,28 @@ map_segments <- function(f = "segment_states.csv", t = max(data$timestamp)) {
         scale_colour_viridis_c(option = "B", limits = c(0, 100)) +
         facet_grid(~speed_fct) +
         xlab("") + ylab("")
+    p
 }
 
 
 view_segment_states("simulations/sim000/segment_states.csv", "simulations/sim000/segment_observations.csv", n = 20)
 view_segment_states("simulations/sim000/segment_states.csv", "simulations/sim000/segment_observations.csv", speed = TRUE, n = 20)
+view_segment_states("simulations/sim000/segment_states.csv", n = 20)
 view_segment_states("simulations/sim000/segment_states.csv", speed = TRUE, n = 20)
+
+## what is happening in segment 4691
+view_segment_states("simulations/sim000/segment_states.csv", "simulations/sim000/segment_observations.csv", n = 20, id = "4691")
+library(leaflet)
+sx <- get_segment_data() %>% filter(road_segment_id == "4691")
+
+m <- leaflet() %>%
+    addTiles() %>%
+    addMarkers(sx$intersection_lon, sx$intersection_lat, 
+        popup = "Start"
+    ) %>%
+    addMarkers(sx$intersection_lon_end, sx$intersection_lat_end,
+        popup = "End"
+    )
 
 map_segments("simulations/sim000/segment_states.csv")
 
