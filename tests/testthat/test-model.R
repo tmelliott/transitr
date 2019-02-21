@@ -45,6 +45,7 @@ test_that("Parameters can be changed", {
         gps_error = 20,
         arrival_error = 10,
         departure_error = 12,
+        nw_system_noise = 0.002,
         save_timings = TRUE
     )
 
@@ -60,6 +61,7 @@ test_that("Parameters can be changed", {
             gps_error = 20,
             arrival_error = 10,
             departure_error = 12,
+            nw_system_noise = 0.002,
             save_timings = TRUE
         )
     )
