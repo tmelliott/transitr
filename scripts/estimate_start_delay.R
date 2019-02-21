@@ -191,7 +191,7 @@ dfit <- lm(dwell ~ stop_id - 1, data = dts.sub)
 tidy(dfit) %>% 
     bind_cols(confint_tidy(dfit)) %>%
     mutate(stop = as.integer(as.factor(term))) %>%
-    ggplot(aes(estimate, stop) +
+    ggplot(aes(estimate, stop)) +
     geom_segment(aes(
         x = conf.low,
         xend = conf.high,
@@ -200,3 +200,4 @@ tidy(dfit) %>%
     geom_point() +
     xlab("Dwell Time (seconds)") +
     ylab("Stop")
+

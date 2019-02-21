@@ -68,7 +68,8 @@ load_gtfs <- function(db, output = "predictions.pb") {
                 # -- transition 
                 system_noise = 1.0,
                 pr_stop = 0.5,
-                dwell_time = 10.0,
+                dwell_time = 20.0,
+                dwell_time_var = 10.0,
                 gamma = 6.0,
                 # -- likelihood
                 gps_error = 5.0,

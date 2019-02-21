@@ -87,7 +87,8 @@ namespace Gtfs
         int n_particles = 1000;
         float system_noise = 5;  // std. dev. of speed variance/second
         float pr_stop = 0.5;
-        float dwell_time = 10.0;
+        float dwell_time = 20.0;
+        float dwell_time_var = 10.0;
         float gamma = 5.0;
         float gps_error = 5.0;   // std. dev. of observation error
         float arrival_error = 5.0;
@@ -562,6 +563,7 @@ namespace Gtfs
             float _systemnoise;
             float _prstop;
             float _dwelltime;
+            float _dwelltimevar;
             float _gamma;
 
             float _arrival_error = 5.0;
@@ -649,6 +651,7 @@ namespace Gtfs
             float system_noise ();
             float pr_stop ();
             float dwell_time ();
+            float dwell_time_var ();
             float gamma ();
             double arrival_error ();
             double departure_error ();

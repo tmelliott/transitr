@@ -936,10 +936,24 @@ namespace Gtfs {
         at.at (stop_index) = time;
 
         double u (rng.runif ());
-        if (u < vehicle->pr_stop ())
+        // if (u < vehicle->pr_stop ())
+        
+        /**
+         * let's try Thomas' idea of stopping probability being
+         * inversely proportional to speed
+         * [0, 30] -> [0.9, 0.1]
+         */
+        double pr = (30 - speed) / 30 * 0.8 + 0.1;
+        if (u < pr)
         {
             // bus stops
-            double dwell = vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
+            // dwell = vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
+            double dwell = -1;
+            while (dwell < 0)
+            {
+                dwell = vehicle->dwell_time () + vehicle->dwell_time_var () * rng.runif ();
+            }
+            dwell += vehicle->gamma ();
             dt.at (stop_index) = time + round (dwell);
             return true;
         }

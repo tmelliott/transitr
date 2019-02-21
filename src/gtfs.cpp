@@ -1806,6 +1806,7 @@ namespace Gtfs
         Rcpp::NumericVector sigx = parameters["system_noise"];
         Rcpp::NumericVector prstop = parameters["pr_stop"];
         Rcpp::NumericVector dwell = parameters["dwell_time"];
+        Rcpp::NumericVector dwell_var = parameters["dwell_time_var"];
         Rcpp::NumericVector gam = parameters["gamma"];
         Rcpp::NumericVector sigy = parameters["gps_error"];
         Rcpp::NumericVector siga = parameters["arrival_error"];
@@ -1820,6 +1821,7 @@ namespace Gtfs
         system_noise = (float) sigx[0];
         pr_stop = (float) prstop[0];
         dwell_time = (float) dwell[0];
+        dwell_time_var = (float) dwell_var[0];
         gamma = (float) gam[0];
         gps_error = (float) sigy[0];
         arrival_error = (float) siga[0];
@@ -1837,6 +1839,7 @@ namespace Gtfs
             << "\n - system_noise = " << system_noise
             << "\n - pr_stop = " << pr_stop
             << "\n - dwell_time = " << dwell_time
+            << "\n - dwell_time_var = " << dwell_time_var
             << "\n - gamma = " << gamma
             << "\n - gps_error = " << gps_error
             << "\n - arrival_error = " << arrival_error
@@ -1892,6 +1895,7 @@ namespace Gtfs
         _systemnoise = params->system_noise;
         _prstop = params->pr_stop;
         _dwelltime = params->dwell_time;
+        _dwelltimevar = params->dwell_time_var;
         _gamma = params->gamma;
         _arrival_error = params->arrival_error;
         _departure_error = params->departure_error;
@@ -2201,6 +2205,10 @@ namespace Gtfs
     float Vehicle::dwell_time ()
     {
         return _dwelltime;
+    }
+    float Vehicle::dwell_time_var ()
+    {
+        return _dwelltimevar;
     }
     float Vehicle::gamma ()
     {
