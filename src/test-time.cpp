@@ -34,10 +34,14 @@ context("Time functions") {
 
   test_that ("UNIX timestamp to time") {
     uint64_t t = 1549764850;
+    // convert it to localtime "manually" to avoid OS timezone interferring
+    std::time_t tt (t);
+    struct tm *t0 = localtime(&tt);
+
     Time tx = Time (t);
-    // expect_true (tx.hour () == 15);
-    expect_true (tx.minute () == 14);
-    expect_true (tx.second () == 10);
+    expect_true (tx.hour () == t0->tm_hour);
+    expect_true (tx.minute () == t0->tm_min);
+    expect_true (tx.second () == t0->tm_sec);
   }
 
   test_that ("Now works") {
