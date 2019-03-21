@@ -18,6 +18,7 @@ addons:
       - libprotoc-dev 
       - protobuf-compiler 
       - libgoogle-perftools-dev
+      - libeigen3-dev
 
 before_install:
   - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
@@ -27,6 +28,9 @@ before_install:
 
 after_success:
   - Rscript -e 'covr::codecov()'
+
+after_failure:
+  - cat /home/travis/build/tmelliott/transitr/transitr.Rcheck/00install.out
 
 notifications:
   email:

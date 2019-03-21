@@ -9,7 +9,8 @@ get_segment_data <- function(routes) {
                 (route_long_name %like% "%To City%" |
                  route_long_name %like% "%To Britomart%" |
                  route_long_name %like% "%To Mayoral%" |
-                 route_long_name %like% "%To Auckland Universities%")) %>%
+                 route_long_name %like% "%To Auckland Universities%" |
+                 route_long_name %like% "%To Hibiscus Coast Station")) %>%
             collect %>% pluck("route_id") %>% unique
         sids <- con %>% tbl("trips") %>%
             filter(route_id %in% rids) %>%

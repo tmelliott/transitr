@@ -17,7 +17,10 @@ test_that("Parameters are set with valid defaults", {
     expect_true(nw$parameters$pr_stop >= 0 && nw$parameters$pr_stop <= 1)
     
     expect_is(nw$parameters$dwell_time, "numeric")
-    expect_true(nw$parameters$dwell_time > 0)
+    expect_true(nw$parameters$dwell_time > 0) 
+
+    expect_is(nw$parameters$dwell_time_var, "numeric")
+    expect_true(nw$parameters$dwell_time_var > 0)
 
     expect_is(nw$parameters$gamma, "numeric")
     expect_true(nw$parameters$gamma > 0)
@@ -31,6 +34,12 @@ test_that("Parameters are set with valid defaults", {
     expect_is(nw$parameters$departure_error, "numeric")
     expect_true(nw$parameters$departure_error > 0)
 
+    expect_is(nw$parameters$nw_system_noise, "numeric")
+    expect_true(nw$parameters$nw_system_noise > 0)
+
+    expect_is(nw$parameters$nw_measurement_error, "numeric")
+    expect_true(nw$parameters$nw_measurement_error > 0)
+
     expect_is(nw$parameters$save_timings, "logical")
 })
 
@@ -40,11 +49,14 @@ test_that("Parameters can be changed", {
         n_particles = 20L,
         system_noise = 1,
         pr_stop = 0.9,
-        dwell_time = 5,
+        dwell_time = 15,
+        dwell_time_var = 5,
         gamma = 2,
         gps_error = 20,
         arrival_error = 10,
         departure_error = 12,
+        nw_system_noise = 0.002,
+        nw_measurement_error = 50,
         save_timings = TRUE
     )
 
@@ -55,11 +67,14 @@ test_that("Parameters can be changed", {
             n_particles = 20L,
             system_noise = 1,
             pr_stop = 0.9,
-            dwell_time = 5,
+            dwell_time = 15,
+            dwell_time_var = 5,
             gamma = 2,
             gps_error = 20,
             arrival_error = 10,
             departure_error = 12,
+            nw_system_noise = 0.002,
+            nw_measurement_error = 50,
             save_timings = TRUE
         )
     )

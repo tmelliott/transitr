@@ -1,10 +1,6 @@
 #ifndef PARTICLE_FILTER_H
 #define PARTICLE_FILTER_H
 
-#ifndef SIMULATION
-#define SIMULATION 0
-#endif
-
 #ifndef WRITE_PARTICLES
 #define WRITE_PARTICLES 0
 #endif

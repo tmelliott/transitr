@@ -24,7 +24,7 @@ loadsim <- function(sim, time) {
                 stus <- e$trip_update$stop_time_update
                 if (length(stus) == 0) return(NULL)
                 xdf <- tibble(
-                    vehicle_id = e$trip_update$vehicle$id,
+                    # vehicle_id = e$trip_update$vehicle$id,
                     trip_id = e$trip_update$trip$trip_id,
                     route_id = e$trip_update$trip$route_id,
                     timestamp = as.POSIXct(time, origin = "1970-01-01"),
@@ -47,8 +47,8 @@ loadsim <- function(sim, time) {
                             function(x) ifelse(x$value == 0, NA, x$value))
                         if (length(qs) != length(quantiles)) return(integer(length(quantiles)))
                         qs
-                    }) %>% t %>% as.tibble
-                    names(qs) <- paste0("q", quantiles)
+                    }) %>% t %>% as_tibble
+                    names(qs) <- paste0("q", round(quantiles, 4))
                     xdf <- bind_cols(xdf, qs)
                 }
                 xdf
@@ -61,10 +61,10 @@ loadsim <- function(sim, time) {
     etas
 }
 
-all_sims <- function(sim) {
+all_sims <- function(sim, n = length(times)) {
     times <- gsub("etas_|\\.pb", "", list.files(file.path("simulations", sim, "etas"), ".pb")) %>%
         as.integer
-    do.call(bind_rows, pbapply::pblapply(times, function(t) loadsim(sim, t)))
+    do.call(bind_rows, pbapply::pblapply(times[1:n], function(t) loadsim(sim, t)))
 }
 
 library(RSQLite)

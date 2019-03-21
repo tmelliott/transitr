@@ -32,6 +32,18 @@ context("Time functions") {
     expect_error (Time (t));
   }
 
+  test_that ("UNIX timestamp to time") {
+    uint64_t t = 1549764850;
+    // convert it to localtime "manually" to avoid OS timezone interferring
+    std::time_t tt (t);
+    struct tm *t0 = localtime(&tt);
+
+    Time tx = Time (t);
+    expect_true (tx.hour () == t0->tm_hour);
+    expect_true (tx.minute () == t0->tm_min);
+    expect_true (tx.second () == t0->tm_sec);
+  }
+
   test_that ("Now works") {
     Time tx = Time::now ();
     expect_true (tx.hour () >= 0);
