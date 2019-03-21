@@ -9,7 +9,7 @@ construct_network <- function(nw) {
     routes <- RSQLite::dbGetQuery(con, "SELECT route_id FROM routes")
 
     pb <- utils::txtProgressBar(0, nrow(routes), style = 3)
-    for (route in routes$route_id) {
+    for (route in rev(routes$route_id)) {
         pb$up(pb$getVal() + 1)
         
         trq <- RSQLite::dbSendQuery(con, "SELECT trip_id, shape_id FROM trips WHERE route_id=? LIMIT 1")
@@ -68,7 +68,19 @@ construct_network <- function(nw) {
 
         ## Finally, create shape_segments - which requires distances
         if (any(is.na(shape$shape_dist_traveled))) {
-            shape$shape_dist_traveled <- c(0, cumsum(geosphere::distGeo(shape[,2L:1L])))
+            if (nrow(shape) == 1) {
+                shape$shape_dist_traveled <- 0
+            } else if (nrow(shape) == 2) {
+                shape$shape_dist_traveled <- c(
+                    0,
+                    geosphere::distGeo(
+                        shape[1, 2L:1L, drop = FALSE], 
+                        shape[2, 2L:1L, drop = FALSE]
+                    )
+                )
+            } else {
+                shape$shape_dist_traveled <- c(0, cumsum(geosphere::distGeo(shape[,2L:1L])))
+            }
         }
 
         siprev <- 0
