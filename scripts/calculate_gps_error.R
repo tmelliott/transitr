@@ -14,24 +14,29 @@ if (FALSE) {
 }
 
 ## Extract the contents and read into memory
-files <- list.files(file.path("simulations", "archive"), full.names = TRUE)
-
-vfiles <- files[grepl("vehicle_locations", files)]
-vps <- do.call(bind_rows, pblapply(vfiles, function(f) {
-    feed <- read(transit_realtime.FeedMessage, f)
-    do.call(bind_rows, lapply(feed$entity, function(x) {
-        if (!x$has('vehicle') ||
-            !x$vehicle$has('vehicle') ||
-            !x$vehicle$has('trip') ||
-            !x$vehicle$has('position')) return(NULL)
-        tibble(vehicle_id = x$vehicle$vehicle$id,
-               timestamp = x$vehicle$timestamp,
-               trip_id = x$vehicle$trip$trip_id,
-               route_id = x$vehicle$trip$route_id,
-               lon = x$vehicle$position$longitude,
-               lat = x$vehicle$position$latitude)
+vpf <- "vps.rda"
+if (!file.exists(vpf)) {
+    files <- list.files(file.path("simulations", "archive"), full.names = TRUE)
+    vfiles <- files[grepl("vehicle_locations", files)]
+    vps <- do.call(bind_rows, pblapply(vfiles, function(f) {
+        feed <- read(transit_realtime.FeedMessage, f)
+        do.call(bind_rows, lapply(feed$entity, function(x) {
+            if (!x$has('vehicle') ||
+                !x$vehicle$has('vehicle') ||
+                !x$vehicle$has('trip') ||
+                !x$vehicle$has('position')) return(NULL)
+            tibble(vehicle_id = x$vehicle$vehicle$id,
+                   timestamp = x$vehicle$timestamp,
+                   trip_id = x$vehicle$trip$trip_id,
+                   route_id = x$vehicle$trip$route_id,
+                   lon = x$vehicle$position$longitude,
+                   lat = x$vehicle$position$latitude)
+        }))
     }))
-}))
+    save(vps, file = vpf)
+} else {
+    load(vpf)
+}
 
 ggplot(vps, aes(lon, lat)) +
     geom_point() +
