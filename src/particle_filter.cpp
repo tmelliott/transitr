@@ -233,6 +233,22 @@ namespace Gtfs {
                             current_event_index++;
                             return;
                         }
+
+                        // if the estimated distance is less than the previous 
+                        // estimated distance, do something about that 
+                        auto pos = latlng (e.position.latitude, e.position.longitude);
+                        auto est_dist = _trip->shape ()->distance_of (pos);
+                        std::cout << "\n-> from " << estimated_dist << " to " << est_dist;
+                        if (est_dist - estimated_dist < -5.0)
+                        {
+                            // looks like we've gone backwards ... 
+                            // ... uh oh
+                            // 1. skip this observation
+                            // 2. undo the entire state, and repredict state using newest obs
+                            // 3. revert particle weights and recalculate based on this new observation
+                            //    (this is probably the easiest, tbh)
+                            std::cout << "\n X - the state is conflooozed!!\n";
+                        }
                         break;
                     }
                 case EventType::arrival :
@@ -254,6 +270,7 @@ namespace Gtfs {
             if (e.type == EventType::gps)
             {
                 _position = latlng (e.position.latitude, e.position.longitude);
+                estimated_dist = _trip->shape ()->distance_of (_position);
             }
             else
             {
