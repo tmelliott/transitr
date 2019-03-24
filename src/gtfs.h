@@ -96,6 +96,7 @@ namespace Gtfs
         float nw_system_noise = 0.001;
         float nw_measurement_error = 50;
         bool save_timings = false;
+        int reset_method = 1;
         par () {}
         par (Rcpp::List parameters);
 
@@ -572,10 +573,14 @@ namespace Gtfs
             float _arrival_error = 5.0;
             float _departure_error = 5.0;
 
+            // reset method:
+            // 1 = reset state completely
+            // 2 = undo previous obs reweighting
+            int reset_method = 1;
+
             std::vector<Event> new_events;  /** these get sorted and moved to time_events */
             std::vector<Event> time_events;
             unsigned current_event_index = 0; // almost makes `Event.used` redundant
-
 
             bool _newtrip = true;
             bool _complete = false;
@@ -646,6 +651,8 @@ namespace Gtfs
             void predict_etas (RNG& rng);
             etavector get_etas ();
             void reset ();
+
+            void revert_state ();
 
             double distance ();
             double speed ();

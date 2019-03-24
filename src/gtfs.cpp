@@ -1824,6 +1824,7 @@ namespace Gtfs
         Rcpp::NumericVector signwx = parameters["nw_system_noise"];
         Rcpp::NumericVector signwy = parameters["nw_measurement_error"];
         Rcpp::LogicalVector tim = parameters["save_timings"];
+        Rcpp::IntegerVector resm = parameters["reset_method"];
 
         // set the parameters
         n_core = (int) nc[0];
@@ -1839,6 +1840,7 @@ namespace Gtfs
         nw_system_noise = (float) signwx[0];
         nw_measurement_error = (float) signwy[0];
         save_timings = (bool) tim[0];
+        reset_method = (int) resm[0];
     }
 
     void par::print ()
@@ -1910,6 +1912,7 @@ namespace Gtfs
         _arrival_error = params->arrival_error;
         _departure_error = params->departure_error;
         _N = params->n_particles;
+        reset_method = params->reset_method;
     }
 
     std::string& Vehicle::vehicle_id ()
@@ -2277,6 +2280,27 @@ namespace Gtfs
     {
         return &_state;
     };
+
+    void Vehicle::revert_state ()
+    {
+        switch(reset_method)
+        {
+            case 1:
+                {
+                    _skip_observation = true;
+                }
+            case 2:
+                {
+                    _state = _previous_state;
+                    // set timestamp to previous obs
+                    _timestamp = time_events.at (current_event_index).timestamp;
+                }
+            case 3:
+                {
+                    // reset just the weights
+                }
+        }
+    }
 
 
 

@@ -247,7 +247,7 @@ namespace Gtfs {
                             // 2. undo the entire state, and repredict state using newest obs
                             // 3. revert particle weights and recalculate based on this new observation
                             //    (this is probably the easiest, tbh)
-                            std::cout << "\n X - the state is conflooozed!!\n";
+                            this->revert_state ();
                         }
                         break;
                     }
@@ -283,7 +283,14 @@ namespace Gtfs {
 #endif
             }
 
-            mutate_to (e, rng);
+            if (!_skip_observation)
+            {
+                _previous_state = _state;
+                mutate_to (e, rng);
+            }
+            if (_skip_observation)
+                std::cout << "\n - skipping observation ...";
+            _skip_observation = false;
 
             // if the current iteration fails, start again from here
             if (bad_sample) initialize (e, rng);

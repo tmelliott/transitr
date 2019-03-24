@@ -41,6 +41,9 @@ test_that("Parameters are set with valid defaults", {
     expect_true(nw$parameters$nw_measurement_error > 0)
 
     expect_is(nw$parameters$save_timings, "logical")
+
+    expect_is(nw$parameters$reset_method, "integer")
+    expect_true(nw$parameters$reset_method > 0)
 })
 
 test_that("Parameters can be changed", {
@@ -57,7 +60,8 @@ test_that("Parameters can be changed", {
         departure_error = 12,
         nw_system_noise = 0.002,
         nw_measurement_error = 50,
-        save_timings = TRUE
+        save_timings = TRUE,
+        reset_method = 2L
     )
 
     expect_equal(
@@ -75,7 +79,8 @@ test_that("Parameters can be changed", {
             departure_error = 12,
             nw_system_noise = 0.002,
             nw_measurement_error = 50,
-            save_timings = TRUE
+            save_timings = TRUE,
+            reset_method = 2L
         )
     )
 })
