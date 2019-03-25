@@ -115,3 +115,13 @@ ggplot(vv2, aes(obs_longitude, obs_latitude)) +
     geom_point(aes(longitude_update, latitude_update), colour = "blue", size = 1) +
     facet_wrap(~trip_id)
 
+
+vv2 %>% group_by(timestamp) %>%
+    summarize(
+        n = n(),
+        dmin = min(delta),
+        dmax = max(delta)
+    ) %>% filter(n>1)
+
+ggplot(vv, aes(sum_llh)) + geom_histogram()
+ggplot(vv2, aes(sum_llh)) + geom_histogram()
