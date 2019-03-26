@@ -125,3 +125,61 @@ vv2 %>% group_by(timestamp) %>%
 
 ggplot(vv, aes(sum_llh)) + geom_histogram()
 ggplot(vv2, aes(sum_llh)) + geom_histogram()
+
+
+############## Just like the all of it
+source("scripts/common.R")
+
+results_skip <- 
+    list.files(
+        "simulations/sim000/history",
+        pattern = "vehicle_[A-Z0-9]*.csv", 
+        full.names = TRUE
+    ) %>%
+    lapply(
+        read_csv,
+        col_types = cols(
+            vehicle_id = col_character(),
+            event_timestamp = col_integer(),
+            vehicle_timestamp = col_integer()
+        )
+    ) %>%
+    bind_rows() %>%
+    mutate(
+        event_timestamp = as.POSIXct(event_timestamp, origin = "1970-01-01"),
+        vehicle_timestamp = as.POSIXct(vehicle_timestamp, origin = "1970-01-01")
+    )
+
+results_revert <- 
+    list.files(
+        "simulations/sim001/history",
+        pattern = "vehicle_[A-Z0-9]*.csv", 
+        full.names = TRUE
+    ) %>%
+    lapply(
+        read_csv,
+        col_types = cols(
+            vehicle_id = col_character(),
+            event_timestamp = col_integer(),
+            vehicle_timestamp = col_integer()
+        )
+    ) %>%
+    bind_rows() %>%
+    mutate(
+        event_timestamp = as.POSIXct(event_timestamp, origin = "1970-01-01"),
+        vehicle_timestamp = as.POSIXct(vehicle_timestamp, origin = "1970-01-01")
+    )
+
+mean(results_skip$state_type == "initialize")
+mean(results_revert$state_type == "initialize")
+
+sum(results_skip$action == "skip", na.rm = TRUE)
+sum(results_revert$action == "revert_state", na.rm = TRUE)
+
+sum(results_skip$action == "resample", na.rm = TRUE) / nrow(results_skip)
+sum(results_revert$action == "resample", na.rm = TRUE) / nrow(results_revert)
+
+results_skip %>% filter(state_type == "update" & event_type == "gps") %>%
+    ggplot(aes(sum_llh)) + geom_histogram()
+results_revert %>% filter(state_type == "update" & event_type == "gps") %>%
+    ggplot(aes(sum_llh)) + geom_histogram()

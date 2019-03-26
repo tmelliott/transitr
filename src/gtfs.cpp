@@ -1913,6 +1913,11 @@ namespace Gtfs
         _departure_error = params->departure_error;
         _N = params->n_particles;
         reset_method = params->reset_method;
+#if SIMULATION
+        std::ostringstream x;
+        x << "history/vehicle_" << _vehicle_id << ".csv";
+        store_name = x.str ();
+#endif
     }
 
     std::string& Vehicle::vehicle_id ()
@@ -2288,18 +2293,32 @@ namespace Gtfs
             case 1:
                 {
                     _skip_observation = true;
+                    action = "skip";
+                    this->store_state ("revert");
+                    break;
                 }
             case 2:
                 {
+                    action = "revert_state";
+                    this->store_state ("revert");
                     _state = _previous_state;
                     // set timestamp to previous obs
-                    _timestamp = time_events.at (current_event_index).timestamp;
+                    if (current_event_index > 0)
+                        _timestamp = time_events.at (current_event_index - 1).timestamp;
+                    else
+                        _timestamp = 0;
+                    this->store_state("reverted");
+                    bad_sample = false;
+                    break;
                 }
             case 3:
                 {
                     // reset just the weights
+                    break;
                 }
         }
+
+        // recalculate Neff, etc
     }
 
 

@@ -5,6 +5,7 @@
 #include <memory>
 #include <unordered_map>
 #include <ctime>
+#include <fstream>
 #include <mutex>
 
 #include "eigen3/Eigen/Dense"
@@ -600,6 +601,7 @@ namespace Gtfs
             bool bad_sample;
             bool resample;
             int resample_count = 0;
+            std::string action = "";
 
             std::vector<unsigned int> _segment_travel_times; // segment travel times
             std::vector<uint64_t> _stop_arrival_times;       // stop arrival times
@@ -675,6 +677,13 @@ namespace Gtfs
             int current_stop ();
 
             Time& trip_start_time (); // the time the trip started (using schedule)
+
+#if SIMULATION
+            std::ofstream f;
+            std::string store_name = "";
+            bool store_created = false;
+            void store_state (std::string type);
+#endif
     };
 
     class Particle {

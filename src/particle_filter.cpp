@@ -15,6 +15,8 @@ namespace Gtfs {
         initialize (rng);
         _timestamp = e.timestamp;
         _delta = 0;
+        _position = e.position;
+        _Neff = _N;
 
         // initialize based on the event
         double dmax, dist;
@@ -69,37 +71,7 @@ namespace Gtfs {
         for (auto p = _state.begin (); p != _state.end (); ++p) p->set_weight (initwt);
 
 #if SIMULATION
-        {
-            double dbar = 0.0, vbar = 0.0;
-            for (auto& p : _state)
-            {
-                dbar += p.get_weight () * p.get_distance ();
-                vbar += p.get_weight () * p.get_speed ();
-            }
-
-            latlng px = _trip->shape ()->coordinates_of (dbar);
-
-            std::ostringstream fname;
-            fname << "history/v" << _vehicle_id << "_mutate.csv";
-            std::ofstream fout;
-            fout.open (fname.str ().c_str (), std::ofstream::app);
-            fout << _timestamp
-                << "," << _trip->trip_id ()
-                << "," << "initialize"
-                << "," << (e.type == EventType::gps ? std::to_string (e.position.latitude) : "")
-                << "," << (e.type == EventType::gps ? std::to_string (e.position.longitude) : "")
-                << "," << (e.type == EventType::gps ? "" : std::to_string (e.stop_index))
-                << "," << dist_to_route
-                << "," << _delta
-                << "," << dbar
-                << "," << vbar
-                << "," << (e.type == EventType::gps ? std::to_string (px.latitude) : "")
-                << "," << (e.type == EventType::gps ? std::to_string (px.longitude) : "")
-                << "," << (e.type == EventType::gps ? std::to_string (distanceEarth (px, _position)) : "")
-                << "," << "" // no likelihood
-                << "\n";
-            fout.close ();
-        }
+        this->store_state ("initialize");
 #endif
 
     }
@@ -289,7 +261,9 @@ namespace Gtfs {
                 mutate_to (e, rng);
             }
             if (_skip_observation)
+            {
                 std::cout << "\n - skipping observation ...";
+            }
             _skip_observation = false;
 
             // if the current iteration fails, start again from here
@@ -500,35 +474,14 @@ namespace Gtfs {
 
         if (all_complete) _complete = true;
 
-        _Neff = 0;
+        // _Neff = 0;
         double sumlh = std::accumulate (_state.begin (), _state.end (), 0.0,
                                         [](double a, Particle& p) {
                                             return a + p.get_weight () * exp (p.get_ll ());
                                         });
 
 #if SIMULATION
-        {
-            std::ostringstream fname;
-            fname << "history/v" << _vehicle_id << "_mutate.csv";
-            std::ofstream fout;
-            fout.open (fname.str ().c_str (), std::ofstream::app);
-            fout << _timestamp
-                << "," << _trip->trip_id ()
-                << "," << e.type_name ()
-                << "," << (e.type == EventType::gps ? std::to_string (e.position.latitude) : "")
-                << "," << (e.type == EventType::gps ? std::to_string (e.position.longitude) : "")
-                << "," << (e.type == EventType::gps ? "" : std::to_string (e.stop_index))
-                << "," << dist_to_route
-                << "," << _delta
-                << "," << dbar2
-                << "," << vbar2
-                << "," << (e.type == EventType::gps ? std::to_string (px.latitude) : "")
-                << "," << (e.type == EventType::gps ? std::to_string (px.longitude) : "")
-                << "," << (e.type == EventType::gps ? std::to_string (distanceEarth (px, _position)) : "")
-                << "," << sumlh
-                << "\n";
-            fout.close ();
-        }
+        this->store_state ("mutate");
 #endif
 
 #if VERBOSE > 0
@@ -541,7 +494,7 @@ namespace Gtfs {
             {
                 // we effectively want to ignore that observation
                 bad_sample = false;
-                n_bad++;   
+                n_bad++;
             }
             return;
         }
@@ -623,25 +576,9 @@ namespace Gtfs {
         std::cout << "\n   -> Neff = " << _Neff;
 #endif
 
+        if (_Neff < (_N / 4)) action = "resample";
 #if SIMULATION
-        {
-            std::ostringstream fname;
-            fname << "history/v" << _vehicle_id << "_update.csv";
-            std::ofstream fout;
-            fout.open (fname.str ().c_str (), std::ofstream::app);
-            fout << _timestamp
-                << "," << _trip->trip_id ()
-                << "," << e.type_name ()
-                << "," << dbar
-                << "," << vbar
-                << "," << (e.type == EventType::gps ? std::to_string (px.latitude) : "")
-                << "," << (e.type == EventType::gps ? std::to_string (px.longitude) : "")
-                << "," << (e.type == EventType::gps ? std::to_string (distanceEarth (px, _position)) : "")
-                << "," << _Neff
-                << "," << (_Neff >= (_N / 4) ? 0 : 1)
-                << "\n";
-            fout.close ();
-        }
+        this->store_state ("update");
 #endif
 
 
