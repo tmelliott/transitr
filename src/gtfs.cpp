@@ -1813,6 +1813,7 @@ namespace Gtfs
         // fetch the parameters
         Rcpp::IntegerVector nc = parameters["n_core"];
         Rcpp::IntegerVector np = parameters["n_particles"];
+        Rcpp::IntegerVector noisem = parameters["noise_model"];
         Rcpp::NumericVector sigx = parameters["system_noise"];
         Rcpp::NumericVector prstop = parameters["pr_stop"];
         Rcpp::NumericVector dwell = parameters["dwell_time"];
@@ -1829,6 +1830,7 @@ namespace Gtfs
         // set the parameters
         n_core = (int) nc[0];
         n_particles = (int) np[0];
+        noise_model = (int) noisem[0];
         system_noise = (float) sigx[0];
         pr_stop = (float) prstop[0];
         dwell_time = (float) dwell[0];

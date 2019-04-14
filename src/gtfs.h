@@ -86,6 +86,7 @@ namespace Gtfs
     {
         int n_core = 1;
         int n_particles = 1000;
+        int noise_model = 0; // [0=once per iteration/segment/stop; 1=each second]
         float system_noise = 5;  // std. dev. of speed variance/second
         float pr_stop = 0.5;
         float dwell_time = 20.0;
