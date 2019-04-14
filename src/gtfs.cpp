@@ -1905,17 +1905,17 @@ namespace Gtfs
     _vehicle_id (id)
     {
         // set the parameters here
-        params = pars;
-        _gpserror = params->gps_error;
-        _systemnoise = params->system_noise;
-        _prstop = params->pr_stop;
-        _dwelltime = params->dwell_time;
-        _dwelltimevar = params->dwell_time_var;
-        _gamma = params->gamma;
-        _arrival_error = params->arrival_error;
-        _departure_error = params->departure_error;
-        _N = params->n_particles;
-        reset_method = params->reset_method;
+        _params = pars;
+        _gpserror = _params->gps_error;
+        _systemnoise = _params->system_noise;
+        _prstop = _params->pr_stop;
+        _dwelltime = _params->dwell_time;
+        _dwelltimevar = _params->dwell_time_var;
+        _gamma = _params->gamma;
+        _arrival_error = _params->arrival_error;
+        _departure_error = _params->departure_error;
+        _N = _params->n_particles;
+        reset_method = _params->reset_method;
 #if SIMULATION
         std::ostringstream x;
         x << "history/vehicle_" << _vehicle_id << ".csv";

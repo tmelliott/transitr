@@ -780,7 +780,14 @@ namespace Gtfs {
         // }
         double vmax = 30; //rng.runif () < 0.5 ? 30.0 : 15.0;
         
-        // if ()
+        if (vehicle->params ()->noise_model == 0)
+        {
+            // add noise once per iteration, 
+            // or when passing segment/stop
+            double vel = speed + rng.rnorm () * vehicle->system_noise ();
+            while (vel <= 0 || vel > 30) vel = speed + rng.rnorm () * vehicle->system_noise ();
+            speed = vel;
+        }
 
         // while (distance < Dmax && delta > 0.0)
         while (behind_event (e, delta))
@@ -819,6 +826,7 @@ namespace Gtfs {
             //     speed = v;
             // }
 
+            if (vehicle->params ()->noise_model == 1)
             {
                 double vel = speed + rng.rnorm () * vehicle->system_noise ();
                 while (vel <= 0 || vel > 30) vel = speed + rng.rnorm () * vehicle->system_noise ();
@@ -849,9 +857,15 @@ namespace Gtfs {
                 // }
                 // else
                 // {
-                    speed_mean = 10.0;
-                    speed_sd = 100.0;
+                    // speed_mean = 10.0;
+                    // speed_sd = 100.0;
                 // }
+                if (vehicle->params ()->noise_model == 0)
+                {
+                    double vel = speed + rng.rnorm () * vehicle->system_noise ();
+                    while (vel <= 0 || vel > 30) vel = speed + rng.rnorm () * 3.0;//vehicle->system_noise ();
+                    speed = vel;
+                }
             }
 
             if (distance >= next_stop_d)
@@ -869,6 +883,12 @@ namespace Gtfs {
                 // else update next stop and delta
                 next_stop_d = stops->at (stop_index + 1).distance;
                 delta -= (int)(dt.at (stop_index) - at.at (stop_index));
+                if (vehicle->params ()->noise_model == 0)
+                {
+                    double vel = speed + rng.rnorm () * vehicle->system_noise ();
+                    while (vel <= 0 || vel > 30) vel = speed + rng.rnorm () * 3.0;//vehicle->system_noise ();
+                    speed = vel;
+                }
                 continue;
             }
         }

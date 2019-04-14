@@ -183,3 +183,53 @@ results_skip %>% filter(state_type == "update" & event_type == "gps") %>%
     ggplot(aes(sum_llh)) + geom_histogram()
 results_revert %>% filter(state_type == "update" & event_type == "gps") %>%
     ggplot(aes(sum_llh)) + geom_histogram()
+
+
+## noise models
+
+sims <- c("sim3340", "sim3341")
+
+results <- lapply(sims,
+    function(sim) {
+        results_skip <- 
+            list.files(
+                sprintf("simulations/%s/history", sim),
+                pattern = "vehicle_[A-Z0-9]*.csv", 
+                full.names = TRUE
+            ) %>%
+            lapply(
+                read_csv,
+                col_types = cols(
+                    vehicle_id = col_character(),
+                    event_timestamp = col_integer(),
+                    vehicle_timestamp = col_integer()
+                )
+            ) %>%
+            bind_rows() %>%
+            mutate(
+                event_timestamp = as.POSIXct(event_timestamp, 
+                    origin = "1970-01-01"),
+                vehicle_timestamp = as.POSIXct(vehicle_timestamp, 
+                    origin = "1970-01-01"),
+                sim = sim
+            )
+    }
+) %>% bind_rows
+
+results <- results %>%
+    mutate(action = fct_explicit_na(action, 'none'))
+
+ggplot(results, aes(event_timestamp, sum_llh)) +
+    geom_point() +
+    facet_wrap(~sim, ncol = 1)
+
+ggplot(results %>% 
+        filter(vehicle_position_error < 100 &
+            state_type %in% c('initialize', 'mutate', 'update')), 
+    aes(event_timestamp, vehicle_position_error)) +
+    geom_point(aes(colour = state_type)) +
+    facet_wrap(~sim, ncol = 1)
+
+iNZightPlots::iNZightPlot(state_type, sim, data = results,
+    inference.type = "conf")
+

@@ -566,7 +566,7 @@ namespace Gtfs
             uint64_t _timestamp = 0;
             unsigned _delta;
 
-            par* params;
+            par* _params;
 
             float _gpserror;
             float _systemnoise;
@@ -626,6 +626,8 @@ namespace Gtfs
             latlng& position ();
             uint64_t timestamp ();
             unsigned delta ();
+
+            par* params () { return _params; }
 
             int get_n () const { return _N; };
 
