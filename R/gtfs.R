@@ -79,7 +79,8 @@ load_gtfs <- function(db, output = "predictions.pb") {
                 nw_system_noise = 0.001,
                 nw_measurement_error = 50,
                 # other ...
-                save_timings = FALSE
+                save_timings = FALSE,
+                reset_method = 1L
             )
         ),
         class = "trgtfs"

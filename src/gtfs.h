@@ -5,6 +5,7 @@
 #include <memory>
 #include <unordered_map>
 #include <ctime>
+#include <fstream>
 #include <mutex>
 
 #include "eigen3/Eigen/Dense"
@@ -96,6 +97,7 @@ namespace Gtfs
         float nw_system_noise = 0.001;
         float nw_measurement_error = 50;
         bool save_timings = false;
+        int reset_method = 1;
         par () {}
         par (Rcpp::List parameters);
 
@@ -572,10 +574,14 @@ namespace Gtfs
             float _arrival_error = 5.0;
             float _departure_error = 5.0;
 
+            // reset method:
+            // 1 = reset state completely
+            // 2 = undo previous obs reweighting
+            int reset_method = 1;
+
             std::vector<Event> new_events;  /** these get sorted and moved to time_events */
             std::vector<Event> time_events;
             unsigned current_event_index = 0; // almost makes `Event.used` redundant
-
 
             bool _newtrip = true;
             bool _complete = false;
@@ -595,6 +601,7 @@ namespace Gtfs
             bool bad_sample;
             bool resample;
             int resample_count = 0;
+            std::string action = "";
 
             std::vector<unsigned int> _segment_travel_times; // segment travel times
             std::vector<uint64_t> _stop_arrival_times;       // stop arrival times
@@ -647,6 +654,8 @@ namespace Gtfs
             etavector get_etas ();
             void reset ();
 
+            void revert_state ();
+
             double distance ();
             double speed ();
             int progress ();
@@ -668,6 +677,13 @@ namespace Gtfs
             int current_stop ();
 
             Time& trip_start_time (); // the time the trip started (using schedule)
+
+#if SIMULATION
+            std::ofstream f;
+            std::string store_name = "";
+            bool store_created = false;
+            void store_state (std::string type);
+#endif
     };
 
     class Particle {

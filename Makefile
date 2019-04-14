@@ -16,8 +16,9 @@ check:
 document:
 	R -e "devtools::document()"
 
+FILTER ?= ".+"
 test:
-	R -e "devtools::load_all(); devtools::test()"
+	R -e "devtools::load_all(); devtools::test(filter=\"${FILTER}\")"
 
 clean:
 	./cleanup
