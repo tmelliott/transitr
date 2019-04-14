@@ -175,9 +175,14 @@ void run_realtime_model (List nw)
         {
             for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
             {
-// #if VERBOSE > 1
-//                 if (v->second.trip ()->route ()->route_short_name () != "928") continue;
-// #endif
+#if SIMULATION
+                auto rsn = v->second.trip ()->route ()->route_short_name ();
+                if (rsn != "27W" && rsn != "27H" && rsn != "27T" &&
+                    rsn != "24B" && rsn != "24W" && rsn != "24R" &&
+                    rsn != "982" && rsn != "983" &&
+                    rsn != "NX1" && rsn != "NX2")
+                    continue;
+#endif
                 v->second.mutate (rngs.at (omp_get_thread_num ()), &gtfs);
             }
         }
