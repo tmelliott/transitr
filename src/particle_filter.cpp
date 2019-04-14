@@ -210,7 +210,7 @@ namespace Gtfs {
                         // estimated distance, do something about that 
                         auto pos = latlng (e.position.latitude, e.position.longitude);
                         auto est_dist = _trip->shape ()->distance_of (pos);
-                        std::cout << "\n-> from " << estimated_dist << " to " << est_dist;
+                        // std::cout << "\n-> from " << estimated_dist << " to " << est_dist;
                         if (est_dist - estimated_dist < -5.0)
                         {
                             // looks like we've gone backwards ... 
