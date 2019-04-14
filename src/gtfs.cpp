@@ -2294,20 +2294,26 @@ namespace Gtfs
                 {
                     _skip_observation = true;
                     action = "skip";
+#if SIMULATION
                     this->store_state ("revert");
+#endif
                     break;
                 }
             case 2:
                 {
                     action = "revert_state";
+#if SIMULATION
                     this->store_state ("revert");
+#endif
                     _state = _previous_state;
                     // set timestamp to previous obs
                     if (current_event_index > 0)
                         _timestamp = time_events.at (current_event_index - 1).timestamp;
                     else
                         _timestamp = 0;
+#if SIMULATION
                     this->store_state("reverted");
+#endif
                     bad_sample = false;
                     break;
                 }
