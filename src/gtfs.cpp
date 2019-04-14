@@ -1899,10 +1899,11 @@ namespace Gtfs
     }
 
     /***************************************************** Vehicle */
-    Vehicle::Vehicle (std::string& id, par* params) : 
+    Vehicle::Vehicle (std::string& id, par* pars) : 
     _vehicle_id (id)
     {
         // set the parameters here
+        params = pars;
         _gpserror = params->gps_error;
         _systemnoise = params->system_noise;
         _prstop = params->pr_stop;

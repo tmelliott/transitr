@@ -779,6 +779,8 @@ namespace Gtfs {
         //     speed_sd = pow(speed_sd, 0.5);
         // }
         double vmax = 30; //rng.runif () < 0.5 ? 30.0 : 15.0;
+        
+        // if ()
 
         // while (distance < Dmax && delta > 0.0)
         while (behind_event (e, delta))

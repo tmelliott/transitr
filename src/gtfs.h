@@ -564,6 +564,9 @@ namespace Gtfs
             int _stop_index;
             uint64_t _timestamp = 0;
             unsigned _delta;
+
+            par* params;
+
             float _gpserror;
             float _systemnoise;
             float _prstop;
@@ -615,7 +618,7 @@ namespace Gtfs
 
 
         public:
-            Vehicle (std::string& id, par* params);
+            Vehicle (std::string& id, par* pars);
 
             std::string& vehicle_id ();
             Trip* trip ();
