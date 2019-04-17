@@ -215,9 +215,7 @@ results <- pbapply::pblapply(sims,
                 sim = sim
             )
     }
-) %>% bind_rows
-
-results <- results %>%
+) %>% bind_rows %>%
     mutate(
         event_type = as.factor(event_type),
         action = fct_explicit_na(action, 'none'),
