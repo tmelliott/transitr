@@ -188,8 +188,9 @@ results_revert %>% filter(state_type == "update" & event_type == "gps") %>%
 ## noise models
 
 sims <- c("sim3340", "sim3341")
+sims <- list.files("simulations", pattern = "sim_")
 
-results <- lapply(sims,
+results <- pbapply::pblapply(sims,
     function(sim) {
         results_skip <- 
             list.files(
@@ -217,7 +218,11 @@ results <- lapply(sims,
 ) %>% bind_rows
 
 results <- results %>%
-    mutate(action = fct_explicit_na(action, 'none'))
+    mutate(
+        event_type = as.factor(event_type),
+        action = fct_explicit_na(action, 'none'),
+        sim = as.factor(sim)
+    )
 
 ggplot(results, aes(event_timestamp, sum_llh)) +
     geom_point() +
@@ -233,3 +238,10 @@ ggplot(results %>%
 iNZightPlots::iNZightPlot(state_type, sim, data = results,
     inference.type = "conf")
 
+iNZightPlots::iNZightPlot(action, sim, data = results)
+
+iNZightPlots::iNZightPlot(Neff, sim, data = results)
+
+
+## at the end of the day, its which method is better at
+#  estimating travel time that wins
