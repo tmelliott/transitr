@@ -1,7 +1,7 @@
 config <- list(
     n_core = 4,
     n_particles = 2000,
-    noise_model = 2,
+    noise_model = 1,
     system_noise = c(0.6, 0.7, 0.8, 0.9),
     pr_stop = 0.1,
     dwell_time = 6.0,
@@ -18,7 +18,7 @@ grid <- do.call(expand.grid, config)
 
 for (i in 1:nrow(grid)) {
     conf <- grid[i, , drop = TRUE]
-    dirname <- glue::glue("sim_3341-{conf$system_noise}")
+    dirname <- glue::glue("sim_334{conf$noise_model}-{conf$system_noise}")
     if (!dir.exists(dirname))
         dir.create(dirname)
     if (!file.exists(file.path(dirname, "config.json")))
