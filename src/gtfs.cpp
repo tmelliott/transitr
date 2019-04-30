@@ -7,7 +7,7 @@
 
 #include "timing.h"
 
-namespace Gtfs 
+namespace Gtfs
 {
 
     /***************************************************** GTFS */
@@ -26,7 +26,7 @@ namespace Gtfs
             close_connection ();
             return;
         }
-        
+
         sqlite3_stmt* stmt;
         std::string qry;
         const char* qrystr;
@@ -117,7 +117,7 @@ namespace Gtfs
             _trips.reserve (sqlite3_column_int (stmt, 0));
             sqlite3_finalize (stmt);
 
-            // ONLY trips running today 
+            // ONLY trips running today
             qry = "SELECT trip_id FROM trips";
             qrystr = qry.c_str ();
             if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
@@ -320,10 +320,10 @@ namespace Gtfs
             std::cout << " + Created " << _calendar.size () << " services\n";
         }
 
-        close_connection ();    
+        close_connection ();
     }
 
-    std::string& Gtfs::dbname () 
+    std::string& Gtfs::dbname ()
     {
         return _dbname;
     }
@@ -336,7 +336,7 @@ namespace Gtfs
         {
             return _connection;
         }
-        
+
         int maxTries = 100;
         while (maxTries > 0)
         {
@@ -491,13 +491,13 @@ namespace Gtfs
 
     bool Gtfs::no_trips_remaining ()
     {
-        // no easy way to do this =/ 
+        // no easy way to do this =/
         return false;
     }
 
 
     /***************************************************** Agency */
-    Agency::Agency (std::string& id, Gtfs* gtfs) : 
+    Agency::Agency (std::string& id, Gtfs* gtfs) :
         gtfs (gtfs), _agency_id (id)
     {
         // Rcpp::Rcout << " + Create Agency " << _agency_id << "\n";
@@ -518,7 +518,7 @@ namespace Gtfs
 
         sqlite3_stmt* stmt;
         std::string qry = "SELECT agency_name, agency_url, agency_phone, agency_timezone, agency_lang FROM agency WHERE agency_id=?";
-        const char* qrystr = qry.c_str ();    
+        const char* qrystr = qry.c_str ();
         if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
@@ -534,7 +534,7 @@ namespace Gtfs
                 << sqlite3_errmsg (db) << "\n";
             sqlite3_finalize (stmt);
             gtfs->close_connection ();
-            return; 
+            return;
         }
         if (sqlite3_step (stmt) != SQLITE_ROW)
         {
@@ -572,33 +572,33 @@ namespace Gtfs
         Rcpp::Rcout << " + Agency " << _agency_id << " is unloaded\n";
     }
 
-    std::string& Agency::agency_id () { 
-        return _agency_id; 
+    std::string& Agency::agency_id () {
+        return _agency_id;
     }
-    std::string& Agency::agency_name () { 
+    std::string& Agency::agency_name () {
         if (!loaded) load();
-        return _agency_name; 
+        return _agency_name;
     }
-    std::string& Agency::agency_url () { 
+    std::string& Agency::agency_url () {
         if (!loaded) load();
-        return _agency_url; 
+        return _agency_url;
     }
-    std::string& Agency::agency_phone () { 
+    std::string& Agency::agency_phone () {
         if (!loaded) load();
-        return _agency_phone; 
+        return _agency_phone;
     }
-    std::string& Agency::agency_timezone () { 
+    std::string& Agency::agency_timezone () {
         if (!loaded) load();
-        return _agency_timezone; 
+        return _agency_timezone;
     }
-    std::string& Agency::agency_lang () { 
+    std::string& Agency::agency_lang () {
         if (!loaded) load();
-        return _agency_lang; 
+        return _agency_lang;
     }
 
 
     /***************************************************** Route */
-    Route::Route (std::string& id, Gtfs* gtfs) : 
+    Route::Route (std::string& id, Gtfs* gtfs) :
         gtfs (gtfs), _route_id (id)
     {
         // Rcpp::Rcout << " + Create Route " << _route_id << "\n";
@@ -635,7 +635,7 @@ namespace Gtfs
                 << sqlite3_errmsg (db) << "\n";
             sqlite3_finalize (stmt);
             gtfs->close_connection ();
-            return; 
+            return;
         }
         if (sqlite3_step (stmt) != SQLITE_ROW)
         {
@@ -673,33 +673,33 @@ namespace Gtfs
         Rcpp::Rcout << " + Route " << _route_id << " is unloaded\n";
     }
 
-    std::string& Route::route_id () { 
-        return _route_id; 
+    std::string& Route::route_id () {
+        return _route_id;
     }
-    std::string& Route::route_short_name () { 
+    std::string& Route::route_short_name () {
         if (!loaded) load();
-        return _route_short_name; 
+        return _route_short_name;
     }
-    std::string& Route::route_long_name () { 
+    std::string& Route::route_long_name () {
         if (!loaded) load();
-        return _route_long_name; 
+        return _route_long_name;
     }
-    unsigned short int Route::route_type () { 
+    unsigned short int Route::route_type () {
         if (!loaded) load();
-        return _route_type; 
+        return _route_type;
     }
-    Agency* Route::agency () { 
+    Agency* Route::agency () {
         if (!loaded) load();
-        return _agency; 
+        return _agency;
     }
-    float Route::version () { 
+    float Route::version () {
         if (!loaded) load();
-        return _version; 
+        return _version;
     }
 
 
     /***************************************************** Trip */
-    Trip::Trip (std::string& id, Gtfs* gtfs) : 
+    Trip::Trip (std::string& id, Gtfs* gtfs) :
         gtfs (gtfs), _trip_id (id)
     {
     }
@@ -735,7 +735,7 @@ namespace Gtfs
                 << sqlite3_errmsg (db) << "\n";
             sqlite3_finalize (stmt);
             gtfs->close_connection ();
-            return; 
+            return;
         }
         if (sqlite3_step (stmt) != SQLITE_ROW)
         {
@@ -769,7 +769,7 @@ namespace Gtfs
         sqlite3_finalize (stmt);
 
         // Load stops
-        { 
+        {
             sqlite3_stmt* stmt;
             const char* qrystr;
 
@@ -789,7 +789,7 @@ namespace Gtfs
                     << sqlite3_errmsg (db) << "\n";
                 sqlite3_finalize (stmt);
                 gtfs->close_connection ();
-                return; 
+                return;
             }
             if (sqlite3_step (stmt) != SQLITE_ROW)
             {
@@ -818,9 +818,9 @@ namespace Gtfs
                     << sqlite3_errmsg (db) << "\n";
                 sqlite3_finalize (stmt);
                 gtfs->close_connection ();
-                return; 
+                return;
             }
-            
+
             while (sqlite3_step (stmt) == SQLITE_ROW)
             {
                 std::string stopid = (char*)sqlite3_column_text (stmt, 0);
@@ -838,7 +838,7 @@ namespace Gtfs
                                      gtfs);
             }
             _version = (float)sqlite3_column_double (stmt, 3);
-            
+
             sqlite3_finalize (stmt);
         }
 
@@ -857,7 +857,7 @@ namespace Gtfs
         _start_time = _stops.at (0).departure_time;
         _arrival_times.resize (_stops.size (), 0);
         _departure_times.resize (_stops.size (), 0);
-        
+
         loaded = true;
     }
 
@@ -867,7 +867,7 @@ namespace Gtfs
     {
         if (!loaded) return;
         std::lock_guard<std::mutex> lk (load_mutex);
-        
+
         completed = complete;
         loaded = false;
         _route = nullptr;
@@ -897,7 +897,7 @@ namespace Gtfs
          */
         if (_vehicle != nullptr) return true;
 
-        /** 
+        /**
          * ... or if it is 30 mins before scheduled start
          * and less than an hour since scheduled end.
          */
@@ -918,41 +918,41 @@ namespace Gtfs
         return loaded && !completed;
     }
 
-    std::string& Trip::trip_id () { 
-        return _trip_id; 
+    std::string& Trip::trip_id () {
+        return _trip_id;
     }
-    Route* Trip::route () { 
+    Route* Trip::route () {
         if (!loaded) load ();
-        return _route; 
+        return _route;
     }
-    Shape* Trip::shape () { 
+    Shape* Trip::shape () {
         if (!loaded) load ();
-        return _shape; 
+        return _shape;
     }
-    Calendar* Trip::calendar () { 
+    Calendar* Trip::calendar () {
         if (!loaded) load ();
-        return _calendar; 
+        return _calendar;
     }
     std::vector<StopTime>& Trip::stops ()
     {
         if (!loaded) load ();
         return _stops;
     }
-    std::string& Trip::block_id () { 
+    std::string& Trip::block_id () {
         if (!loaded) load ();
-        return _block_id; 
+        return _block_id;
     }
-    bool Trip::direction_id () { 
+    bool Trip::direction_id () {
         if (!loaded) load ();
-        return _direction_id; 
+        return _direction_id;
     }
-    std::string& Trip::trip_headsign () { 
+    std::string& Trip::trip_headsign () {
         if (!loaded) load ();
-        return _trip_headsign; 
+        return _trip_headsign;
     }
-    float Trip::version () { 
+    float Trip::version () {
         if (!loaded) load ();
-        return _version; 
+        return _version;
     }
 
     void Trip::set_arrival_time (int m, uint64_t t)
@@ -988,8 +988,8 @@ namespace Gtfs
 
     }
     StopTime::StopTime (std::string& stop_id, std::string& trip_id,
-                        std::string& at, std::string& dt, 
-                        std::string& headsign, 
+                        std::string& at, std::string& dt,
+                        std::string& headsign,
                         int pickup, int dropoff, double dist,
                         Gtfs* gtfs)
     {
@@ -1015,9 +1015,9 @@ namespace Gtfs
     /***************************************************** ShapeSegment */
     ShapeSegment::ShapeSegment ()
     {
-        
+
     }
-    ShapeSegment::ShapeSegment (Segment* s, double d) 
+    ShapeSegment::ShapeSegment (Segment* s, double d)
     {
         segment = s;
         distance = d;
@@ -1025,7 +1025,7 @@ namespace Gtfs
 
 
     /***************************************************** Shape */
-    Shape::Shape (std::string& id, Gtfs* gtfs) : 
+    Shape::Shape (std::string& id, Gtfs* gtfs) :
         gtfs (gtfs), _shape_id (id) {}
 
     void Shape::load ()
@@ -1061,7 +1061,7 @@ namespace Gtfs
                 << sqlite3_errmsg (db) << "\n";
             sqlite3_finalize (stmt);
             gtfs->close_connection ();
-            return; 
+            return;
         }
         if (sqlite3_step (stmt) != SQLITE_ROW)
         {
@@ -1090,9 +1090,9 @@ namespace Gtfs
                 << sqlite3_errmsg (db) << "\n";
             sqlite3_finalize (stmt);
             gtfs->close_connection ();
-            return; 
+            return;
         }
-        
+
         double d = 0.0;
         latlng px;
         while (sqlite3_step (stmt) == SQLITE_ROW)
@@ -1107,7 +1107,7 @@ namespace Gtfs
         }
         _version = (float)sqlite3_column_double (stmt, 3);
 
-        // and then load the shape segments 
+        // and then load the shape segments
         qry = "SELECT count(shape_id) FROM shape_segments WHERE shape_id=?";
         qrystr = qry.c_str ();
         if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
@@ -1124,7 +1124,7 @@ namespace Gtfs
                 << sqlite3_errmsg (db) << "\n";
             sqlite3_finalize (stmt);
             gtfs->close_connection ();
-            return; 
+            return;
         }
         if (sqlite3_step (stmt) != SQLITE_ROW)
         {
@@ -1153,7 +1153,7 @@ namespace Gtfs
                 << sqlite3_errmsg (db) << "\n";
             sqlite3_finalize (stmt);
             gtfs->close_connection ();
-            return; 
+            return;
         }
 
         Segment* segi;
@@ -1182,8 +1182,8 @@ namespace Gtfs
         std::cout << " + Shape " << _shape_id << " is unloaded\n";
     }
 
-    std::string& Shape::shape_id () { 
-        return _shape_id; 
+    std::string& Shape::shape_id () {
+        return _shape_id;
     }
 
     std::vector<ShapePt>& Shape::path ()
@@ -1198,9 +1198,9 @@ namespace Gtfs
         return _segments;
     }
 
-    float Shape::version () { 
+    float Shape::version () {
         if (!loaded) load ();
-        return _version; 
+        return _version;
     }
 
     double Shape::distance_of (latlng& x)
@@ -1211,14 +1211,14 @@ namespace Gtfs
         double di;
         for (unsigned int i=0; i<_path.size (); ++i)
         {
-            di = distanceEarth (_path[i].pt, x); 
+            di = distanceEarth (_path[i].pt, x);
             if (di < dmin)
             {
                 dmin = di;
                 closest = i;
             }
         }
-        
+
         if (dmin < 0.0001)
         {
             return _path[closest].distance;
@@ -1240,7 +1240,7 @@ namespace Gtfs
 
         if (forward)
         {
-            return _path[closest].distance + 
+            return _path[closest].distance +
                 alongTrackDistance(x, _path[closest].pt, _path[closest+1].pt);
         }
         else
@@ -1281,12 +1281,12 @@ namespace Gtfs
         // distance difference
         double b = bearing (_path[i].pt, _path[i+1].pt);
 
-        return destinationPoint (_path[i].pt, b, dd);       
+        return destinationPoint (_path[i].pt, b, dd);
     }
 
 
     /***************************************************** Segment */
-    Segment::Segment (int id, Gtfs* gtfs) : 
+    Segment::Segment (int id, Gtfs* gtfs) :
         gtfs (gtfs), _segment_id (id) {}
 
     void Segment::load ()
@@ -1321,7 +1321,7 @@ namespace Gtfs
                 << sqlite3_errmsg (db) << "\n";
             sqlite3_finalize (stmt);
             gtfs->close_connection ();
-            return; 
+            return;
         }
         if (sqlite3_step (stmt) != SQLITE_ROW)
         {
@@ -1357,7 +1357,7 @@ namespace Gtfs
     }
 
     int Segment::segment_id () {
-        return _segment_id; 
+        return _segment_id;
     }
 
     Intersection* Segment::from ()
@@ -1421,7 +1421,7 @@ namespace Gtfs
 
 
     /***************************************************** Intersection */
-    Intersection::Intersection (int id, Gtfs* gtfs) : 
+    Intersection::Intersection (int id, Gtfs* gtfs) :
         gtfs (gtfs), _intersection_id (id) {}
 
     void Intersection::load ()
@@ -1455,7 +1455,7 @@ namespace Gtfs
                 << sqlite3_errmsg (db) << "\n";
             sqlite3_finalize (stmt);
             gtfs->close_connection ();
-            return; 
+            return;
         }
         if (sqlite3_step (stmt) != SQLITE_ROW)
         {
@@ -1492,7 +1492,7 @@ namespace Gtfs
 
 
     /***************************************************** Stop */
-    Stop::Stop (std::string& id, Gtfs* gtfs) : 
+    Stop::Stop (std::string& id, Gtfs* gtfs) :
         gtfs (gtfs), _stop_id (id) {}
 
     void Stop::load ()
@@ -1527,7 +1527,7 @@ namespace Gtfs
                 << sqlite3_errmsg (db) << "\n";
             sqlite3_finalize (stmt);
             gtfs->close_connection ();
-            return; 
+            return;
         }
         if (sqlite3_step (stmt) != SQLITE_ROW)
         {
@@ -1589,7 +1589,7 @@ namespace Gtfs
     }
 
     std::string& Stop::stop_id () {
-        return _stop_id; 
+        return _stop_id;
     }
     latlng& Stop::stop_position ()
     {
@@ -1631,9 +1631,9 @@ namespace Gtfs
         if (!loaded) load ();
         return _trips;
     }
-    float Stop::version () { 
+    float Stop::version () {
         if (!loaded) load ();
-        return _version; 
+        return _version;
     }
 
     void Stop::add_trip (Trip* t)
@@ -1653,7 +1653,7 @@ namespace Gtfs
 
 
     /***************************************************** Calendar */
-    Calendar::Calendar (std::string& id, Gtfs* gtfs) : 
+    Calendar::Calendar (std::string& id, Gtfs* gtfs) :
         gtfs (gtfs), _service_id (id)
     {
     }
@@ -1673,7 +1673,7 @@ namespace Gtfs
 
         sqlite3_stmt* stmt;
         const char* qrystr;
-        
+
         std::string qry = "SELECT monday, tuesday, wednesday, thursday, friday, saturday, sunday, start_date, end_date, version FROM calendar WHERE service_id=?";
         qrystr = qry.c_str ();
         if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
@@ -1691,7 +1691,7 @@ namespace Gtfs
                 << sqlite3_errmsg (db) << "\n";
             sqlite3_finalize (stmt);
             gtfs->close_connection ();
-            return; 
+            return;
         }
         if (sqlite3_step (stmt) != SQLITE_ROW)
         {
@@ -1722,7 +1722,7 @@ namespace Gtfs
         sqlite3_finalize (stmt);
 
         // Load exceptions
-        
+
         gtfs->close_connection ();
 
         loaded = true;
@@ -1740,8 +1740,8 @@ namespace Gtfs
         std::cout << " + Calendar " << _service_id << " is unloaded\n";
     }
 
-    std::string& Calendar::service_id () { 
-        return _service_id; 
+    std::string& Calendar::service_id () {
+        return _service_id;
     }
     bool Calendar::monday ()
     {
@@ -1788,9 +1788,9 @@ namespace Gtfs
         if (!loaded) load ();
         return _end_date;
     }
-    float Calendar::version () { 
+    float Calendar::version () {
         if (!loaded) load();
-        return _version; 
+        return _version;
     }
 
     std::vector<CalendarDate*>& Calendar::exceptions ()
@@ -1824,6 +1824,7 @@ namespace Gtfs
         Rcpp::NumericVector sigd = parameters["departure_error"];
         Rcpp::NumericVector signwx = parameters["nw_system_noise"];
         Rcpp::NumericVector signwy = parameters["nw_measurement_error"];
+        Rcpp::IntegerVector etam = parameters["eta_model"];
         Rcpp::LogicalVector tim = parameters["save_timings"];
         Rcpp::IntegerVector resm = parameters["reset_method"];
 
@@ -1841,6 +1842,7 @@ namespace Gtfs
         departure_error = (float) sigd[0];
         nw_system_noise = (float) signwx[0];
         nw_measurement_error = (float) signwy[0];
+        eta_model = (int) etam[0];
         save_timings = (bool) tim[0];
         reset_method = (int) resm[0];
     }
@@ -1850,6 +1852,7 @@ namespace Gtfs
         std::cout << "\n >>> Using the following parameters:"
             << "\n - n_core = " << n_core
             << "\n - n_particles = " << n_particles
+            << "\n - noise_model = " << noise_model
             << "\n - system_noise = " << system_noise
             << "\n - pr_stop = " << pr_stop
             << "\n - dwell_time = " << dwell_time
@@ -1860,6 +1863,7 @@ namespace Gtfs
             << "\n - departure_error = " << departure_error
             << "\n - nw_system_noise = " << nw_system_noise
             << "\n - nw_measurement_error = " << nw_measurement_error
+            << "\n - eta_model = " << eta_model
             << "\n - save_timings = " << (save_timings ? "true" : "false")
             << "\n";
     }
@@ -1901,7 +1905,7 @@ namespace Gtfs
     }
 
     /***************************************************** Vehicle */
-    Vehicle::Vehicle (std::string& id, par* pars) : 
+    Vehicle::Vehicle (std::string& id, par* pars) :
     _vehicle_id (id)
     {
         // set the parameters here
@@ -1985,16 +1989,16 @@ namespace Gtfs
         if (!vp.trip ().has_trip_id ()) return;
         if (!vp.has_position ()) return;
         if (!vp.has_timestamp ()) return;
-        
-        add_event (Event (vp.timestamp (), 
-                          EventType::gps, 
+
+        add_event (Event (vp.timestamp (),
+                          EventType::gps,
                           vp.trip ().trip_id (),
-                          latlng (vp.position ().latitude (), 
+                          latlng (vp.position ().latitude (),
                                   vp.position ().longitude ())));
 
         return;
 
-//         if (vp.timestamp () <= _timestamp) 
+//         if (vp.timestamp () <= _timestamp)
 //         {
 //             _delta = 0;
 //             return;
@@ -2090,7 +2094,7 @@ namespace Gtfs
             {
                 continue;
             }
-            add_event (Event (ste->time (), 
+            add_event (Event (ste->time (),
                               (stu.has_arrival () ? EventType::arrival : EventType::departure),
                               tu.trip ().trip_id (),
                               stu.stop_sequence () - 1));
@@ -2152,7 +2156,7 @@ namespace Gtfs
     {
         if (new_events.size () == 0) return;
 
-        // sort events, replacing any duplicated timestamps with 
+        // sort events, replacing any duplicated timestamps with
         // the "last" event (gps < arrival < departure)
         // - completely overwrite (trip_id too)
         std::sort (new_events.begin (), new_events.end ());
@@ -2166,7 +2170,7 @@ namespace Gtfs
                 // update ?
                 EventType prev_type = time_events.back ().type;
                 if (prev_type == EventType::departure) continue;
-                if (prev_type == EventType::arrival && 
+                if (prev_type == EventType::arrival &&
                     e.type != EventType::departure) continue;
 
                 time_events.back ().trip_id = e.trip_id;
@@ -2263,14 +2267,14 @@ namespace Gtfs
     uint64_t Vehicle::stop_arrival_time (int m)
     {
         if (m < 0) m = 0;
-        if (m >= _stop_arrival_times.size ()) 
+        if (m >= _stop_arrival_times.size ())
             m = _stop_arrival_times.size () - 1;
         return _stop_arrival_times.at (m);
     }
     uint64_t Vehicle::stop_departure_time (int m)
     {
         if (m < 0) m = 0;
-        if (m >= _stop_departure_times.size ()) 
+        if (m >= _stop_departure_times.size ())
             m = _stop_departure_times.size () - 1;
         return _stop_departure_times.at (m);
     }
@@ -2462,7 +2466,7 @@ namespace Gtfs
     }
 
 
-    unsigned int 
+    unsigned int
     find_stop_index (double distance, std::vector<StopTime>* stops)
     {
         /*

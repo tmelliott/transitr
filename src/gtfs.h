@@ -29,7 +29,7 @@
 #define SIMULATION 0
 #endif
 
-namespace Gtfs 
+namespace Gtfs
 {
 
     // matrix formatting
@@ -74,7 +74,7 @@ namespace Gtfs
         etaQ (float q, uint64_t t) : quantile (q), time (t) {};
     };
 
-    unsigned int 
+    unsigned int
     find_stop_index (double distance, std::vector<StopTime>* stops);
     unsigned int
     find_segment_index (double distance, std::vector<ShapeSegment>* segments);
@@ -97,6 +97,7 @@ namespace Gtfs
         float departure_error = 5.0;
         float nw_system_noise = 0.001;
         float nw_measurement_error = 50;
+        int eta_model = 0; // [0=analytic; 1=pf]
         bool save_timings = false;
         int reset_method = 1;
         par () {}
@@ -131,8 +132,8 @@ namespace Gtfs
 
         StopTime ();
         StopTime (std::string& stop_id, std::string& trip_id,
-                  std::string& at, std::string& dt, 
-                  std::string& headsign, 
+                  std::string& at, std::string& dt,
+                  std::string& headsign,
                   int pickup, int dropoff, double dist,
                   Gtfs* gtfs);
     };
@@ -143,7 +144,7 @@ namespace Gtfs
         CalendarDate (std::string& date, int type);
     };
 
-    class Agency 
+    class Agency
     {
     private:
         Gtfs* gtfs;
@@ -174,7 +175,7 @@ namespace Gtfs
         std::string& agency_lang ();
     };
 
-    class Route 
+    class Route
     {
     private:
         Gtfs* gtfs;
@@ -205,7 +206,7 @@ namespace Gtfs
         float version ();
     };
 
-    class Trip 
+    class Trip
     {
     private:
         Gtfs* gtfs;
@@ -225,7 +226,7 @@ namespace Gtfs
         Eigen::MatrixXd Hseg;   // transform segment travel times to stop tts
         uint64_t _ts;
         bool state_initialised = false;
-        
+
         std::vector<uint64_t> _arrival_times;
         std::vector<uint64_t> _departure_times;
 
@@ -425,7 +426,7 @@ namespace Gtfs
     };
 
 
-    class Calendar 
+    class Calendar
     {
     private:
         Gtfs* gtfs;
@@ -471,7 +472,7 @@ namespace Gtfs
     };
 
 
-    class Gtfs 
+    class Gtfs
     {
     private:
         std::string _dbname;
@@ -599,7 +600,7 @@ namespace Gtfs
             std::vector<STU> _stop_time_updates;
             int _last_stop_update_index = -1;
             bool _skip_observation = false;
-            
+
             double estimated_dist = 0.0;
             double dist_to_route = 0.0;
             bool bad_sample;
@@ -717,7 +718,7 @@ namespace Gtfs
         Particle (double d, double s, double a, Vehicle* v);
         Particle (const Particle &p);
         ~Particle ();
-        
+
         bool is_complete ();
         double get_distance ();
         double get_speed ();
@@ -742,7 +743,7 @@ namespace Gtfs
         void predict_etas (RNG& rng);
         int calculate_stop_eta (double vel, int i, RNG& rng);
         // int calculate_segment_tt (double vel, int i, RNG& rng);
-        
+
         void calculate_likelihood (latlng& y, std::vector<ShapePt>& path, double sigma);
         void calculate_likelihood (Event& e, double error);
         void set_weight (double w);
