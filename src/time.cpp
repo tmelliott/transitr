@@ -11,26 +11,33 @@ Time::Time ()
 
 Time::Time (int s)
 {
+    _seconds = 0;
     if (s < 0)
     {
-        throw std::invalid_argument ("Seconds must be 0 or greater.");
+        return;
+        // throw std::invalid_argument ("Seconds must be 0 or greater.");
     }
     _seconds = s;
 }
 
 Time::Time (int h, int m, int s)
 {
+    _seconds = 0;
+
     if (h < 0)
     {
-        throw std::invalid_argument ("Hours must be 0 or greater.");
+        return;
+        // throw std::invalid_argument ("Hours must be 0 or greater.");
     }
     if (m < 0 || m >= 60)
     {
-        throw std::invalid_argument ("Minutes must be between 0 and 60.");
+        return;
+        // throw std::invalid_argument ("Minutes must be between 0 and 60.");
     }
     if (s < 0 || s >= 60)
     {
-        throw std::invalid_argument ("Seconds must be between 0 and 60.");
+        return;
+        // throw std::invalid_argument ("Seconds must be between 0 and 60.");
     }
 
     int sec = h * SECONDS_IN_HOUR + m * SECONDS_IN_MIN + s;

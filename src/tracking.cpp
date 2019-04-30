@@ -51,6 +51,9 @@ namespace Gtfs
             }
         );
 
+        double dx = this->distance ();
+        latlng pest = _trip->shape ()->coordinates_of (dx);
+
         f
             << _vehicle_id
             << "," << _trip->trip_id ()
@@ -66,9 +69,9 @@ namespace Gtfs
             << "," << _delta
             << "," << this->distance ()
             << "," << this->speed ()
-            << "," << _position.latitude
-            << "," << _position.longitude
-            << "," << (e.type == EventType::gps ? std::to_string (distanceEarth (e.position, _position)) : "")
+            << "," << pest.latitude
+            << "," << pest.longitude
+            << "," << (e.type == EventType::gps ? std::to_string (distanceEarth (e.position, pest)) : "")
             << "," << llh
             << "," << _Neff
             << "," << action

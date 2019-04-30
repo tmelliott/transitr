@@ -1813,6 +1813,7 @@ namespace Gtfs
         // fetch the parameters
         Rcpp::IntegerVector nc = parameters["n_core"];
         Rcpp::IntegerVector np = parameters["n_particles"];
+        Rcpp::IntegerVector noisem = parameters["noise_model"];
         Rcpp::NumericVector sigx = parameters["system_noise"];
         Rcpp::NumericVector prstop = parameters["pr_stop"];
         Rcpp::NumericVector dwell = parameters["dwell_time"];
@@ -1829,6 +1830,7 @@ namespace Gtfs
         // set the parameters
         n_core = (int) nc[0];
         n_particles = (int) np[0];
+        noise_model = (int) noisem[0];
         system_noise = (float) sigx[0];
         pr_stop = (float) prstop[0];
         dwell_time = (float) dwell[0];
@@ -1899,20 +1901,21 @@ namespace Gtfs
     }
 
     /***************************************************** Vehicle */
-    Vehicle::Vehicle (std::string& id, par* params) : 
+    Vehicle::Vehicle (std::string& id, par* pars) : 
     _vehicle_id (id)
     {
         // set the parameters here
-        _gpserror = params->gps_error;
-        _systemnoise = params->system_noise;
-        _prstop = params->pr_stop;
-        _dwelltime = params->dwell_time;
-        _dwelltimevar = params->dwell_time_var;
-        _gamma = params->gamma;
-        _arrival_error = params->arrival_error;
-        _departure_error = params->departure_error;
-        _N = params->n_particles;
-        reset_method = params->reset_method;
+        _params = pars;
+        _gpserror = _params->gps_error;
+        _systemnoise = _params->system_noise;
+        _prstop = _params->pr_stop;
+        _dwelltime = _params->dwell_time;
+        _dwelltimevar = _params->dwell_time_var;
+        _gamma = _params->gamma;
+        _arrival_error = _params->arrival_error;
+        _departure_error = _params->departure_error;
+        _N = _params->n_particles;
+        reset_method = _params->reset_method;
 #if SIMULATION
         std::ostringstream x;
         x << "history/vehicle_" << _vehicle_id << ".csv";

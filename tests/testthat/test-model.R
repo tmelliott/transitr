@@ -10,6 +10,8 @@ test_that("Parameters are set with valid defaults", {
 
     expect_is(nw$parameters$n_particles, "integer")
 
+    expect_is(nw$parameters$noise_model, "integer")
+
     expect_is(nw$parameters$system_noise, "numeric")
     expect_true(nw$parameters$system_noise > 0)
     
@@ -50,6 +52,7 @@ test_that("Parameters can be changed", {
     nw <- nw %>% set_parameters(
         n_core = 2L,
         n_particles = 20L,
+        noise_model = 1L,
         system_noise = 1,
         pr_stop = 0.9,
         dwell_time = 15,
@@ -69,6 +72,7 @@ test_that("Parameters can be changed", {
         list(
             n_core = 2L,
             n_particles = 20L,
+            noise_model = 1L,
             system_noise = 1,
             pr_stop = 0.9,
             dwell_time = 15,

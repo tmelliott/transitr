@@ -66,6 +66,7 @@ load_gtfs <- function(db, output = "predictions.pb") {
                 n_particles = 1000L, 
                 # vehicle parameters
                 # -- transition 
+                noise_model = 0L,
                 system_noise = 1.0,
                 pr_stop = 0.5,
                 dwell_time = 20.0,

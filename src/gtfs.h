@@ -86,6 +86,7 @@ namespace Gtfs
     {
         int n_core = 1;
         int n_particles = 1000;
+        int noise_model = 0; // [0=once per iteration/segment/stop; 1=each second]
         float system_noise = 5;  // std. dev. of speed variance/second
         float pr_stop = 0.5;
         float dwell_time = 20.0;
@@ -564,6 +565,9 @@ namespace Gtfs
             int _stop_index;
             uint64_t _timestamp = 0;
             unsigned _delta;
+
+            par* _params;
+
             float _gpserror;
             float _systemnoise;
             float _prstop;
@@ -615,13 +619,15 @@ namespace Gtfs
 
 
         public:
-            Vehicle (std::string& id, par* params);
+            Vehicle (std::string& id, par* pars);
 
             std::string& vehicle_id ();
             Trip* trip ();
             latlng& position ();
             uint64_t timestamp ();
             unsigned delta ();
+
+            par* params () { return _params; }
 
             int get_n () const { return _N; };
 

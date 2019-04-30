@@ -183,3 +183,108 @@ results_skip %>% filter(state_type == "update" & event_type == "gps") %>%
     ggplot(aes(sum_llh)) + geom_histogram()
 results_revert %>% filter(state_type == "update" & event_type == "gps") %>%
     ggplot(aes(sum_llh)) + geom_histogram()
+
+
+## noise models
+
+sims <- list.files("simulations", pattern = "sim_")
+
+results <- pbapply::pblapply(sims,
+    function(sim) {
+        x <- try({
+            list.files(
+                sprintf("simulations/%s/history", sim),
+                pattern = "vehicle_[A-Z0-9]*.csv", 
+                full.names = TRUE
+            ) %>%
+            lapply(
+                read_csv,
+                col_types = cols(
+                    vehicle_id = col_character(),
+                    event_timestamp = col_integer(),
+                    vehicle_timestamp = col_integer()
+                )
+            ) %>%
+            bind_rows() %>%
+            mutate(
+                event_timestamp = as.POSIXct(event_timestamp, 
+                    origin = "1970-01-01"),
+                vehicle_timestamp = as.POSIXct(vehicle_timestamp, 
+                    origin = "1970-01-01"),
+                sim = sim
+            )
+        }, silent = TRUE)
+        if (inherits(x, "try-error")) return(NULL)
+        x
+    }
+) %>% bind_rows %>%
+    mutate(
+        event_type = as.factor(event_type),
+        action = fct_explicit_na(action, 'none'),
+        sim = as.factor(sim),
+        noise_model = as.factor(ifelse(grepl("3340", sim), "1", "2")),
+        noise = as.numeric(gsub(".+\\-", "", sim))
+    )
+
+# ggplot(results, aes(event_timestamp, sum_llh)) +
+#     geom_point() +
+#     facet_wrap(~sim, ncol = 1)
+
+# ggplot(results %>% 
+#         filter(vehicle_position_error < 100 &
+#             state_type %in% c('initialize', 'mutate', 'update')), 
+#     aes(event_timestamp, vehicle_position_error)) +
+#     geom_point(aes(colour = state_type)) +
+#     facet_wrap(~sim, ncol = 1)
+
+# iNZightPlots::iNZightPlot(state_type, sim, data = results,
+#     inference.type = "conf", g1 = noise_model)
+
+# iNZightPlots::iNZightPlot(action, sim, data = results)
+
+# iNZightPlots::iNZightPlot(Neff, sim, data = results)
+
+smry <- results %>% group_by(noise_model, noise) %>%
+    summarize(
+        pr_init = mean(state_type == "initialize"),
+        pr_mutate = mean(state_type == "mutate"),
+        pr_revert = mean(state_type == "revert"),
+        pr_update = mean(state_type == "update"),
+        n = n()
+    ) %>% 
+    filter(noise > 0.4)
+
+gridExtra::grid.arrange(
+    ggplot(smry, aes(noise, colour = noise_model)) +
+        facet_wrap(~noise_model, scales = "free") +
+        geom_linerange(aes(
+            ymin = pr_init - 1.96 * pr_init * (1 - pr_init) / sqrt(n),
+            ymax = pr_init + 1.96 * pr_init * (1 - pr_init) / sqrt(n))
+        ) +
+        geom_point(aes(y = pr_init)),
+    ggplot(smry, aes(noise, colour = noise_model)) +
+        facet_wrap(~noise_model, scales = "free") +
+        geom_linerange(aes(
+            ymin = pr_mutate - 1.96 * pr_mutate * (1 - pr_mutate) / sqrt(n),
+            ymax = pr_mutate + 1.96 * pr_mutate * (1 - pr_mutate) / sqrt(n))
+        ) +
+        geom_point(aes(y = pr_mutate)),
+    ggplot(smry, aes(noise, colour = noise_model)) +
+        facet_wrap(~noise_model, scales = "free") +
+        geom_linerange(aes(
+            ymin = pr_revert - 1.96 * pr_revert * (1 - pr_revert) / sqrt(n),
+            ymax = pr_revert + 1.96 * pr_revert * (1 - pr_revert) / sqrt(n))
+        ) +
+        geom_point(aes(y = pr_revert)),
+    ggplot(smry, aes(noise, colour = noise_model)) +
+        facet_wrap(~noise_model, scales = "free") +
+        geom_linerange(aes(
+            ymin = pr_update - 1.96 * pr_update * (1 - pr_update) / sqrt(n),
+            ymax = pr_update + 1.96 * pr_update * (1 - pr_update) / sqrt(n))
+        ) +
+        geom_point(aes(y = pr_update)),
+    ncol = 1
+)
+
+## at the end of the day, its which method is better at
+#  estimating travel time that wins
