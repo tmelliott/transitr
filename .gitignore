@@ -1,6 +1,7 @@
 
 # Created by https://www.gitignore.io/api/r,linux,macos,emacs
 
+*.sqlite
 windows
 fulldata.db
 *.log

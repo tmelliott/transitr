@@ -11,7 +11,7 @@ namespace Gtfs {
 
         // fetch prior from the database
         // ...
-        
+
         _travel_time (0) = _length / 10.0;
         _travel_time (1) = 0.0;
         _uncertainty = Eigen::Matrix2d::Zero ();
@@ -58,10 +58,10 @@ namespace Gtfs {
         {
             _timestamp = now;
         }
-        
+
 #if VERBOSE > 0
-        std::cout << "\n\n + Segment " << _segment_id 
-            << "\n  => X = "<< _travel_time.format (tColVec) 
+        std::cout << "\n\n + Segment " << _segment_id
+            << "\n  => X = "<< _travel_time.format (tColVec)
             << " and P = " << _uncertainty.format(inlineMat);
 #endif
 
@@ -74,14 +74,14 @@ namespace Gtfs {
 
 #if VERBOSE > 0
         std::cout
-            << "\n  => X = "<< xhat.format (tColVec) 
+            << "\n  => X = "<< xhat.format (tColVec)
             << " and P = " << Phat.format(inlineMat);
 #endif
 
-        
+
         // then update with observations
         {
-            // transform to information 
+            // transform to information
             Eigen::Matrix2d Z = Phat.inverse ();
             Eigen::Vector2d z = Z * xhat;
 
@@ -119,7 +119,7 @@ namespace Gtfs {
             xhat = Phat * z;
 #if VERBOSE > 0
             std::cout << "\n  => X = "
-                << xhat.format (tColVec) 
+                << xhat.format (tColVec)
                 << " and P = " << Phat.format(inlineMat);
 #endif
         }
@@ -156,7 +156,7 @@ namespace Gtfs {
     int Segment::sample_travel_time (RNG& rng, int delta)
     {
         if (!loaded) load ();
-        if ( _travel_time (0) == 0) 
+        if ( _travel_time (0) == 0)
         {
             return _length / (rng.rnorm () * 25.0 + 5.0); // [5, 30m/s]
         }
@@ -183,4 +183,4 @@ namespace Gtfs {
         return _length / x;
     }
 
-} // end Gtfs 
+} // end Gtfs
