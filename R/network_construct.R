@@ -8,9 +8,10 @@ construct_network <- function(nw) {
     ## For each route ...
     routes <- RSQLite::dbGetQuery(con, "SELECT route_id FROM routes")
 
-    pb <- utils::txtProgressBar(0, nrow(routes), style = 3)
+    if (interactive())
+        pb <- utils::txtProgressBar(0, nrow(routes), style = 3)
     for (route in rev(routes$route_id)) {
-        pb$up(pb$getVal() + 1)
+        if (interactive()) pb$up(pb$getVal() + 1)
         
         trq <- RSQLite::dbSendQuery(con, "SELECT trip_id, shape_id FROM trips WHERE route_id=? LIMIT 1")
         RSQLite::dbBind(trq, list(route))
@@ -104,7 +105,7 @@ construct_network <- function(nw) {
                     shape$shape_dist_traveled[si] - shape$shape_dist_traveled[siprev]
         }
     }
-    close(pb)
+    if (interactive()) close(pb)
 
     RSQLite::dbWriteTable(con, "road_segments", segments, overwrite = TRUE)
     RSQLite::dbWriteTable(con, "intersections", intersections, overwrite = TRUE)
