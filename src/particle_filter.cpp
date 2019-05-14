@@ -979,14 +979,11 @@ namespace Gtfs {
                                     double sigma)
     {
         latlng ppos = vehicle->trip ()->shape ()->coordinates_of (distance);
-        // (log) distance between points
-        double ld = log (distanceEarth (ppos, vehicle->position ()));
-        // (log) (d/sigma)^2 ~ Chi2(2) ~ Exp(2)
-        double lX2 = 2 * (ld - log (sigma));
-        // log pdf of lX2 ~ Exp(2)
-        log_likelihood = log (0.5) - 0.5 * exp(lX2);
+        double d = distanceEarth (ppos, vehicle->position ());
+        log_likelihood = - log(2.0) - 2.0 * log(sigma) - pow(d, 2) / 2.0 / pow(sigma, 2);
+
 #if VERBOSE == 2
-        if (vehicle->get_n () < 20) std::cout << " => d(h(x), y) = " << exp (ld) << "m";
+        if (vehicle->get_n () < 20) std::cout << " => d(h(x), y) = " << d << "m";
 #endif
     }
 
@@ -1017,7 +1014,7 @@ namespace Gtfs {
 #endif
 
         log_likelihood = - 0.5 * log (2 * M_PI) - log (error) - 
-            pow (tdiff, 2) / 2 / pow (error, 2);
+            pow (tdiff, 2) / 2.0 / pow (error, 2);
         
     }
 
@@ -1025,12 +1022,12 @@ namespace Gtfs {
     {
         // particle's arrival time at stop INDEX
         if (get_arrival_time (index) == 0) log_likelihood = 0;
-        log_likelihood = - 0.5 * log (2 * M_PI) - log (error) - pow (get_arrival_time (index) - time, 2) / 2 / pow (error, 2);
+        log_likelihood = - 0.5 * log (2 * M_PI) - log (error) - pow (get_arrival_time (index) - time, 2) / 2.0 / pow (error, 2);
     }
     void Particle::calculate_departure_likelihood (int index, uint64_t time, double error)
     {
         if (get_departure_time (index) == 0) log_likelihood = 0;
-        log_likelihood = - 0.5 * log (2 * M_PI) - log (error) - pow (get_departure_time (index) - time, 2) / 2 / pow (error, 2);
+        log_likelihood = - 0.5 * log (2 * M_PI) - log (error) - pow (get_departure_time (index) - time, 2) / 2.0 / pow (error, 2);
     }
 
     void Particle::set_weight (double w)
