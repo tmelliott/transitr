@@ -2,7 +2,7 @@ config <- list(
     n_core = 4,
     n_particles = 2000,
     noise_model = 1,
-    system_noise = c(0.6, 0.7, 0.8, 0.9),
+    system_noise = c(0.001, 0.05, 0.1, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.5, 2),
     pr_stop = 0.1,
     dwell_time = 6.0,
     gamma = 5.0,
