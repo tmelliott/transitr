@@ -27,24 +27,6 @@ dbDisconnect(con)
 
 
 ## --- generate some simulated data with known travel times
-# what we want ...
-pb <- list.files("simulations/archive", full = TRUE)[1]
-f <- read(transit_realtime.FeedMessage, pb)
-
-Date <- "2019-04-01"
-start <- as.integer(as.POSIXct(
-    sprintf("%s %s", Date, stops$arrival_time[1])
-))  
-data <- data.frame(
-    vehicle_id = "TEST",
-    trip_id = trip$trip_id,
-    route_id = route$route_id,
-    timestamp = start,
-    type = "arrival",
-    stop_sequence = 1,
-    stop_id = stops$stop_id[1],
-    stringsAsFactors = FALSE
-)
 make_protobuf_feed <- function(data) {
     new(transit_realtime.FeedMessage,
         header = new(transit_realtime.FeedHeader,
@@ -85,9 +67,37 @@ make_protobuf_feed <- function(data) {
     )
 }
 
+Date <- "2019-04-01"
+start <- as.integer(as.POSIXct(
+    sprintf("%s %s", Date, stops$arrival_time[1])
+))  
+data <- data.frame(
+    vehicle_id = "TEST",
+    trip_id = trip$trip_id,
+    route_id = route$route_id,
+    timestamp = start +
+        c(0, 60, 120),
+    type = "departure",
+    stop_sequence = 1:3,
+    stop_id = stops$stop_id[1:3],
+    stringsAsFactors = FALSE
+)
+
+dir <- "scripts/simulation_traveltime1"
+dir.create(dir)
+invisible(lapply(
+    seq_along(1:nrow(data)), 
+    function(i) {
+        serialize(
+            make_protobuf_feed(data[i, ]),
+            connection = sprintf("%s/trip_update_%s.pb", dir, i)
+        )
+    }
+))
+
 
 ## --- run model on that data to estimate travel times 
-
+# this bit I'm not so sure about the best way to go ahead ... 
 
 
 ## --- examine estimation accuracy
