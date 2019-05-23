@@ -2461,6 +2461,17 @@ namespace Gtfs
         return ttpred.at (i);
     }
 
+    /**
+     * Initialize travel time in the specified segment. Currently used for initialization from
+     * a trip update.
+     * @param i segment index to start at
+     */
+    void Particle::init_travel_time (int i)
+    {
+        if (i >= tt.size ()) return;
+        tt.at (i) = 0;
+    }
+
 
     unsigned int 
     find_stop_index (double distance, std::vector<StopTime>* stops)

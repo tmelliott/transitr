@@ -64,6 +64,10 @@ namespace Gtfs {
                     p->set_departure_time (e.stop_index, p->get_departure_time (e.stop_index) - dwell);
                 }
                 
+                // and set the travel time for the segment to zero
+                auto segments = _trip->shape ()->segments ();
+                int segindex = find_segment_index (dist, &segments);
+                p->init_travel_time (segindex);
             }
         }
 
@@ -418,6 +422,7 @@ namespace Gtfs {
                 std::cout << " -> [" << p.get_distance () 
                     << ", " << p.get_speed () 
                     << ", " << (p.get_stop_index () + 1)
+                    << ", " << (p.get_segment_index () + 1)
                     << "]";
 #endif
             
