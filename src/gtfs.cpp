@@ -2184,8 +2184,8 @@ namespace Gtfs
 
     bool Vehicle::valid ()
     {
-        return (_position.latitude != 0.0 || _position.longitude != 0.0) &&
-                _trip != nullptr && _timestamp != 0;
+        // return (_position.latitude != 0.0 || _position.longitude != 0.0) &&
+        return _trip != nullptr && _timestamp != 0;
     }
 
     bool Vehicle::complete ()
