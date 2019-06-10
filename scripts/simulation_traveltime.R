@@ -164,8 +164,8 @@ nw <- load_gtfs("../../fulldata.db", output = "etas.pb") %>%
     realtime_feed(sprintf("http://localhost:3000/sim_tt_01/trip_updates_only"),
                   response = "protobuf") %>%
     set_parameters(
-        n_particles = 2000,
-        system_noise = 1
+        n_particles = 10000,
+        system_noise = 1.5
     )
 
 ## reset server ID
@@ -174,4 +174,5 @@ RCurl::getURL(sprintf("localhost:3000/%s/reset", "sim_tt_01"))
 model(nw)
 
 print(travel_times)
+
 ## --- examine estimation accuracy
