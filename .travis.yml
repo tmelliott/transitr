@@ -1,6 +1,7 @@
 language: R
 sudo: false
 cache: packages
+latex: false
 
 r:
   - release
@@ -17,9 +18,19 @@ addons:
       - libprotoc-dev 
       - protobuf-compiler 
       - libgoogle-perftools-dev
+      - libeigen3-dev
+
+before_install:
+  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+  - sudo apt-get update -q
+  - sudo apt-get install g++-4.9 -y
+  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-4.9 100
 
 after_success:
   - Rscript -e 'covr::codecov()'
+
+after_failure:
+  - cat /home/travis/build/tmelliott/transitr/transitr.Rcheck/00install.out
 
 notifications:
   email:

@@ -9,3 +9,7 @@
 ^fulldata.db$
 ^NEWS.md$
 ^.+\.csv$
+^.gtfs_date$
+^.+\.pb$
+^simulations$
+^.running_pid$

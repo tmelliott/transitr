@@ -137,6 +137,34 @@ void run_realtime_model (
         // Wait for vehicle writing to complete ...
         writev.join ();
 
+//         for (unsigned i=0; i<vehicles.bucket_count (); ++i)
+//         {
+//             for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
+//             {
+// #if VERBOSE > 1
+//                 if (v->second.trip ()->route ()->route_short_name () != "NX1") continue;
+// #endif
+//                 v->second.predict_etas (rngs.at (omp_get_thread_num ()));
+//             }
+//         }
+//         timer.report ("predicting ETAs");
+
+        // Write vehicles to (new) feed
+// #if SIMULATION
+//         std::ostringstream outputname_t;
+//         outputname_t << "etas/etas";
+//         if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ()) 
+//         {
+//             outputname_t << "_" << rtfeed.feed ()->header ().timestamp ();
+//         }
+//         outputname_t << ".pb";
+//         std::string oname (outputname_t.str ());
+//         write_vehicles (&vehicles, oname);
+// #endif
+//         write_vehicles (&vehicles, outputname);
+
+        // timer.report ("writing ETAs to protobuf feed");
+
         gtfs.close_connection (true);
         timer.end ();
 

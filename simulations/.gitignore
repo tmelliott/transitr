@@ -1,0 +1,8 @@
+*.pb
+node_modules
+*.zip
+*.csv
+*.rda
+*/history
+
+sim*

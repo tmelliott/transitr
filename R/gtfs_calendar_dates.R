@@ -20,7 +20,7 @@ create_calendar_dates <- function(db) {
 update_calendar_dates <- function(object, file) {
     con <- db_connect(object$database)
     on.exit(db_close(con))
-    existing <- RSQLite::dbGetQuery(con, "SELECT service_id || date FROM calendar_dates")
+    existing <- RSQLite::dbGetQuery(con, "SELECT service_id || date FROM calendar_dates")[[1]]
     tbl <- utils::read.csv(file, header = TRUE)
     calendar_dates <- data.frame(service_id = as.character(tbl$service_id),
                                  date = as.character(tbl$date),

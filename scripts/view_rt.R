@@ -30,6 +30,9 @@ dev.flush()
 
 ## something else
 library(tidyverse)
+library(RSQLite)
+library(dbplyr)
+library(ggmap)
 
 doaplot <- function(id, which = 1, nrow = NULL, ncol = NULL) {
     v <- read.csv(sprintf("history/vehicle_%s.csv", vs[vn]), header = FALSE)
@@ -47,9 +50,6 @@ doaplot <- function(id, which = 1, nrow = NULL, ncol = NULL) {
                timestamp = as.POSIXct(timestamp, origin = "1970-01-01"),
                arrival_time = pmin(Sys.time() + 3600, as.POSIXct(arrival_time, origin = "1970-01-01")))
 
-    library(RSQLite)
-    library(dbplyr)
-    library(ggmap)
     con <- dbConnect(SQLite(), "fulldata.db")
     tid <- v$trip_id[1]
     shape <- con %>% tbl("trips") %>% 
@@ -80,8 +80,74 @@ doaplot <- function(id, which = 1, nrow = NULL, ncol = NULL) {
 
 ps <- list.files("history", pattern = "*_particles.csv")
 vs <- gsub("vehicle_|_particles.csv", "", ps)
-vn <- 15
+vn <- 25
 doaplot(vs[vn], 1, nrow = 4)
 doaplot(vs[vn], 2)
 doaplot(vs[vn], 3)
 doaplot(vs[vn], 4)
+
+
+
+
+
+
+############ New appraoch
+library(tidyverse)
+library(ggmap)
+library(RProtoBuf)
+library(RSQLite)
+library(dbplyr)
+library(pbapply)
+curd <- setwd("src/vendor/protobuf")
+readProtoFiles("gtfs-realtime-ext.proto")
+setwd(curd)
+
+f <- "at_predictions.pb"
+
+go <- function(error = 20) {
+    feed <- read(transit_realtime.FeedMessage, f)
+
+    p <- lapply(feed$entity, function(entity) {
+        preal <- entity$vehicle$position$as.list()
+        pmodel <- entity$vehicle$getExtension(transit_network.position_estimate)$as.list()
+        bind_rows(as.tibble(preal) %>% mutate(which = 'obs'), 
+                  as.tibble(pmodel) %>% mutate(which = 'model')) %>% 
+            mutate(vehicle_id = rep(entity$vehicle$vehicle$id, 2))
+    }) %>% bind_rows
+
+    d <- p %>% group_by(vehicle_id) %>% do({
+        px = (.) %>% select(longitude, latitude) %>% as.matrix
+        tibble(dist = geosphere::distGeo(px[1,], px[2,]))
+        })
+
+    p1 <- ggplot(d, aes(x = dist+1)) +
+        geom_vline(xintercept = error, color = 'red') +
+        geom_histogram(aes(y = cumsum(..count..) / sum(..count..) * 100)) +
+        scale_x_continuous(trans = "log10") +
+        xlab("Distance between observed and modeled position (m)") +
+        ylab("% buses")
+
+    e <- rexp(nrow(d), 0.5)
+    dstar <- sqrt(e) * error
+    p2 <- ggplot() +
+        geom_histogram(aes(x = dstar, y = cumsum(..count..) / sum(..count..) * 100)) +
+        scale_x_continuous(trans = "log10") +
+        xlab("Distribution of distance between observed and modeled position under hypothesis (m)") +
+        ylab("% buses")
+
+    gridExtra::grid.arrange(p1, p2, nrow = 2)
+}
+go()
+
+ggplot(p, aes(longitude, latitude)) +
+    geom_path(aes(group = vehicle_id)) +
+    coord_fixed(1.6) +
+    theme(legend.position = "none")
+
+
+## under the null hypothesis...
+d^2 / error ~ exp(0.5)
+e <- rexp(nrow(d), 0.5)
+dstar <- sqrt(e * error)
+
+ggplot() + geom_histogram(aes(x = dstar))

@@ -44,9 +44,16 @@ context("GTFS classes") {
 
     test_that("Shape distance functions return the correct values") {
         Gtfs::Shape* s = &(gtfs.shapes ().begin (0)->second);
-        double d (1000);
-        latlng p = s->coordinates_of (d);
-        expect_true (fabs (s->distance_of (p) - d) < 0.001);
+        std::vector<double> ds {0.0, 1000.0, 2000.0, 10000.0, 100000.0};
+        double dx;
+        latlng p;
+        double slen = s->path ().back ().distance;
+        for (auto d : ds)
+        {
+            p = s->coordinates_of (d);
+            dx = s->distance_of (p);
+            expect_true (fabs (fmin (d, slen) - dx) < 1);
+        }
     }
 
 }

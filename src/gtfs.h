@@ -307,6 +307,8 @@ namespace Gtfs
         sqlite3* get_connection ();
         void close_connection ();
         void close_connection (bool sure);
+        void set_parameters (par& params);
+        par* parameters ();
         std::unordered_map<std::string, Agency>& agencies ();
         std::unordered_map<std::string, Route>& routes ();
         std::unordered_map<std::string, Trip>& trips ();

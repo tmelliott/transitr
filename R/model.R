@@ -1,13 +1,10 @@
 #' Run realtime transit model
 #'
 #' @param nw a loaded \code{trgtfs} object
-#' @param n.particles the number of particles to use to model each vehicle
-#' @param cores the number of cores to use in parallel
-#' @param error the GPS error to use in the likelihood
 #' @return NULL (in fact, it never returns anything ...)
 #' @author Tom Elliott
 #' @export
-model <- function(nw, n.particles = 500L, cores = 1L, error = 20) {
+model <- function(nw) {
     if (!inherits(nw, "trgtfs")) stop("Not a GTFS transit object. See ?create_gtfs")
 
     if (!check_tables(nw)) stop("GTFS tables don't appear to be valid.")
@@ -24,5 +21,17 @@ model <- function(nw, n.particles = 500L, cores = 1L, error = 20) {
         list(name = names(nw$apis$realtime$headers)[i], value = nw$apis$realtime$headers[[i]])
     })
 
-    run_realtime_model(nw, n.particles, cores, error)
+    run_realtime_model(nw)
+}
+
+#' Set parameters for the model
+#'
+#' @param nw a loaded \code{trgtfs} object
+#' @param ... parameters
+#' @author Tom Elliott
+#' @export
+set_parameters <- function(nw, ...) {
+    pars <- list(...)
+    nw$parameters <- utils::modifyList(nw$parameters, pars)
+    nw
 }

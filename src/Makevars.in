@@ -6,14 +6,17 @@ PKG_CPPFLAGS=@PKG_CPPFLAGS@
 PKG_LIBS=@PKG_LIBS@ -lprofiler
 
 PROTODIR = vendor/protobuf
+PROTOOBJ=$(PROTODIR)/gtfs-realtime.pb.o $(PROTODIR)/gtfs-realtime-ext.pb.o
 
 $(SHLIB): $(OBJECTS)
 
 OBJ = $(patsubst %.cpp,%.o,$(wildcard *.cpp))
-OBJECTS = vendor/sqlite3/sqlite3.o $(PROTODIR)/gtfs-realtime.pb.o $(OBJ)
+OBJECTS = vendor/sqlite3/sqlite3.o $(PROTOOBJ) $(OBJ)
 
-PROTOFILES = $(PROTODIR)/gtfs-realtime.pb.cpp $(PROTODIR)/gtfs-realtime.pb.h
-$(PROTODIR)/gtfs-realtime.pb.o: $(PROTOFILES)
-$(PROTOFILES): $(PROTODIR)/gtfs-realtime.proto
+PROTOFILES = $(PROTODIR)/$(PROTONAME).pb.cpp $(PROTODIR)/$(PROTONAME).pb.h
+$(PROTODIR)/%.pb.o: $(PROTODIR)/%.pb.cpp $(PROTODIR)/%.pb.h
+$(PROTODIR)/%.pb.cpp: $(PROTODIR)/%.proto
 	protoc -I=$(PROTODIR) --cpp_out=$(PROTODIR) $^
-	mv $(PROTODIR)/gtfs-realtime.pb.cc $(PROTODIR)/gtfs-realtime.pb.cpp
+	mv $(PROTODIR)/$*.pb.cc $(PROTODIR)/$*.pb.cpp
+
+

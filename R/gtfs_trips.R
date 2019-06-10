@@ -24,7 +24,7 @@ create_trips <- function(db) {
 update_trips <- function(object, file) {
 	  con <- db_connect(object$database)
     on.exit(db_close(con))
-    existing <- RSQLite::dbGetQuery(con, "SELECT trip_id FROM trips")
+    existing <- RSQLite::dbGetQuery(con, "SELECT trip_id FROM trips")[[1]]
     tbl <- utils::read.csv(file, header = TRUE)
     trips <- data.frame(trip_id = as.character(tbl$trip_id),
                         route_id = as.character(tbl$route_id),

@@ -6,6 +6,18 @@ fulldata.db
 *.log
 *.out
 *.csv
+.gtfs_date
+*.pb
+*.rda
+*.zip
+
+config.json
+.running_pid
+
+*.db-shm
+*.db-wal
+
+yarn.lock
 
 ### Emacs ###
 # -*- mode: gitignore; -*-

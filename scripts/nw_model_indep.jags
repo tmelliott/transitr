@@ -1,0 +1,35 @@
+model {
+    ## system noise hyperparameters
+    Q_mu ~ dunif(0, 100)
+    Q_tau ~ dgamma(0.001, 0.001)
+    Q_sig <- 1 / sqrt(Q_tau)
+
+    for (m in 1:M) {
+        ## system noise
+        q_tau[m] <- 1 / pow(q[m], 2)
+        q[m] ~ dnorm(Q_mu, Q_tau)
+
+        ## state transition
+        X[m, 1] ~ dnorm(0,1e-5) T(0,)
+        Xdot[m, 1] ~ dnorm(0, 0.001)
+        Xdotdot[m, 1] ~ dnorm(0, 0.01)
+        for (t in 2:T) {
+            Xdot[m, t] ~ dnorm(Xdot[m, t - 1], q_tau[m]) T(-X[m,t-1], )
+            X[m, t] <- max(X[m, t - 1] + Xdot[m, t], 1e-10)
+        }
+    }
+
+    ## measurement error
+    R_mu ~ dunif(0, 100)
+    R_tau ~ dgamma(0.001, 0.001)
+    R_sig <- 1 / sqrt(R_tau)
+
+    ## likelihood
+    for (m in 1:M) {
+        r_tau[m] <- 1 / pow(r[m], 2)
+        r[m] ~ dnorm(R_mu, R_tau)
+        for (t in 1:T) {
+            Y[m, t] ~ dnorm(log(X[m, t]), r_tau[m])
+        }
+    }
+}

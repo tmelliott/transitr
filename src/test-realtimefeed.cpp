@@ -12,7 +12,8 @@ context("GTFS classes") {
         std::string apikey = key;
         expect_true (key != "");
 
-        std::string url = "https://api.at.govt.nz/v2/public/realtime/vehiclelocations";
+        std::vector<std::string> urls;
+        urls.push_back ("https://api.at.govt.nz/v2/public/realtime/vehiclelocations");
         List headers;
         {
             List keyheader = List::create (_["name"] = "Ocp-Apim-Subscription-Key",
@@ -24,7 +25,7 @@ context("GTFS classes") {
                                             _["value"] = "application/x-protobuf");
             headers.push_back (typeheader);
         }
-        RealtimeFeed rt (url, headers);
+        RealtimeFeed rt (urls, headers);
 
         expect_true (rt.update () == 0);
         expect_true (rt.feed ()->entity_size () > 0);

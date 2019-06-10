@@ -1,0 +1,56 @@
+#!/bin/bash
+
+## config
+AUTOUPDATE=true
+Rcmd="$(which R) --slave"
+
+## script directory
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do # resolve $SOURCE until the file is no longer a symlink
+  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE" # if $SOURCE was a relative symlink, we need to resolve it relative to the path where the symlink file was located
+done
+SCRIPTDIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+PKGDIR="$( cd $SCRIPTDIR && cd ../../ && pwd )"
+
+CDIR=$( pwd )
+cd $PKGDIR
+
+## check for updates
+git fetch
+
+UPSTREAM=${1:-'@{u}'}
+LOCAL=$(git rev-parse @)
+REMOTE=$(git rev-parse "$UPSTREAM")
+BASE=$(git merge-base @ "$UPSTREAM")
+
+if [ $LOCAL = $REMOTE ]; then
+    echo "Up-to-date"
+elif [ $LOCAL = $BASE ]; then
+    echo "Updating ..."
+    git pull
+    make clean install
+else
+    echo "You've done something ... please fix!"
+    exit 1
+fi
+
+## Up-to-date ... launch program
+
+## check for existing one
+if [ -f .running_pid ]; then
+    echo "Killing currently running process ... "
+    typeset -i PID=$( cat .running_pid )
+    kill -s TERM $PID 2>/dev/null
+    while kill -0 $PID 2>/dev/null; do sleep 1; done
+    rm .running_pid
+fi
+
+echo "Starting ... "
+
+$Rcmd -f scripts/run_model.R > run.log 2>&1 & 
+echo $! >> .running_pid
+
+cd $CDIR
+exit 0

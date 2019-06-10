@@ -6,18 +6,19 @@
 ##' @param source where the GTFS data comes from
 ##' @param db where the GTFS data is going to be stored
 ##' @param quiet logical, if \code{TRUE} progress output will be suppressed
+##' @param output filename to output ETA predictions
 ##' @return a \code{trgtfs} object
 ##' @author Tom Elliott
 ##' @importFrom stats update
 ##' @export
-create_gtfs <- function(source, db = tempfile(), quiet = FALSE) {
+create_gtfs <- function(source, db = tempfile(), quiet = FALSE, output = "predictions.pb") {
     if (!requireNamespace("RSQLite", quietly = TRUE)) {
         stop("Please install the `RSQLite` package first,\n",
              "  or connect to a database manually and use `load_gtfs` instead.")
     }
     
     create_tables(db)
-    nw <- load_gtfs(db)
+    nw <- load_gtfs(db, output)
     if (!missing(source)) {
         update(nw, source, quiet = quiet)
     }
@@ -45,15 +46,46 @@ check_tables <- function(db) {
 ##'
 ##' @title Load GTFS database
 ##' @param db a database connection from \code{dbConnect}
+##' @param output filename to output ETA predictions
 ##' @return a \code{trgtfs} object
 ##' @author Tom Elliott
 ##' @export
-load_gtfs <- function(db) {
+load_gtfs <- function(db, output = "predictions.pb") {
     if (!check_tables(db)) {
         stop("Oops, some of the tables aren't right...")
     }
-    structure(list(database = db, apis = apis()),
-              class = "trgtfs")
+
+    structure(
+        list(
+            database = db, 
+            apis = apis(), 
+            output = output,
+            parameters = list(
+                # computation parameters
+                n_core = 1L, 
+                n_particles = 1000L, 
+                # vehicle parameters
+                # -- transition 
+                noise_model = 0L,
+                system_noise = 1.0,
+                pr_stop = 0.5,
+                dwell_time = 20.0,
+                dwell_time_var = 10.0,
+                gamma = 6.0,
+                # -- likelihood
+                gps_error = 5.0,
+                arrival_error = 5.0,
+                departure_error = 5.0,
+                # network parameters
+                nw_system_noise = 0.001,
+                nw_measurement_error = 50,
+                # other ...
+                save_timings = FALSE,
+                reset_method = 1L
+            )
+        ),
+        class = "trgtfs"
+    )
 }
 
 ##' Update a GTFS database object with new data.
@@ -84,6 +116,7 @@ update.trgtfs <- function(object, source, quiet = FALSE, ...) {
 
     ## Create a function call e.g., `.update_url(object, source)`
     eval(parse(text = sprintf(".update_%s", fn)))(object, source, quiet)
+    ## Update versions
     update_versions(object)
 }
 

@@ -1,7 +1,6 @@
 Package: transitr
 Title: Predict Transit Vehicle Arrival Times using Transit Network
-Version: 0.1.0
-Date: 2018-08-23
+Version: 0.3
 Authors@R: person("Tom", "Elliott", email = "tom.elliott@auckland.ac.nz",
                   role = c("aut", "cre"))
 Description: GTFS is an API specification used globally for transit data, including realtime vehicle locations. This package allows users to a) construct a transit network, b) track vehicles in real time to update the network, and c) obtain arrival time predictions.
@@ -36,7 +35,8 @@ Suggests:
     covr
 LinkingTo: 
     Rcpp, 
+    RcppThread,
     BH,
     testthat
-RoxygenNote: 6.0.1
+RoxygenNote: 6.1.0.9000
 Biarch: TRUE
