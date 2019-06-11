@@ -10,9 +10,20 @@ test_that("network shapes makes sense", {
     expect_equal(length(sh), 17)
 })
 
+test_that("network tables get constructed", {
+    create_network_tables(nw)
+    con <- db_connect(nw$database)
+    expect_true(dbExistsTable(con, "road_segments"))
+    expect_true(dbExistsTable(con, "intersections"))
+    expect_true(dbExistsTable(con, "shape_nodes"))
+    expect_true(dbExistsTable(con, "nodes"))
+})
+
 test_that("network gets constructed correctly", {
-    n <- construct(nw)
+    construct_network(nw)
+
+    expect_equal(dim(load_nodes(nw)), c(369, 4))
     expect_equal(dim(load_road_segments(nw)), c(379, 4))
-    expect_equal(dim(load_intersections(nw)), c(369, 3))
-    expect_equal(dim(load_shape_segments(nw)), c(581, 4))
+    expect_equal(dim(load_intersections(nw)), c(0, 3))
+    expect_equal(dim(load_shape_segments(nw)), c(598, 4))
 })
