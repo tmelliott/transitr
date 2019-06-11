@@ -21,16 +21,22 @@ construct_network <- function(nw, node_threshold = 0.5) {
         # check for existing node
         node_id <- NA
         if (nrow(NodeMatrix)) {
-            dists <- geosphere::distGeo(
-                stops[i, c("stop_lon", "stop_lat")],
-                NodeMatrix
-            )
+            # dists <- geosphere::distGeo(
+            #     stops[i, c("stop_lon", "stop_lat")],
+            #     NodeMatrix
+            # )
+            rad <- function(x) x*pi/180
+            dists <- sqrt(
+                ((rad(NodeMatrix[,1]) - rad(stops$stop_lon[i])) * 
+                    cos(rad(stops$stop_lat[i])))^2 +
+                (rad(NodeMatrix[,2]) - rad(stops$stop_lat[i]))^2
+            ) * 6378137
             if (min(dists) < node_threshold)
                 node_id <- nodes$node_id[which.min(dists)]
         }
         # if one doesn't exist, create it
         if (is.na(node_id)) {
-            node_id <- max(nodes$node_id + 1, 1)
+            node_id <- max(nodes$node_id + 1L, 1L)
             nodes <- rbind(
                 nodes,
                 data.frame(
@@ -77,7 +83,11 @@ construct_network <- function(nw, node_threshold = 0.5) {
         
         # - find all NODES that are within ~5m of shape
         node_dist <- apply(NodeMatrix, 1, function(n) {
-            d <- geosphere::distGeo(n, ShapeMat)
+            # d <- geosphere::distGeo(n, ShapeMat)
+            # use equirectangular instead
+            rad <- function(x) x*pi/180
+            d <- sqrt(((rad(ShapeMat[,1]) - rad(n[1])) * cos(rad(n[2])))^2 +
+                (rad(ShapeMat[,2]) - rad(n[2]))^2) * 6378137
             if (min(d) > 5) return(NA)
             # - compute shape dist travelled of found nodes
             shape$shape_dist_traveled[which.min(d)]
@@ -100,9 +110,9 @@ construct_network <- function(nw, node_threshold = 0.5) {
         RSQLite::dbClearResult(qry)
         ShapeNodes$dist <- node_dist
         ShapeNodes <- ShapeNodes[ShapeNodes$node_id %in% stopnodes | ShapeNodes$node_type == 1,]
-
+        if (nrow(ShapeNodes) == 0) next
         ShapeNodes <- ShapeNodes[order(ShapeNodes$dist),]
-        ShapeNodes$seq <- 1:nrow(ShapeNodes)
+        ShapeNodes$seq <- seq_along(1:nrow(ShapeNodes))
 
         # with(ShapeNodes, points(node_lon, node_lat, cex = 0.5, pch = 21, bg="white"))
         # with(ShapeNodes, text(node_lon, node_lat, seq, col = "blue"))
