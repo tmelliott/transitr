@@ -78,7 +78,9 @@ construct_network <- function(nw, node_threshold = 0.5) {
         # points(NodeMatrix, pch = 21, cex = 0.5, col = "black", bg="white")
 
         # shape distance
-        shape$shape_dist_traveled <- c(0, cumsum(geosphere::distGeo(ShapeMat)))
+        # distGeo now adds an NA
+        shape$shape_dist_traveled <- 
+            c(0, cumsum(geosphere::distGeo(ShapeMat)[-nrow(ShapeMat)]))
 
         
         # - find all NODES that are within ~5m of shape
