@@ -15,7 +15,7 @@ context("GTFS classes") {
         expect_true (gtfs.shapes ().size () == 17);
         expect_true (gtfs.stops ().size () == 369);
         expect_true (gtfs.calendar ().size () == 17);
-        expect_true (gtfs.nodes ().size () == 1);
+        expect_true (gtfs.nodes ().size () == 369);
     }
 
     test_that("objects load on request") {

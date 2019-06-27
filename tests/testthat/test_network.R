@@ -1,8 +1,10 @@
 context("Construct the GTFS road network")
 library(RSQLite)
 
-nw <- create_gtfs(system.file("extdata", "auckland_gtfs.zip", package = "transitr"),
-                  quiet = TRUE)
+nw <- create_gtfs(
+    system.file("extdata", "auckland_gtfs.zip", package = "transitr"),
+    quiet = TRUE
+)
 
 test_that("network shapes makes sense", {
     sh <- load_shapes(nw)
@@ -27,3 +29,5 @@ test_that("network gets constructed correctly", {
     expect_equal(dim(load_intersections(nw)), c(0, 3))
     expect_equal(dim(load_shape_segments(nw)), c(598, 4))
 })
+
+## file.rename(nw$database, "auckland_gtfs.db")

@@ -436,6 +436,10 @@ namespace Gtfs
     {
         return _intersections;
     }
+    std::unordered_map<int, Node>& Gtfs::nodes ()
+    {
+        return _nodes;
+    }
     std::unordered_map<std::string, Stop>& Gtfs::stops ()
     {
         return _stops;
@@ -1165,65 +1169,65 @@ namespace Gtfs
         }
         _version = (float)sqlite3_column_double (stmt, 3);
 
-        // and then load the shape segments 
-        qry = "SELECT count(shape_id) FROM shape_segments WHERE shape_id=?";
-        qrystr = qry.c_str ();
-        if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
-        {
-            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
-                << sqlite3_errmsg (db) << "\n";
-            sqlite3_finalize (stmt);
-            gtfs->close_connection ();
-            return;
-        }
-        if (sqlite3_bind_text (stmt, 1, shstr, -1, SQLITE_STATIC) != SQLITE_OK)
-        {
-            Rcpp::Rcerr << " x Can't bind shape id to query\n  "
-                << sqlite3_errmsg (db) << "\n";
-            sqlite3_finalize (stmt);
-            gtfs->close_connection ();
-            return; 
-        }
-        if (sqlite3_step (stmt) != SQLITE_ROW)
-        {
-            Rcpp::Rcerr << " x Couldn't get row count from db\n  "
-                << sqlite3_errmsg (db) << "\n";
-            sqlite3_finalize (stmt);
-            gtfs->close_connection ();
-            return;
-        }
-        _segments.reserve (sqlite3_column_int (stmt, 0));
-        sqlite3_finalize (stmt);
+        // // and then load the shape segments 
+        // qry = "SELECT count(shape_id) FROM shape_segments WHERE shape_id=?";
+        // qrystr = qry.c_str ();
+        // if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
+        // {
+        //     Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+        //         << sqlite3_errmsg (db) << "\n";
+        //     sqlite3_finalize (stmt);
+        //     gtfs->close_connection ();
+        //     return;
+        // }
+        // if (sqlite3_bind_text (stmt, 1, shstr, -1, SQLITE_STATIC) != SQLITE_OK)
+        // {
+        //     Rcpp::Rcerr << " x Can't bind shape id to query\n  "
+        //         << sqlite3_errmsg (db) << "\n";
+        //     sqlite3_finalize (stmt);
+        //     gtfs->close_connection ();
+        //     return; 
+        // }
+        // if (sqlite3_step (stmt) != SQLITE_ROW)
+        // {
+        //     Rcpp::Rcerr << " x Couldn't get row count from db\n  "
+        //         << sqlite3_errmsg (db) << "\n";
+        //     sqlite3_finalize (stmt);
+        //     gtfs->close_connection ();
+        //     return;
+        // }
+        // _segments.reserve (sqlite3_column_int (stmt, 0));
+        // sqlite3_finalize (stmt);
 
-        qry = "SELECT road_segment_id, distance_traveled FROM shape_segments WHERE shape_id=? ORDER BY shape_road_sequence";
-        qrystr = qry.c_str ();
-        if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
-        {
-            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
-                << sqlite3_errmsg (db) << "\n";
-            sqlite3_finalize (stmt);
-            gtfs->close_connection ();
-            return;
-        }
-        if (sqlite3_bind_text (stmt, 1, shstr, -1, SQLITE_STATIC) != SQLITE_OK)
-        {
-            Rcpp::Rcerr << " x Can't bind shape id to query\n  "
-                << sqlite3_errmsg (db) << "\n";
-            sqlite3_finalize (stmt);
-            gtfs->close_connection ();
-            return; 
-        }
+        // qry = "SELECT road_segment_id, distance_traveled FROM shape_segments WHERE shape_id=? ORDER BY shape_road_sequence";
+        // qrystr = qry.c_str ();
+        // if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
+        // {
+        //     Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+        //         << sqlite3_errmsg (db) << "\n";
+        //     sqlite3_finalize (stmt);
+        //     gtfs->close_connection ();
+        //     return;
+        // }
+        // if (sqlite3_bind_text (stmt, 1, shstr, -1, SQLITE_STATIC) != SQLITE_OK)
+        // {
+        //     Rcpp::Rcerr << " x Can't bind shape id to query\n  "
+        //         << sqlite3_errmsg (db) << "\n";
+        //     sqlite3_finalize (stmt);
+        //     gtfs->close_connection ();
+        //     return; 
+        // }
 
-        Segment* segi;
-        double di;
-        while (sqlite3_step (stmt) == SQLITE_ROW)
-        {
-            segi = gtfs->find_segment (sqlite3_column_int (stmt, 0));
-            di = sqlite3_column_double (stmt, 1);
-            _segments.emplace_back (segi, di);
-        }
+        // Segment* segi;
+        // double di;
+        // while (sqlite3_step (stmt) == SQLITE_ROW)
+        // {
+        //     segi = gtfs->find_segment (sqlite3_column_int (stmt, 0));
+        //     di = sqlite3_column_double (stmt, 1);
+        //     _segments.emplace_back (segi, di);
+        // }
 
-        sqlite3_finalize (stmt);
+        // sqlite3_finalize (stmt);
         gtfs->close_connection ();
 
         loaded = true;
