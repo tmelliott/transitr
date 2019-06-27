@@ -15,6 +15,7 @@ context("GTFS classes") {
         expect_true (gtfs.shapes ().size () == 17);
         expect_true (gtfs.stops ().size () == 369);
         expect_true (gtfs.calendar ().size () == 17);
+        expect_true (gtfs.nodes ().size () == 1);
     }
 
     test_that("objects load on request") {
@@ -54,6 +55,10 @@ context("GTFS classes") {
             dx = s->distance_of (p);
             expect_true (fabs (fmin (d, slen) - dx) < 1);
         }
+    }
+
+    test_that("Nodes load") {
+        Gtfs::Node* n = gtfs.find_node (1);
     }
 
 }
