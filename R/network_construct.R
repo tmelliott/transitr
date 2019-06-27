@@ -41,7 +41,7 @@ construct_network <- function(nw, node_threshold = 0.5) {
                 nodes,
                 data.frame(
                     node_id = node_id,
-                    node_type = 0,
+                    node_type = 0L,
                     node_lon = stops$stop_lon[i],
                     node_lat = stops$stop_lat[i]
                 )
@@ -111,7 +111,7 @@ construct_network <- function(nw, node_threshold = 0.5) {
         stopnodes <- RSQLite::dbFetch(qry)$node_id
         RSQLite::dbClearResult(qry)
         ShapeNodes$dist <- node_dist
-        ShapeNodes <- ShapeNodes[ShapeNodes$node_id %in% stopnodes | ShapeNodes$node_type == 1,]
+        ShapeNodes <- ShapeNodes[ShapeNodes$node_id %in% stopnodes | ShapeNodes$node_type == 1L,]
         if (nrow(ShapeNodes) == 0) next
         ShapeNodes <- ShapeNodes[order(ShapeNodes$dist),]
         ShapeNodes$seq <- seq_along(1:nrow(ShapeNodes))

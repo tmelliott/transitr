@@ -25,9 +25,16 @@ test_that("network gets constructed correctly", {
     construct_network(nw)
 
     expect_equal(dim(load_nodes(nw)), c(369, 4))
+    expect_equal(
+        sapply(load_nodes(nw), class),
+        c(
+            node_id = "integer", node_type = "integer",
+            node_lon = "numeric", node_lat = "numeric"
+        )
+    )
     expect_equal(dim(load_road_segments(nw)), c(379, 4))
     expect_equal(dim(load_intersections(nw)), c(0, 3))
     expect_equal(dim(load_shape_segments(nw)), c(598, 4))
 })
 
-## file.rename(nw$database, "auckland_gtfs.db")
+## file.copy(nw$database, "auckland_gtfs.db")
