@@ -1,4 +1,4 @@
-construct_network <- function(nw, node_threshold = 0.5) {
+construct_network <- function(nw, node_threshold = 0.01) {
     con <- db_connect(nw$database)
 
     nodes <- RSQLite::dbReadTable(con, "nodes")
@@ -9,34 +9,35 @@ construct_network <- function(nw, node_threshold = 0.5) {
     ## Load STOPS -> nodes
     # checking each stop for an existing node within ~2m
     stops <- RSQLite::dbGetQuery(con,
-        "SELECT * FROM stops WHERE node_id is null"
+        "SELECT * FROM stops"
     )
     if (interactive() && nrow(stops)) {
         cat("\n * Processing stops as nodes ...\n")
         pb <- utils::txtProgressBar(0, nrow(stops), style = 3)
     }
     for (i in seq_along(stops$stop_id)) {
+        if (!is.na(stops$node_id[i])) next()
         if (interactive()) pb$up(pb$getVal() + 1)
-        NodeMatrix <- nodes[, c("node_lon", "node_lat")]
+        # NodeMatrix <- nodes[, c("node_lon", "node_lat")]
         # check for existing node
         node_id <- NA
-        if (nrow(NodeMatrix)) {
-            # dists <- geosphere::distGeo(
-            #     stops[i, c("stop_lon", "stop_lat")],
-            #     NodeMatrix
-            # )
-            rad <- function(x) x*pi/180
-            dists <- sqrt(
-                ((rad(NodeMatrix[,1]) - rad(stops$stop_lon[i])) * 
-                    cos(rad(stops$stop_lat[i])))^2 +
-                (rad(NodeMatrix[,2]) - rad(stops$stop_lat[i]))^2
-            ) * 6378137
-            if (min(dists) < node_threshold)
-                node_id <- nodes$node_id[which.min(dists)]
-        }
+        # if (nrow(NodeMatrix)) {
+        #     # dists <- geosphere::distGeo(
+        #     #     stops[i, c("stop_lon", "stop_lat")],
+        #     #     NodeMatrix
+        #     # )
+        #     rad <- function(x) x*pi/180
+        #     dists <- sqrt(
+        #         ((rad(NodeMatrix[,1]) - rad(stops$stop_lon[i])) * 
+        #             cos(rad(stops$stop_lat[i])))^2 +
+        #         (rad(NodeMatrix[,2]) - rad(stops$stop_lat[i]))^2
+        #     ) * 6378137
+        #     if (min(dists) < node_threshold)
+        #         node_id <- nodes$node_id[which.min(dists)]
+        # }
         # if one doesn't exist, create it
         if (is.na(node_id)) {
-            node_id <- max(nodes$node_id + 1L, 1L)
+            node_id <- max(nodes$node_id + 1L, 1L, na.rm = TRUE)
             nodes <- rbind(
                 nodes,
                 data.frame(
@@ -82,8 +83,25 @@ construct_network <- function(nw, node_threshold = 0.5) {
         shape$shape_dist_traveled <- 
             c(0, cumsum(geosphere::distGeo(ShapeMat)[-nrow(ShapeMat)]))
 
+        ## New approach:
+        # - use all nodes that are STOPS, and
+        # - find all nodes that are INTERSECTIONS within ~5m of shape
         
-        # - find all NODES that are within ~5m of shape
+        qry <- RSQLite::dbSendQuery(con, 
+            paste0(
+                "SELECT node_id FROM stops WHERE stop_id IN (",
+                "  SELECT stop_id FROM stop_times WHERE trip_id=(",
+                "    SELECT trip_id FROM trips WHERE shape_id=? LIMIT 1",
+                "  )",
+                ")"
+            )
+        )
+        RSQLite::dbBind(qry, list(shape_id))
+        stop_node_ids <- RSQLite::dbFetch(qry)$node_id
+        RSQLite::dbClearResult(qry)
+
+        stop_nodes <- nodes[nodes$node_id %in% stop_node_ids, ]
+        NodeMatrix <- stop_nodes[, c("node_lon", "node_lat")]
         node_dist <- apply(NodeMatrix, 1, function(n) {
             # d <- geosphere::distGeo(n, ShapeMat)
             # use equirectangular instead
@@ -94,24 +112,24 @@ construct_network <- function(nw, node_threshold = 0.5) {
             # - compute shape dist travelled of found nodes
             shape$shape_dist_traveled[which.min(d)]
         })
-        ShapeNodes <- nodes[!is.na(node_dist), ]
+        ShapeNodes <- stop_nodes[!is.na(node_dist), ]
         node_dist <- node_dist[!is.na(node_dist)]
 
         # with(ShapeNodes, points(node_lon, node_lat, cex = 0.5, pch = 21, bg="red"))
 
         ## Filter out unscheduled stops
-        qry <- RSQLite::dbSendQuery(con, 
-            paste_nl(
-                "SELECT node_id FROM stops WHERE stop_id IN ",
-                "  (SELECT stop_id FROM stop_times",
-                "  WHERE trip_id=(SELECT trip_id FROM trips WHERE shape_id=? LIMIT 1))"
-            )
-        )
-        RSQLite::dbBind(qry, list(shape_id))
-        stopnodes <- RSQLite::dbFetch(qry)$node_id
-        RSQLite::dbClearResult(qry)
+        # qry <- RSQLite::dbSendQuery(con, 
+        #     paste_nl(
+        #         "SELECT node_id FROM stops WHERE stop_id IN ",
+        #         "  (SELECT stop_id FROM stop_times",
+        #         "  WHERE trip_id=(SELECT trip_id FROM trips WHERE shape_id=? LIMIT 1))"
+        #     )
+        # )
+        # RSQLite::dbBind(qry, list(shape_id))
+        # stopnodes <- RSQLite::dbFetch(qry)$node_id
+        # RSQLite::dbClearResult(qry)
         ShapeNodes$dist <- node_dist
-        ShapeNodes <- ShapeNodes[ShapeNodes$node_id %in% stopnodes | ShapeNodes$node_type == 1L,]
+        # ShapeNodes <- ShapeNodes[ShapeNodes$node_id %in% stopnodes | ShapeNodes$node_type == 1L,]
         if (nrow(ShapeNodes) == 0) next
         ShapeNodes <- ShapeNodes[order(ShapeNodes$dist),]
         ShapeNodes$seq <- seq_along(1:nrow(ShapeNodes))
@@ -150,6 +168,12 @@ construct_network <- function(nw, node_threshold = 0.5) {
 
         # insert new segments
         shape_segs <- shape_segs[is.na(shape_segs$road_segment_id), ]
+        next_seg_id <- RSQLite::dbGetQuery(con, 
+            "SELECT MAX(road_segment_id)as ID FROM road_segments"
+        )$ID + 1
+        if (is.na(next_seg_id)) next_seg_id <- 1
+        shape_segs$road_segment_id <- 
+            seq(next_seg_id, by = 1, length.out = nrow(shape_segs))
         RSQLite::dbWriteTable(con, "road_segments", shape_segs, append = TRUE)
     }
     if (exists("pb")) close(pb)

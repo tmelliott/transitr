@@ -1169,6 +1169,66 @@ namespace Gtfs
         }
         _version = (float)sqlite3_column_double (stmt, 3);
 
+        // and then load the shape nodes 
+        qry = "SELECT count(shape_id) FROM shape_nodes WHERE shape_id=?";
+        qrystr = qry.c_str ();
+        if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+        if (sqlite3_bind_text (stmt, 1, shstr, -1, SQLITE_STATIC) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't bind shape id to query\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return; 
+        }
+        if (sqlite3_step (stmt) != SQLITE_ROW)
+        {
+            Rcpp::Rcerr << " x Couldn't get row count from db\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+        _nodes.reserve (sqlite3_column_int (stmt, 0));
+        sqlite3_finalize (stmt);
+
+        qry = "SELECT node_id, distance_traveled FROM shape_nodes WHERE shape_id=? ORDER BY node_sequence";
+        qrystr = qry.c_str ();
+        if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+        if (sqlite3_bind_text (stmt, 1, shstr, -1, SQLITE_STATIC) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't bind shape id to query\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return; 
+        }
+
+        Node* nodei;
+        double di;
+        while (sqlite3_step (stmt) == SQLITE_ROW)
+        {
+            nodei = gtfs->find_node (sqlite3_column_int (stmt, 0));
+            di = sqlite3_column_double (stmt, 1);
+            _nodes.emplace_back (nodei, di);
+        }
+
+        sqlite3_finalize (stmt);
+
         // // and then load the shape segments 
         // qry = "SELECT count(shape_id) FROM shape_segments WHERE shape_id=?";
         // qrystr = qry.c_str ();
@@ -1258,6 +1318,12 @@ namespace Gtfs
     {
         if (!loaded) load ();
         return _segments;
+    }
+
+    std::vector<ShapeNode>& Shape::nodes ()
+    {
+        if (!loaded) load ();
+        return _nodes;
     }
 
     float Shape::version () { 

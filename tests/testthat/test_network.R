@@ -9,7 +9,7 @@ nw <- create_gtfs(
 test_that("network shapes makes sense", {
     sh <- load_shapes(nw)
     expect_is(sh, "network.shape.list")
-    expect_equal(length(sh), 17)
+    expect_equal(length(sh), 15)
 })
 
 test_that("network tables get constructed", {
@@ -22,9 +22,9 @@ test_that("network tables get constructed", {
 })
 
 test_that("network gets constructed correctly", {
-    construct_network(nw)
+    construct_network(nw, node_threshold = 0.0)
 
-    expect_equal(dim(load_nodes(nw)), c(369, 4))
+    expect_equal(dim(load_nodes(nw)), c(356, 4))
     expect_equal(
         sapply(load_nodes(nw), class),
         c(
@@ -32,9 +32,9 @@ test_that("network gets constructed correctly", {
             node_lon = "numeric", node_lat = "numeric"
         )
     )
-    expect_equal(dim(load_road_segments(nw)), c(379, 4))
+    expect_equal(dim(load_road_segments(nw)), c(362, 4))
     expect_equal(dim(load_intersections(nw)), c(0, 3))
-    expect_equal(dim(load_shape_segments(nw)), c(598, 4))
+    expect_equal(dim(load_shape_nodes(nw)), c(569, 4))
 })
 
-## file.copy(nw$database, "auckland_gtfs.db")
+## file.copy(nw$database, "tests/testthat/auckland_gtfs.db", overwrite = TRUE)

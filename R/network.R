@@ -100,7 +100,7 @@ load_intersections <- function(nw) {
     load_table(nw, "intersections")
 }
 
-load_shape_segments <- function(nw) {
+load_shape_nodes <- function(nw) {
     load_table(nw, "shape_nodes")
 }
 
