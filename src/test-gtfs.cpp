@@ -30,7 +30,8 @@ context("GTFS classes") {
         expect_true (t0->shape ()->path ().size () == 1019);
         expect_true (t0->shape ()->nodes ().size () == 47);
         // expect_true (t0->shape ()->segments ().size () == 1);
-        expect_true (t0->calendar ()->monday ());
+        expect_false (t0->calendar ()->monday ());
+        expect_true (t0->calendar ()->sunday ());
         // expect_true (t0->calendar ()->exceptions ().size () == 0);
         expect_true (t0->stops ().size () == 47);
     }
