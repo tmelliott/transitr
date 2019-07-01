@@ -895,12 +895,22 @@ namespace Gtfs
         gtfs->close_connection ();
 
         // now load stop distances ...
+        std::vector<ShapeNode> nodes = _shape->nodes ();
+        int ni = 0;
         for (auto st = _stops.begin (); st != _stops.end (); ++st)
         {
-            if (st->stop && _shape && st->distance == 0)
+            // find next stop node
+            while (nodes.at (ni).node->node_type () == 1) ni++;
+            if (nodes.at (ni).node->node_id () == st->stop->node ()->node_id ())
             {
-                st->distance = _shape->distance_of (st->stop->stop_position ());
+                st->distance = nodes.at (ni).distance;
+                ni++;
             }
+            // something went wrong ... 
+            // else if (st->stop && _shape && st->distance == 0)
+            // {
+            //     st->distance = _shape->distance_of (st->stop->stop_position ());
+            // }
         }
 
         // set start time
@@ -1671,7 +1681,7 @@ namespace Gtfs
 
         sqlite3_stmt* stmt;
         const char* qrystr;
-        std::string qry = "SELECT stop_lat, stop_lon, stop_code, stop_name, stop_desc, zone_id, parent_station, location_type, version FROM stops WHERE stop_id=?";
+        std::string qry = "SELECT stop_lat, stop_lon, stop_code, stop_name, stop_desc, zone_id, parent_station, location_type, node_id, version FROM stops WHERE stop_id=?";
         qrystr = qry.c_str ();
         if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {
@@ -1726,7 +1736,9 @@ namespace Gtfs
         {
             _location_type = sqlite3_column_int (stmt, 7);
         }
-        _version = (float)sqlite3_column_double (stmt, 8);
+        int nodeid = sqlite3_column_int (stmt, 8);
+        _node = gtfs->find_node (nodeid);
+        _version = (float)sqlite3_column_double (stmt, 9);
 
         sqlite3_finalize (stmt);
         gtfs->close_connection ();
@@ -1786,6 +1798,11 @@ namespace Gtfs
     {
         if (!loaded) load ();
         return _location_type;
+    }
+    Node* Stop::node ()
+    {
+        if (!loaded) load ();
+        return _node;
     }
     std::vector<Trip*>& Stop::trips ()
     {
@@ -1988,7 +2005,7 @@ namespace Gtfs
 
         sqlite3_stmt* stmt;
         const char* qrystr;
-        std::string qry = "SELECT node_type, node_lat, node_lon FROM node WHERE node_id=?";
+        std::string qry = "SELECT node_type, node_lat, node_lon FROM nodes WHERE node_id=?";
         qrystr = qry.c_str ();
         if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {
@@ -2040,11 +2057,13 @@ namespace Gtfs
 
     int Node::node_type ()
     {
+        if (!loaded) load ();
         return _node_type;
     }
 
     latlng& Node::node_position ()
     {
+        if (!loaded) load ();
         return _node_position;
     }
 

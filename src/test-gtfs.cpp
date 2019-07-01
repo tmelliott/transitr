@@ -29,11 +29,11 @@ context("GTFS classes") {
 
         expect_true (t0->shape ()->path ().size () == 1019);
         expect_true (t0->shape ()->nodes ().size () == 47);
+        expect_true (t0->stops ().size () == 47);
         // expect_true (t0->shape ()->segments ().size () == 1);
         expect_false (t0->calendar ()->monday ());
         expect_true (t0->calendar ()->sunday ());
         // expect_true (t0->calendar ()->exceptions ().size () == 0);
-        expect_true (t0->stops ().size () == 47);
     }
 
     test_that("Invalid requests return nullptrs") {
@@ -61,7 +61,19 @@ context("GTFS classes") {
 
     test_that("Nodes load") {
         Gtfs::Node* n = gtfs.find_node (1);
+        expect_true (n->node_type () == 0);
+    }
 
+    test_that("Stop and node distances are equal") {
+        std::string t ("1141160875-20190613111133_v80.31");
+        Gtfs::Trip* t0 = gtfs.find_trip (t);
+        std::vector<Gtfs::StopTime> stops = t0->stops ();
+        std::vector<Gtfs::ShapeNode> nodes = t0->shape ()->nodes ();
+        expect_true (stops.size () == nodes.size ());
+        for (int i=0; i<stops.size (); i++)
+        {
+            expect_true (stops.at (i).distance == nodes.at (i).distance);
+        }
     }
 
 }

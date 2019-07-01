@@ -406,6 +406,7 @@ namespace Gtfs
         std::string _zone_id;
         std::string _parent_station;
         int _location_type;
+        Node* _node;
         std::vector<Trip*> _trips;
         float _version;
 
@@ -429,6 +430,7 @@ namespace Gtfs
         std::string& zone_id ();
         std::string& parent_station ();
         int location_type ();
+        Node* node ();
         std::vector<Trip*>& trips ();
         float version ();
 
