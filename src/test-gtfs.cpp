@@ -50,16 +50,12 @@ context("GTFS classes") {
         double dx;
         latlng p;
         double slen = s->path ().back ().distance;
-        std::cout << "\n shape_id = " << s->shape_id () << ", length = "
-            << slen << "\n";
         for (auto d : ds)
         {
             p = s->coordinates_of (d);
             dx = s->distance_of (p);
-            std::cout << "\n " << d << " -> " << dx;
             expect_true (fabs (fmin (d, slen) - dx) < 1);
         }
-        std::cout << "\n";
     }
 
     test_that("Nodes load") {

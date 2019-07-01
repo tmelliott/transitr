@@ -1335,7 +1335,7 @@ namespace Gtfs
     {
         if (!loaded) load ();
         int closest = 0;
-        double dmin = 100000;
+        double dmin = 1e6;
         double di;
         for (unsigned int i=0; i<_path.size (); ++i)
         {
@@ -1352,30 +1352,63 @@ namespace Gtfs
             return _path[closest].distance;
         }
 
-        // pA -> pB -> pC
-        // p0B is closest, but on AB or BC?
-        bool forward (true);
-        if (closest >= _path.size () - 1)
+        // closest point is the first point? must be on the first piece!
+        if (closest == 0)
         {
-            forward = false;
+            return alongTrackDistance(x, _path[0].pt, _path[1].pt);
+        } 
+        
+        // closest point is the last point? must be on the last piece!
+        if (closest == _path.size () - 1)
+        {
+            return _path[closest - 1].distance +
+                alongTrackDistance(x, _path[closest - 1].pt, _path[closest].pt);
         }
-        else if (closest != 0)
+        
+        // compute the ALONG TRACK DISTANCE for
+        // segments either side of closest point
+        // to determing where the point lies
+        double a1, a2, d1, d2;
+        a1 = alongTrackDistance(x, _path[closest - 1].pt, _path[closest].pt);
+        a2 = alongTrackDistance(x, _path[closest].pt, _path[closest + 1].pt);
+        d1 = _path[closest].distance - _path[closest - 1].distance;
+        d2 = _path[closest + 1].distance - _path[closest].distance;
+
+        if (a1 >= 0 && a1 < d1)
         {
-            double dA = distanceEarth (_path[closest-1].pt, x);
-            double dB = distanceEarth (_path[closest+1].pt, x);
-            forward = dB <= dA;
+            return _path[closest - 1].distance + a1;
+        }
+        if (a2 >= 0 && a2 < d2)
+        {
+            return _path[closest].distance + a2;
         }
 
-        if (forward)
-        {
-            return _path[closest].distance + 
-                alongTrackDistance(x, _path[closest].pt, _path[closest+1].pt);
-        }
-        else
-        {
-            return _path[closest-1].distance +
-                alongTrackDistance(x, _path[closest-1].pt, _path[closest].pt);
-        }
+        return 0.0;
+
+        // pA -> pB -> pC
+        // p0B is closest, but on AB or BC?
+        // bool forward (true);
+        // if (closest >= _path.size () - 1)
+        // {
+        //     forward = false;
+        // }
+        // else if (closest != 0)
+        // {
+        //     double dA = distanceEarth (_path[closest-1].pt, x);
+        //     double dB = distanceEarth (_path[closest+1].pt, x);
+        //     forward = dB <= dA;
+        // }
+
+        // if (forward)
+        // {
+        //     return _path[closest].distance + 
+        //         alongTrackDistance(x, _path[closest].pt, _path[closest+1].pt);
+        // }
+        // else
+        // {
+        //     return _path[closest-1].distance +
+        //         alongTrackDistance(x, _path[closest-1].pt, _path[closest].pt);
+        // }
     }
 
     latlng Shape::coordinates_of (double& d)
