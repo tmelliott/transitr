@@ -1286,15 +1286,6 @@ namespace Gtfs
         _segments.reserve (sqlite3_column_int (stmt, 0));
         sqlite3_finalize (stmt);
 
-        // Segment* segi;
-        // double di;
-        // while (sqlite3_step (stmt) == SQLITE_ROW)
-        // {
-        //     segi = gtfs->find_segment (sqlite3_column_int (stmt, 0));
-        //     di = sqlite3_column_double (stmt, 1);
-        //     _segments.emplace_back (segi, di);
-        // }
-
         // sqlite3_finalize (stmt);
         gtfs->close_connection ();
 
