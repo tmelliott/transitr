@@ -75,6 +75,8 @@ context ("Vehicle states") {
 
     std::string t ("1141160875-20190613111133_v80.31");
     Gtfs::Trip* t0 = gtfs.find_trip (t);
+    uint64_t ts = 1562034647;
+    Gtfs::Stop* s1 = t0->stops ().at (0).stop;
 
     test_that ("Vehicle loads OK with a trip") {
         expect_true (v.trip () == nullptr);
@@ -82,11 +84,9 @@ context ("Vehicle states") {
         expect_false (v.trip () == nullptr);
     }
 
-    test_that ("Vehicle initializes to zero with position update at stop 1") {
+    test_that ("Vehicle initializes OK with position update at stop 1") {
         // this timestamp holds no significance, other than it was the time
         // when I needed a timestamp!
-        uint64_t ts = 1562034647;
-        Gtfs::Stop* s1 = t0->stops ().at (0).stop;
         v.add_event (Gtfs::Event (ts, Gtfs::EventType::gps, t, s1->stop_position ()));
         v.update (&gtfs);
         expect_true (v.get_events ().size () == 1);
@@ -97,5 +97,9 @@ context ("Vehicle states") {
         {
             expect_true (p->get_distance () <= 100);
         }
+    }
+
+    test_that ("Vehicle initializes OK with position update mid-route") {
+        // v.
     }
 }
