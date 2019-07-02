@@ -1239,54 +1239,52 @@ namespace Gtfs
 
         sqlite3_finalize (stmt);
 
-        // // and then load the shape segments 
-        // qry = "SELECT count(shape_id) FROM shape_segments WHERE shape_id=?";
-        // qrystr = qry.c_str ();
-        // if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
-        // {
-        //     Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
-        //         << sqlite3_errmsg (db) << "\n";
-        //     sqlite3_finalize (stmt);
-        //     gtfs->close_connection ();
-        //     return;
-        // }
-        // if (sqlite3_bind_text (stmt, 1, shstr, -1, SQLITE_STATIC) != SQLITE_OK)
-        // {
-        //     Rcpp::Rcerr << " x Can't bind shape id to query\n  "
-        //         << sqlite3_errmsg (db) << "\n";
-        //     sqlite3_finalize (stmt);
-        //     gtfs->close_connection ();
-        //     return; 
-        // }
-        // if (sqlite3_step (stmt) != SQLITE_ROW)
-        // {
-        //     Rcpp::Rcerr << " x Couldn't get row count from db\n  "
-        //         << sqlite3_errmsg (db) << "\n";
-        //     sqlite3_finalize (stmt);
-        //     gtfs->close_connection ();
-        //     return;
-        // }
-        // _segments.reserve (sqlite3_column_int (stmt, 0));
-        // sqlite3_finalize (stmt);
-
-        // qry = "SELECT road_segment_id, distance_traveled FROM shape_segments WHERE shape_id=? ORDER BY shape_road_sequence";
-        // qrystr = qry.c_str ();
-        // if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
-        // {
-        //     Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
-        //         << sqlite3_errmsg (db) << "\n";
-        //     sqlite3_finalize (stmt);
-        //     gtfs->close_connection ();
-        //     return;
-        // }
-        // if (sqlite3_bind_text (stmt, 1, shstr, -1, SQLITE_STATIC) != SQLITE_OK)
-        // {
-        //     Rcpp::Rcerr << " x Can't bind shape id to query\n  "
-        //         << sqlite3_errmsg (db) << "\n";
-        //     sqlite3_finalize (stmt);
-        //     gtfs->close_connection ();
-        //     return; 
-        // }
+        // now load the road segments
+        _segments.reserve (_nodes.size () - 1);
+        Segment* segi;
+        qry = "SELECT road_segment_id FROM road_segments WHERE node_from=? AND node_to=?";
+        qrystr = qry.c_str ();
+        if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+        for (int i=0; i<_nodes.size ()-1; i++)
+        {
+            if (sqlite3_bind_int (stmt, 1, _nodes.at (i).node->node_id ()) != SQLITE_OK)
+            {
+                Rcpp::Rcerr << " x Can't bind FROM node to query\n  "
+                    << sqlite3_errmsg (db) << "\n";
+                sqlite3_finalize (stmt);
+                gtfs->close_connection ();
+                return; 
+            }
+            if (sqlite3_bind_int (stmt, 2, _nodes.at (i+1).node->node_id ()) != SQLITE_OK)
+            {
+                Rcpp::Rcerr << " x Can't bind TO node to query\n  "
+                    << sqlite3_errmsg (db) << "\n";
+                sqlite3_finalize (stmt);
+                gtfs->close_connection ();
+                return; 
+            }
+            if (sqlite3_step (stmt) != SQLITE_ROW)
+            {
+                Rcpp::Rcerr << " x Couldn't get row count from db\n  "
+                    << sqlite3_errmsg (db) << "\n";
+                sqlite3_finalize (stmt);
+                gtfs->close_connection ();
+                return;
+            }
+            segi = gtfs->find_segment (sqlite3_column_int (stmt, 0));
+            _segments.emplace_back (segi, _nodes.at (i).distance);
+            sqlite3_reset (stmt);
+        }
+    
+        _segments.reserve (sqlite3_column_int (stmt, 0));
+        sqlite3_finalize (stmt);
 
         // Segment* segi;
         // double di;

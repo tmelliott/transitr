@@ -76,4 +76,10 @@ context("GTFS classes") {
         }
     }
 
+    test_that("Shape segments are loaded correctly") {
+        Gtfs::Shape* s = &(gtfs.shapes ().begin (0)->second);
+        std::vector<Gtfs::ShapeSegment> segs = s->segments ();
+        expect_true (segs.size () == s->nodes ().size () - 1);
+    }
+
 }
