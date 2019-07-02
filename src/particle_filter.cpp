@@ -45,7 +45,7 @@ namespace Gtfs {
             {
                 // initialize each particle within 100m of obs
                 u = rng.runif ();
-                d = (dist < 0 ? u * dmax : fmin(dmax, u * 200 + dist / 2.0));
+                d = (dist < 0 ? u * dmax : fmax(0, fmin(dmax, u * 200 - 100 + dist)));
                 _state.emplace_back (d, rng.runif () * 30.0, rng.rnorm () * _systemnoise, this);
             }
             else

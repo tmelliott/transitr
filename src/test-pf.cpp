@@ -1,4 +1,5 @@
 #include <testthat.h>
+#include <iostream>
 #include <string>
 
 #include "gtfs.h"
@@ -65,6 +66,7 @@ context ("Vehicle states") {
     std::string dbname ("auckland_gtfs.db");
     Gtfs::Gtfs gtfs (dbname);
     Gtfs::par par;
+    par.n_particles = 10;
 
     RNG rng (10);
 
@@ -81,6 +83,8 @@ context ("Vehicle states") {
     }
 
     test_that ("Vehicle initializes to zero with position update at stop 1") {
+        // this timestamp holds no significance, other than it was the time
+        // when I needed a timestamp!
         uint64_t ts = 1562034647;
         Gtfs::Stop* s1 = t0->stops ().at (0).stop;
         v.add_event (Gtfs::Event (ts, Gtfs::EventType::gps, t, s1->stop_position ()));
@@ -89,5 +93,9 @@ context ("Vehicle states") {
 
         v.mutate (rng, &gtfs);
         expect_true (v.state ()->size () == par.n_particles);
+        for (auto p = v.state ()->begin (); p < v.state ()->end (); ++p)
+        {
+            expect_true (p->get_distance () <= 100);
+        }
     }
 }
