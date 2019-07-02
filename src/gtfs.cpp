@@ -1465,7 +1465,7 @@ namespace Gtfs
         sqlite3_stmt* stmt;
         const char* qrystr;
 
-        std::string qry = "SELECT int_from, int_to, length FROM road_segments WHERE road_segment_id=?";
+        std::string qry = "SELECT node_from, node_to, length FROM road_segments WHERE road_segment_id=?";
         qrystr = qry.c_str ();
         if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {

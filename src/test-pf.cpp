@@ -60,3 +60,34 @@ context("Particle filter helper functions") {
         expect_true (Gtfs::find_segment_index (3000, &seg2) == 0);
     }
 }
+
+context ("Vehicle states") {
+    std::string dbname ("auckland_gtfs.db");
+    Gtfs::Gtfs gtfs (dbname);
+    Gtfs::par par;
+
+    RNG rng (10);
+
+    std::string vid ("test");
+    Gtfs::Vehicle v (vid, &par);
+
+    std::string t ("1141160875-20190613111133_v80.31");
+    Gtfs::Trip* t0 = gtfs.find_trip (t);
+
+    test_that ("Vehicle loads OK with a trip") {
+        expect_true (v.trip () == nullptr);
+        v.set_trip (t0);
+        expect_false (v.trip () == nullptr);
+    }
+
+    test_that ("Vehicle initializes to zero with position update at stop 1") {
+        uint64_t ts = 1562034647;
+        Gtfs::Stop* s1 = t0->stops ().at (0).stop;
+        v.add_event (Gtfs::Event (ts, Gtfs::EventType::gps, t, s1->stop_position ()));
+        v.update (&gtfs);
+        expect_true (v.get_events ().size () == 1);
+
+        v.mutate (rng, &gtfs);
+        expect_true (v.state ()->size () == par.n_particles);
+    }
+}

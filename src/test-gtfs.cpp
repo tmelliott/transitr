@@ -81,5 +81,22 @@ context("GTFS classes") {
         std::vector<Gtfs::ShapeSegment> segs = s->segments ();
         expect_true (segs.size () == s->nodes ().size () - 1);
     }
-
 }
+
+
+context ("Road network") {
+    std::string dbname ("auckland_gtfs.db");
+    Gtfs::Gtfs gtfs (dbname);
+
+    Gtfs::par par;
+
+    test_that("Initialising road network works") {
+        for (auto it = gtfs.segments ().begin (); it != gtfs.segments ().end (); ++it)
+        {
+            it->second.update (&par, &gtfs);
+            expect_true (it->second.travel_time () == it->second.length () / 10.0);
+        }
+    }
+}
+
+
