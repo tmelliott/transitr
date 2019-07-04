@@ -93,13 +93,36 @@ context ("Vehicle states") {
 
         v.mutate (rng, &gtfs);
         expect_true (v.state ()->size () == par.n_particles);
-        for (auto p = v.state ()->begin (); p < v.state ()->end (); ++p)
+        for (auto p = v.state ()->begin (); p != v.state ()->end (); ++p)
         {
             expect_true (p->get_distance () <= 100);
+            expect_true (
+                p->get_travel_times ().size () == 
+                    t0->shape ()->segments ().size ()
+            );
         }
     }
 
-    test_that ("Vehicle initializes OK with position update mid-route") {
-        // v.
+    std::vector<Gtfs::StopTime>& stops = t0->stops ();
+    test_that("Arrival and departure observations at stop 2 get dealt with correctly") {
+        // another timestamp, I suppose
+        // we pretend that the previous observation was at STOP 1
+        // and bus travels at 15m/s to next stop, and waits for 20 seconds
+        double d = stops.at (1).distance - stops.at (0).distance;
+        uint64_t ts2, ts3;
+        ts2 = ts + round(d / 15.0);
+        int dwell = 20;
+        ts3 = ts2 + dwell;
+        v.add_event (Gtfs::Event (ts2, Gtfs::EventType::arrival, t, 2));
+        v.add_event (Gtfs::Event (ts3, Gtfs::EventType::departure, t, 2));
+        v.update (&gtfs);
+        expect_true (v.get_events ().size () == 2);
+
+        // now mutate that 
+        v.mutate (rng, &gtfs);
+        for (auto p = v.state ()->begin (); p != v.state ()->end (); ++p)
+        {
+            // expect_true(p->get_arrival_time (1) > 0);
+        }
     }
 }
