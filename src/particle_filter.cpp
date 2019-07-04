@@ -657,253 +657,440 @@ namespace Gtfs {
 
     void Particle::travel (int delta, Event& e, RNG& rng)
     {
-        if (complete || !vehicle || !vehicle->trip () || 
-            !vehicle->trip ()->shape ()) return;
+        std::cout << "\n ===> Transition particle\n"
+            << " * Initial state: [d=" << distance 
+            << ", s=" << speed 
+            << ", j=" << stop_index
+            << ",l=" << segment_index
+            << "]";
 
-        // do the particle physics
-        double Dmax = vehicle->trip ()->shape ()->path ().back ().distance;
-        if (distance >= Dmax) 
+        std::cout << "\n * Delta = " << delta;
+
+        std::cout << "\n * Event = ";
+        if (e.type == EventType::gps)
+        {
+            std::cout << "GPS observation";
+        }
+        else
+        {
+            std::cout << (e.type == EventType::arrival ? "arrival" : "departure")
+                << " at stop " << e.stop_index;
+        }
+
+        if (delta == 0 || complete || !vehicle || !vehicle->trip () || 
+            !vehicle->trip ()->shape ()) 
+        {
+            std::cout << "\n ** nothing to mutate, skipping particle\n";
+            return;
+        }
+
+        // Shape is:
+        Shape* shape = vehicle->trip ()->shape ();
+        std::vector<ShapeNode>& nodes = shape->nodes ();
+        std::vector<StopTime>& stops = vehicle->trip ()->stops ();
+
+        int M, L;
+        M = stops.size ();
+        L = nodes.size ();
+
+        std::cout << "\n\n * Shape: " << shape->path ().size ()
+            << " with " << L << " nodes and " << M << " stops";
+
+        double Dmax (shape->path ().back ().distance);
+        std::cout << "\n * Route distance = " << Dmax << "m";
+        if (distance >= Dmax)
         {
             distance = Dmax;
             complete = true;
-            return;
-        }
-        
-        // get STOPS
-        std::vector<StopTime>* stops;
-        stops = &(vehicle->trip ()->stops ());
-        int M (stops->size ());
-        stop_index = find_stop_index (distance, stops);
-        // std::cout << " [M=" << M << ",m=" << stop_index << "], ";
-        if (stop_index == M-1) 
-        {
-            distance = Dmax;
-            complete = true;
+            std::cout << " -> particle has finished\n\n";
             return;
         }
 
-        double next_stop_d = stops->at (stop_index + 1).distance;
-        
-        // get SEGMENTS
-        std::vector<ShapeSegment>* segments;
-        segments = &(vehicle->trip ()->shape ()->segments ());
-        int L (segments->size ());
-        // std::cout << " [L=" << L;
-        unsigned int l (segment_index);
-        // std::cout << ",l=" << l << " --> " << segment_index << "], ";
-        double next_segment_d;
-        next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
-        
-        // allow vehicle to remain stationary if at a stop:
-        // if (distance == stops->at (stop_index).distance)
-        // {
-        //     if (rng.runif () < 0.05)
-        //     {
-        //         double w = vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
-        //         delta = fmax (0, delta - round (w));
-        //         // we don't want this to affect the speed
-        //     }
-        // }
-        // else if (distance == segments->at (l).distance &&
-        //          rng.runif () < 0.05)
-        // {
-        //     double w = - log (rng.runif ()) * delta;
-        //     delta = fmax (0, delta - round (w));
-        //     if (tt.at (l) >= 0)
-        //         tt.at (l) = tt.at (l) + 1;
-        // }
+        ShapeNode* next_node;
+        next_node = &(nodes.at (segment_index + 1));
+        std::cout << "\n\n * Next node: "
+            << (segment_index + 1)
+            << " (" << next_node->distance << "m)";
 
-         
-        // adjust "delta" if arrival/departure already set
-        uint64_t tx = vehicle->timestamp () - delta;
-        if (dt.at (stop_index) > tx)
+        StopTime* next_stop;
+        next_stop = &(stops.at (stop_index + 1));
+        std::cout << "\n * Next stop: "
+            << (stop_index + 1)
+            << " (" << next_stop->distance << "m)";
+
+        if (next_node->node->node_type () == 0)
         {
-            // particle is AT the stop, not yet departed (it's just about to...)
-            if (e.type == EventType::departure && stop_index == e.stop_index)
+            if (next_node->node->node_id () == next_stop->stop->node ()->node_id ())
             {
-                uint64_t newtime = rng.rnorm () * vehicle->departure_error () + e.timestamp + 0.5;
-                // departure time has to be >= arrival time
-                dt.at (stop_index) = fmax (newtime, at.at (stop_index));
-                delta = (int)(vehicle->timestamp () - dt.at (stop_index));
-            }
-            // can't fudge arrival time (in case its based on speed!!!)
-        }
-        else if (at.at (stop_index) > tx)
-        {
-            // particle has not yet ARRIVED at the stop
-            if (e.type == EventType::departure && stop_index == e.stop_index)
-            {
-                // let's fudge 
-                uint64_t newtime = rng.rnorm () * vehicle->departure_error () + e.timestamp + 0.5;
-                dt.at (stop_index) = fmax (newtime, at.at (stop_index));
-                delta = (int)(vehicle->timestamp () - dt.at (stop_index));
-            }
-            else if (e.type == EventType::arrival && stop_index == e.stop_index)
-            {
-                // resample dwell time (to allow variation)
-                bus_stop (at.at (stop_index), rng);
-                delta = (int)(vehicle->timestamp () - dt.at (stop_index));
+                std::cout << "\n   -> next node is the next stop!";
             }
             else
             {
-                delta = (int)(vehicle->timestamp () - at.at (stop_index));
+                // something odd happening and stop/node aren't matching up :(
+                std::cout << "\n   -> next node is a stop, but not the right one!!!\n\n";
+                return;
             }
         }
 
-        if (distance > stops->at (stop_index).distance && rng.runif () < 0.01)
+        // if at a stop, we must wait there while people get on/off
+        if (distance == nodes.at (segment_index).distance)
         {
-            // a very small chance for particles to remain stationary
-            int tr = rng.runif () * delta + 0.5;
-            if (tt.at (l) >= 0)
-                tt.at (l) = tt.at (l) + tr;
-            delta -= tr;
-
-            // speed = 0.0;
-            // when /not/ at a bus stop, set speed to 0 and wait
-            // double w = - log (rng.runif ()) * delta;
-            // delta = fmax (0.0, delta - round (w));
-            // then the bus needs to accelerate back up to speed ... for how many seconds?
-            // accelerating = 5.0 + rng.runif () * 10.0;
-            // acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
+            std::cout << "\n   -> currently still at node " << segment_index;
+            double wait (0);
+            if (nodes.at (segment_index).node->node_type () == 0)
+            {
+                std::cout << " which is a bus stop";
+                wait = vehicle->gamma () - 
+                    vehicle->dwell_time () * log (rng.runif ());
+            }
+            else
+            {
+                std::cout << " which is a generic intersection";
+                wait = vehicle->dwell_time () * log (rng.runif ());
+            }
+            std::cout << " -> waiting " << round (wait) << "s";
+            delta -= round (wait);
         }
 
-
-        double speed_mean = 10.0;
-        double speed_sd = 100.0;
-        // if (segments->at (l).segment->travel_time () > 0 &&
-        //     segments->at (l).segment->uncertainty () > 0) 
-        // {
-        //     speed_mean = segments->at (l).segment->get_speed ();
-        //     speed_sd = - segments->at (l).segment->length () / pow (speed_mean, 2) *
-        //         segments->at (l).segment->uncertainty ();
-        //     speed_sd = pow(speed_sd, 0.5);
-        // }
-        double vmax = 30; //rng.runif () < 0.5 ? 30.0 : 15.0;
+        if (delta == 0) return;
         
         if (vehicle->params ()->noise_model == 0)
         {
+            std::cout << "\n\n * Using noise model 0, adjusting speed:"
+                << "\n   " << speed << " -> ";
             // add noise once per iteration, 
             // or when passing segment/stop
             double vel = speed + rng.rnorm () * vehicle->system_noise ();
-            while (vel <= 0 || vel > 30) vel = speed + rng.rnorm () * vehicle->system_noise ();
+            while (vel <= 0 || vel > 30) 
+                vel = speed + rng.rnorm () * vehicle->system_noise ();
             speed = vel;
+            std::cout << speed;
         }
 
-        // while (distance < Dmax && delta > 0.0)
-        while (behind_event (e, delta))
+        // now begin travelling
+        double node_dist, node_eta;
+        while (delta > 0) //behind_event (e, delta))
         {
-            // add system noise to acceleration to ensure speed remains in [0, vmax]
-            // double accel_prop (-100.0);
-            // double n = 0;
-            // if (speed > vmax)
-            // {
-            //     speed = rng.runif () * vmax;
-            // }
-            // while (speed + accel_prop < 0.0 || speed + accel_prop > vmax && n < 1000)
-            // {
-            //     accel_prop = rng.rnorm () * vehicle->system_noise () * 
-            //         (1.0 + (double)n / 100.0);
-            //     n++;
-            //     // if (accelerating > 0.0)
-            //     // {
-            //     //     accel_prop += acceleration;
-            //     //     accelerating--;
-            //     // }
-            // }
-
-            // double v = fmax (0, fmin (30, speed + acceleration));
-            // double v = speed;
-            // double vstar = speed + accel_prop;
-            // double alpha = (pow (v - speed_mean, 2) - pow(vstar - speed_mean, 2)) / (2 * pow (speed_sd, 2));
-            // alpha = fmin (0, alpha);
-            // if (rng.runif () < exp (alpha))
-            // {
-            //     acceleration = accel_prop;
-            //     speed = vstar;
-            // }
-            // else
-            // {
-            //     speed = v;
-            // }
-
-            if (vehicle->params ()->noise_model == 1)
+            // noise model 0
+            // jump straight to node/
+            if (vehicle->params ()->noise_model == 0)
             {
-                double vel = speed + rng.rnorm () * vehicle->system_noise ();
-                while (vel <= 0 || vel > 30) vel = speed + rng.rnorm () * vehicle->system_noise ();
-                speed = vel;
-            }
-            distance += speed;
-            if (distance >= Dmax) complete = true;
-            delta--;
+                node_dist = next_node->distance - distance;
+                node_eta = node_dist / speed;
+                std::cout << "\n\n * Next node is " << node_dist << "m away"
+                    << "\n   -> ETA of " << node_eta << "s";
+                if (node_eta > delta)
+                {
+                    distance += delta * speed;
+                    delta = 0;
+                    tt.at (segment_index) += delta;
+                    std::cout << "\n   -> stopped at " << distance << "m";
+                }
+                else
+                {
+                    delta -= node_eta;
+                    tt.at (segment_index) += node_eta;
+                    distance = node_dist;
+                    segment_index++;
+                    next_node = &(nodes.at (segment_index + 1));
+                    bool is_stop;
+                    is_stop = next_node->node->node_type () == 0;
+                    if (is_stop)
+                    {
+                        stop_index++;
+                        next_stop = &(stops.at (stop_index + 1));
+                    }
+                    std::cout << "\n   -> arrival at node " << (segment_index);
+                    tt.at (segment_index) = 0;
 
-            if (tt.at (l) >= 0)
-                tt.at (l) = tt.at (l) + 1;
-            
-            if (l < L-1 && distance >= next_segment_d)
-            {
-                // reaching intersection ... 
-                l++;
-                segment_index++;
-                tt.at (l) = 0;
-                next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
-                // vmax = rng.runif () < 0.5 ? 30.0 : 15.0;
-                // if (segments->at (l).segment->travel_time () > 0 &&
-                //     segments->at (l).segment->uncertainty () > 0) 
-                // {
-                //     speed_mean = segments->at (l).segment->get_speed ();
-                //     speed_sd = - segments->at (l).segment->length () / pow (speed_mean, 2) *
-                //         segments->at (l).segment->uncertainty ();
-                //     speed_sd = pow(speed_sd, 0.5);
-                // }
-                // else
-                // {
-                    // speed_mean = 10.0;
-                    // speed_sd = 100.0;
-                // }
-                if (vehicle->params ()->noise_model == 0)
-                {
-                    double vel = speed + rng.rnorm () * vehicle->system_noise ();
-                    while (vel <= 0 || vel > 30) vel = speed + rng.rnorm () * 3.0;//vehicle->system_noise ();
-                    speed = vel;
-                }
-            }
+                    if (distance >= Dmax)
+                    {
+                        complete = true;
+                        std::cout << "\n\n * End of the line reached!";
+                        return;
+                    }
 
-            if (distance >= next_stop_d)
-            {
-                stop_index++;
-                // bus arrives at stop - either stops at stop, of drives past
-                if (bus_stop (vehicle->timestamp () - delta, rng)) 
-                    distance = next_stop_d;
-                // end of route? end.
-                if (stop_index >= M-1)
-                {
-                    complete = true;
-                    break;
+                    // now handle stopping behaviour
+                    double dwell = 0.0;
+                    if (is_stop)
+                    {
+                        if (rng.runif() < vehicle->pr_stop ())
+                        {
+                            std::cout << "\n   -> dwell time at stop: ";
+                            dwell = vehicle->gamma () + 
+                                vehicle->dwell_time () +
+                                vehicle->dwell_time_var () * rng.runif ();
+                            std::cout << round (dwell);
+                        }
+                        else
+                        {
+                            std::cout << "\n   -> skipping stop";
+                        }
+                    }
+                    else
+                    {
+
+                    }
+                    delta -= fmin (delta, round(dwell));
                 }
-                // else update next stop and delta
-                next_stop_d = stops->at (stop_index + 1).distance;
-                delta -= (int)(dt.at (stop_index) - at.at (stop_index));
-                if (vehicle->params ()->noise_model == 0)
-                {
-                    double vel = speed + rng.rnorm () * vehicle->system_noise ();
-                    while (vel <= 0 || vel > 30) vel = speed + rng.rnorm () * 3.0;//vehicle->system_noise ();
-                    speed = vel;
-                }
-                continue;
+
             }
         }
 
-        // almost at next stop ...
-        if (stop_index < M-1 &&
-            next_stop_d - distance < 20)
-        {
-            stop_index++;
-            bus_stop (vehicle->timestamp () - delta, rng);
-            distance = next_stop_d;
-            if (stop_index < M - 1) 
-                next_stop_d = stops->at (stop_index + 1).distance;
-        }
+
+        std::cout << "\n ==> transition complete.\n"
+            << "--------------------------\n\n";
     }
+
+    // void Particle::old_travel (int delta, Event& e, RNG& rng)
+    // {
+            // if (complete || !vehicle || !vehicle->trip () || 
+            // !vehicle->trip ()->shape ()) return;
+
+    //     // do the particle physics
+    //     double Dmax = vehicle->trip ()->shape ()->path ().back ().distance;
+    //     if (distance >= Dmax) 
+    //     {
+    //         distance = Dmax;
+    //         complete = true;
+    //         return;
+    //     }
+        
+    //     // get STOPS
+    //     std::vector<StopTime>* stops;
+    //     stops = &(vehicle->trip ()->stops ());
+    //     int M (stops->size ());
+    //     stop_index = find_stop_index (distance, stops);
+    //     // std::cout << " [M=" << M << ",m=" << stop_index << "], ";
+    //     if (stop_index == M-1) 
+    //     {
+    //         distance = Dmax;
+    //         complete = true;
+    //         return;
+    //     }
+
+    //     double next_stop_d = stops->at (stop_index + 1).distance;
+        
+    //     // get SEGMENTS
+    //     std::vector<ShapeSegment>* segments;
+    //     segments = &(vehicle->trip ()->shape ()->segments ());
+    //     int L (segments->size ());
+    //     // std::cout << " [L=" << L;
+    //     unsigned int l (segment_index);
+    //     // std::cout << ",l=" << l << " --> " << segment_index << "], ";
+    //     double next_segment_d;
+    //     next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
+        
+    //     // allow vehicle to remain stationary if at a stop:
+    //     // if (distance == stops->at (stop_index).distance)
+    //     // {
+    //     //     if (rng.runif () < 0.05)
+    //     //     {
+    //     //         double w = vehicle->gamma () - vehicle->dwell_time () * log (rng.runif ());
+    //     //         delta = fmax (0, delta - round (w));
+    //     //         // we don't want this to affect the speed
+    //     //     }
+    //     // }
+    //     // else if (distance == segments->at (l).distance &&
+    //     //          rng.runif () < 0.05)
+    //     // {
+    //     //     double w = - log (rng.runif ()) * delta;
+    //     //     delta = fmax (0, delta - round (w));
+    //     //     if (tt.at (l) >= 0)
+    //     //         tt.at (l) = tt.at (l) + 1;
+    //     // }
+
+         
+    //     // adjust "delta" if arrival/departure already set
+    //     uint64_t tx = vehicle->timestamp () - delta;
+    //     if (dt.at (stop_index) > tx)
+    //     {
+    //         // particle is AT the stop, not yet departed (it's just about to...)
+    //         if (e.type == EventType::departure && stop_index == e.stop_index)
+    //         {
+    //             uint64_t newtime = rng.rnorm () * vehicle->departure_error () + e.timestamp + 0.5;
+    //             // departure time has to be >= arrival time
+    //             dt.at (stop_index) = fmax (newtime, at.at (stop_index));
+    //             delta = (int)(vehicle->timestamp () - dt.at (stop_index));
+    //         }
+    //         // can't fudge arrival time (in case its based on speed!!!)
+    //     }
+    //     else if (at.at (stop_index) > tx)
+    //     {
+    //         // particle has not yet ARRIVED at the stop
+    //         if (e.type == EventType::departure && stop_index == e.stop_index)
+    //         {
+    //             // let's fudge 
+    //             uint64_t newtime = rng.rnorm () * vehicle->departure_error () + e.timestamp + 0.5;
+    //             dt.at (stop_index) = fmax (newtime, at.at (stop_index));
+    //             delta = (int)(vehicle->timestamp () - dt.at (stop_index));
+    //         }
+    //         else if (e.type == EventType::arrival && stop_index == e.stop_index)
+    //         {
+    //             // resample dwell time (to allow variation)
+    //             bus_stop (at.at (stop_index), rng);
+    //             delta = (int)(vehicle->timestamp () - dt.at (stop_index));
+    //         }
+    //         else
+    //         {
+    //             delta = (int)(vehicle->timestamp () - at.at (stop_index));
+    //         }
+    //     }
+
+    //     if (distance > stops->at (stop_index).distance && rng.runif () < 0.01)
+    //     {
+    //         // a very small chance for particles to remain stationary
+    //         int tr = rng.runif () * delta + 0.5;
+    //         if (tt.at (l) >= 0)
+    //             tt.at (l) = tt.at (l) + tr;
+    //         delta -= tr;
+
+    //         // speed = 0.0;
+    //         // when /not/ at a bus stop, set speed to 0 and wait
+    //         // double w = - log (rng.runif ()) * delta;
+    //         // delta = fmax (0.0, delta - round (w));
+    //         // then the bus needs to accelerate back up to speed ... for how many seconds?
+    //         // accelerating = 5.0 + rng.runif () * 10.0;
+    //         // acceleration = 2.0 + rng.rnorm () * vehicle->system_noise ();
+    //     }
+
+
+    //     double speed_mean = 10.0;
+    //     double speed_sd = 100.0;
+    //     // if (segments->at (l).segment->travel_time () > 0 &&
+    //     //     segments->at (l).segment->uncertainty () > 0) 
+    //     // {
+    //     //     speed_mean = segments->at (l).segment->get_speed ();
+    //     //     speed_sd = - segments->at (l).segment->length () / pow (speed_mean, 2) *
+    //     //         segments->at (l).segment->uncertainty ();
+    //     //     speed_sd = pow(speed_sd, 0.5);
+    //     // }
+    //     double vmax = 30; //rng.runif () < 0.5 ? 30.0 : 15.0;
+        
+    //     if (vehicle->params ()->noise_model == 0)
+    //     {
+    //         // add noise once per iteration, 
+    //         // or when passing segment/stop
+    //         double vel = speed + rng.rnorm () * vehicle->system_noise ();
+    //         while (vel <= 0 || vel > 30) vel = speed + rng.rnorm () * vehicle->system_noise ();
+    //         speed = vel;
+    //     }
+
+    //     // while (distance < Dmax && delta > 0.0)
+    //     while (behind_event (e, delta))
+    //     {
+    //         // add system noise to acceleration to ensure speed remains in [0, vmax]
+    //         // double accel_prop (-100.0);
+    //         // double n = 0;
+    //         // if (speed > vmax)
+    //         // {
+    //         //     speed = rng.runif () * vmax;
+    //         // }
+    //         // while (speed + accel_prop < 0.0 || speed + accel_prop > vmax && n < 1000)
+    //         // {
+    //         //     accel_prop = rng.rnorm () * vehicle->system_noise () * 
+    //         //         (1.0 + (double)n / 100.0);
+    //         //     n++;
+    //         //     // if (accelerating > 0.0)
+    //         //     // {
+    //         //     //     accel_prop += acceleration;
+    //         //     //     accelerating--;
+    //         //     // }
+    //         // }
+
+    //         // double v = fmax (0, fmin (30, speed + acceleration));
+    //         // double v = speed;
+    //         // double vstar = speed + accel_prop;
+    //         // double alpha = (pow (v - speed_mean, 2) - pow(vstar - speed_mean, 2)) / (2 * pow (speed_sd, 2));
+    //         // alpha = fmin (0, alpha);
+    //         // if (rng.runif () < exp (alpha))
+    //         // {
+    //         //     acceleration = accel_prop;
+    //         //     speed = vstar;
+    //         // }
+    //         // else
+    //         // {
+    //         //     speed = v;
+    //         // }
+
+    //         if (vehicle->params ()->noise_model == 1)
+    //         {
+    //             double vel = speed + rng.rnorm () * vehicle->system_noise ();
+    //             while (vel <= 0 || vel > 30) vel = speed + rng.rnorm () * vehicle->system_noise ();
+    //             speed = vel;
+    //         }
+    //         distance += speed;
+    //         if (distance >= Dmax) complete = true;
+    //         delta--;
+
+    //         if (tt.at (l) >= 0)
+    //             tt.at (l) = tt.at (l) + 1;
+            
+    //         if (l < L-1 && distance >= next_segment_d)
+    //         {
+    //             // reaching intersection ... 
+    //             l++;
+    //             segment_index++;
+    //             tt.at (l) = 0;
+    //             next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
+    //             // vmax = rng.runif () < 0.5 ? 30.0 : 15.0;
+    //             // if (segments->at (l).segment->travel_time () > 0 &&
+    //             //     segments->at (l).segment->uncertainty () > 0) 
+    //             // {
+    //             //     speed_mean = segments->at (l).segment->get_speed ();
+    //             //     speed_sd = - segments->at (l).segment->length () / pow (speed_mean, 2) *
+    //             //         segments->at (l).segment->uncertainty ();
+    //             //     speed_sd = pow(speed_sd, 0.5);
+    //             // }
+    //             // else
+    //             // {
+    //                 // speed_mean = 10.0;
+    //                 // speed_sd = 100.0;
+    //             // }
+    //             if (vehicle->params ()->noise_model == 0)
+    //             {
+    //                 double vel = speed + rng.rnorm () * vehicle->system_noise ();
+    //                 while (vel <= 0 || vel > 30) vel = speed + rng.rnorm () * 3.0;//vehicle->system_noise ();
+    //                 speed = vel;
+    //             }
+    //         }
+
+    //         if (distance >= next_stop_d)
+    //         {
+    //             stop_index++;
+    //             // bus arrives at stop - either stops at stop, of drives past
+    //             if (bus_stop (vehicle->timestamp () - delta, rng)) 
+    //                 distance = next_stop_d;
+    //             // end of route? end.
+    //             if (stop_index >= M-1)
+    //             {
+    //                 complete = true;
+    //                 break;
+    //             }
+    //             // else update next stop and delta
+    //             next_stop_d = stops->at (stop_index + 1).distance;
+    //             delta -= (int)(dt.at (stop_index) - at.at (stop_index));
+    //             if (vehicle->params ()->noise_model == 0)
+    //             {
+    //                 double vel = speed + rng.rnorm () * vehicle->system_noise ();
+    //                 while (vel <= 0 || vel > 30) vel = speed + rng.rnorm () * 3.0;//vehicle->system_noise ();
+    //                 speed = vel;
+    //             }
+    //             continue;
+    //         }
+    //     }
+
+    //     // almost at next stop ...
+    //     if (stop_index < M-1 &&
+    //         next_stop_d - distance < 20)
+    //     {
+    //         stop_index++;
+    //         bus_stop (vehicle->timestamp () - delta, rng);
+    //         distance = next_stop_d;
+    //         if (stop_index < M - 1) 
+    //             next_stop_d = stops->at (stop_index + 1).distance;
+    //     }
+    // }
 
     /**
      * Simulate the behaviour of a bus when it reaches a bus stop (at time t)

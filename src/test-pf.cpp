@@ -113,8 +113,8 @@ context ("Vehicle states") {
         ts2 = ts + round(d / 15.0);
         int dwell = 20;
         ts3 = ts2 + dwell;
-        v.add_event (Gtfs::Event (ts2, Gtfs::EventType::arrival, t, 2));
-        v.add_event (Gtfs::Event (ts3, Gtfs::EventType::departure, t, 2));
+        v.add_event (Gtfs::Event (ts2, Gtfs::EventType::arrival, t, 1));
+        v.add_event (Gtfs::Event (ts3, Gtfs::EventType::departure, t, 1));
         v.update (&gtfs);
         expect_true (v.get_events ().size () == 2);
 
@@ -124,5 +124,53 @@ context ("Vehicle states") {
         {
             // expect_true(p->get_arrival_time (1) > 0);
         }
+    }
+}
+
+context("Particle functions") {
+    std::string dbname ("auckland_gtfs.db");
+    Gtfs::Gtfs gtfs (dbname);
+    Gtfs::par par;
+    par.n_particles = 10;
+
+    RNG rng (10);
+
+    std::string vid ("test");
+    Gtfs::Vehicle v (vid, &par);
+
+    std::string t ("1141160875-20190613111133_v80.31");
+    Gtfs::Trip* t0 = gtfs.find_trip (t);
+    uint64_t ts = 1562034647;
+    std::vector<Gtfs::StopTime> stops = t0->stops ();
+
+    v.add_event (Gtfs::Event (ts, Gtfs::EventType::arrival, t, 0));
+    v.update (&gtfs);
+    v.mutate (rng, &gtfs);
+
+    test_that("Particles initialized at stop with arrival update") {
+        expect_true (v.state ()->size () == 10);
+        for (auto p = v.state ()->begin (); p != v.state ()->end (); ++p)
+        {
+            expect_true (p->get_distance () == 0);
+            expect_true (p->get_stop_index () == 0);
+        }
+    }
+
+    double d = stops.at (1).distance - stops.at (0).distance;
+    uint64_t ts2, ts3;
+    ts2 = ts + round(d / 15.0);
+    int dwell = 20;
+    ts3 = ts2 + dwell;
+
+    test_that("Particle travel function behaves") {
+        Gtfs::Event e2 (ts2, Gtfs::EventType::arrival, t, 1);
+        expect_true (v.state ()->size () == 10);
+        for (auto p = v.state ()->begin (); p != v.state ()->end (); ++p)
+        {
+            expect_true (p->get_distance () == 0);
+            p->travel (ts2 - ts, e2, rng);
+            // expect_true (p->get_distance () > 0);
+        }
+        // expect_true (1 == 2);
     }
 }
