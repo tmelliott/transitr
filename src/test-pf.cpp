@@ -158,19 +158,26 @@ context("Particle functions") {
 
     double d = stops.at (1).distance - stops.at (0).distance;
     uint64_t ts2, ts3;
-    ts2 = ts + round(d / 15.0);
+    ts2 = ts + round(d / 12.0);
     int dwell = 20;
     ts3 = ts2 + dwell;
 
     test_that("Particle travel function behaves") {
         Gtfs::Event e2 (ts2, Gtfs::EventType::arrival, t, 1);
+        Gtfs::Event e3 (ts3, Gtfs::EventType::departure, t, 1);
         expect_true (v.state ()->size () == 10);
         for (auto p = v.state ()->begin (); p != v.state ()->end (); ++p)
         {
             expect_true (p->get_distance () == 0);
             p->travel (ts2 - ts, e2, rng);
-            // expect_true (p->get_distance () > 0);
+
+            expect_true (p->get_distance () >= 0);
+            expect_true (p->get_distance () < 30 * (ts2 - ts));
+            expect_true (p->get_arrival_time (1) > ts);
+
+            p->travel (ts3 - ts2, e3, rng);
         }
+
         // expect_true (1 == 2);
     }
 }

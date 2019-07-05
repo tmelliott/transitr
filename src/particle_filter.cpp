@@ -740,13 +740,14 @@ namespace Gtfs {
             if (nodes.at (segment_index).node->node_type () == 0)
             {
                 std::cout << " which is a bus stop";
-                wait = vehicle->gamma () - 
-                    vehicle->dwell_time () * log (rng.runif ());
+                wait = vehicle->gamma () +
+                    vehicle->dwell_time () +
+                    vehicle->dwell_time_var () * rng.rnorm ();
             }
             else
             {
                 std::cout << " which is a generic intersection";
-                wait = vehicle->dwell_time () * log (rng.runif ());
+                wait = - vehicle->dwell_time () * log (rng.runif ());
             }
             std::cout << " -> waiting " << round (wait) << "s";
             delta -= round (wait);
@@ -802,12 +803,14 @@ namespace Gtfs {
                     }
                     std::cout << "\n   -> arrival at node " << (segment_index);
                     tt.at (segment_index) = 0;
+                    at.at (stop_index) = vehicle->timestamp () - delta;
 
                     if (distance >= Dmax)
                     {
                         complete = true;
+                        delta = 0;
                         std::cout << "\n\n * End of the line reached!";
-                        return;
+                        break;
                     }
 
                     // now handle stopping behaviour
@@ -819,17 +822,28 @@ namespace Gtfs {
                             std::cout << "\n   -> dwell time at stop: ";
                             dwell = vehicle->gamma () + 
                                 vehicle->dwell_time () +
-                                vehicle->dwell_time_var () * rng.runif ();
+                                vehicle->dwell_time_var () * rng.rnorm ();
                             std::cout << round (dwell);
                         }
                         else
                         {
                             std::cout << "\n   -> skipping stop";
                         }
+                        dt.at (stop_index) = at.at (stop_index) + round (dwell);
                     }
                     else
                     {
-
+                        if (rng.runif () < vehicle->pr_stop ())
+                        {
+                            std::cout << "\n   -> queue time at node: ";
+                            dwell = vehicle->dwell_time () +
+                                vehicle->dwell_time_var () * rng.rnorm ();
+                            std::cout << round (dwell);
+                        }
+                        else
+                        {
+                            std::cout << "\n   -> not stopping";
+                        }
                     }
                     delta -= fmin (delta, round(dwell));
                 }
@@ -837,6 +851,41 @@ namespace Gtfs {
             }
         }
 
+        std::cout << "\n\n * Final state: [d=" << distance 
+            << ", s=" << speed 
+            << ", j=" << stop_index
+            << ",l=" << segment_index
+            << "]";
+
+        if (e.type != EventType::gps && behind_event (e, delta))
+        {
+            std::cout << "\n * Event is a stop arrival/departure ... "
+                << "extrapolating particle's arrival/departure time";
+
+            if (at.at (stop_index + 1) == 0)
+            {
+                double stop_dist, stop_eta;
+                stop_dist = fmax (0, next_stop->distance - distance);
+                stop_eta = stop_dist / speed;
+                at.at (stop_index + 1) = vehicle->timestamp () + stop_eta;
+                std::cout << "\n   -> arrival: " 
+                    << at.at (stop_index + 1);
+            }
+
+            if (e.type == EventType::departure)
+            {
+                double dwell = 0;
+                if (rng.runif () < vehicle->pr_stop ())
+                {
+                    dwell += vehicle->gamma () +
+                        vehicle->dwell_time () + 
+                        vehicle->dwell_time_var () * rng.rnorm ();
+                }
+                dt.at (stop_index + 1) = at.at (stop_index + 1) + dwell;
+                std::cout << "\n   -> departure: " 
+                    << dt.at (stop_index + 1);
+            }
+        }
 
         std::cout << "\n ==> transition complete.\n"
             << "--------------------------\n\n";
@@ -1121,7 +1170,7 @@ namespace Gtfs {
             double dwell = -1;
             while (dwell < 0)
             {
-                dwell = vehicle->dwell_time () + vehicle->dwell_time_var () * rng.runif ();
+                dwell = vehicle->dwell_time () + vehicle->dwell_time_var () * rng.rnorm();
             }
             dwell += vehicle->gamma ();
             dt.at (stop_index) = time + round (dwell);
