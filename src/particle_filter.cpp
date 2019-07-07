@@ -812,7 +812,9 @@ namespace Gtfs {
             while (vel <= 0 || vel > 30) 
                 vel = speed + rng.rnorm () * vehicle->system_noise ();
             speed = vel;
+#if VERBOSE > 3
             std::cout << speed;
+#endif
         }
 
         // now begin travelling
@@ -826,8 +828,11 @@ namespace Gtfs {
                 node_dist = next_node->distance - distance;
                 node_eta = node_dist / speed;
 #if VERBOSE > 3
-                std::cout << "\n\n * Next node is " << node_dist << "m away"
-                    << "\n   -> ETA of " << node_eta << "s";
+                std::cout << "\n\n * Next node is " 
+                    << "(" << next_node->distance << " - " << distance << ") = "
+                    << node_dist << "m away"
+                    << "\n   -> ETA of " << node_eta << "s, delta = "
+                    << delta;
 #endif
                 if (node_eta > delta)
                 {
@@ -842,20 +847,22 @@ namespace Gtfs {
                 {
                     delta -= node_eta;
                     tt.at (segment_index) += node_eta;
-                    distance = node_dist;
+                    distance = next_node->distance;
                     segment_index++;
-                    next_node = &(nodes.at (segment_index + 1));
+                    // next_node = nullptr;
+                    if (distance < Dmax) next_node = &(nodes.at (segment_index + 1));
                     bool is_stop;
                     is_stop = next_node->node->node_type () == 0;
                     if (is_stop)
                     {
                         stop_index++;
-                        next_stop = &(stops.at (stop_index + 1));
+                        // next_stop = nullptr;
+                        if (distance < Dmax) &(stops.at (stop_index + 1));
                     }
 #if VERBOSE > 3
                     std::cout << "\n   -> arrival at node " << (segment_index);
 #endif
-                    tt.at (segment_index) = 0;
+                    if (distance < Dmax) tt.at (segment_index) = 0;
                     at.at (stop_index) = vehicle->timestamp () - delta;
 #if VERBOSE > 3
                     std::cout << " at " << at.at (stop_index);

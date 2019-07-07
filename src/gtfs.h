@@ -22,7 +22,7 @@
 #include "RcppThread.h"
 
 #ifndef VERBOSE
-#define VERBOSE 1
+#define VERBOSE 4
 #endif
 
 #ifndef SIMULATION
