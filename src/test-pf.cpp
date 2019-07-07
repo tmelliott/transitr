@@ -227,7 +227,6 @@ context("Vehicle mutate/update") {
         expect_true (v.state ()->size () == 10);
         for (auto p = v.state ()->begin (); p != v.state ()->end (); ++p)
         {
-            std::cout << "\n l(y|p) = " << exp (p->get_ll ());
             // expect_true (exp (p->get_ll ()) > 0);
         }
     }
@@ -242,9 +241,27 @@ context("Vehicle mutate/update") {
         expect_true (v.state ()->size () == 10);
         for (auto p = v.state ()->begin (); p != v.state ()->end (); ++p)
         {
-            std::cout << "\n l(y|p) = " << exp (p->get_ll ());
             expect_true (exp (p->get_ll ()) > 0);
         }
+    }
+
+    d = stops.at (2).distance - stops.at (0).distance;
+    uint64_t ts4 = ts3 + round (d / 14.0);
+    v.add_event (Gtfs::Event (ts4, Gtfs::EventType::departure, t, 2));
+    v.update (&gtfs);
+    v.mutate (rng, &gtfs);
+
+    // std::cout << "\nSeg travel time (0->1): "
+    //     << v.segment_travel_time (0) << "\n";
+
+    test_that("Travel times estimated") {
+        expect_true (v.segment_travel_time (0) > 0);
+        expect_true (v.state ()->size () == 10);
+        for (auto p = v.state ()->begin (); p != v.state ()->end (); ++p)
+        {
+            expect_true (p->get_departure_time (2) > ts);
+        }
+
         // expect_true (1 == 2);
     }
 }

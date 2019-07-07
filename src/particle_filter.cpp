@@ -303,6 +303,9 @@ namespace Gtfs {
                 int n;
                 while (_current_segment < m)
                 {
+#if VERBOSE > 0
+                    std::cout << "\n  - segment " << _current_segment;
+#endif
                     // get the average travel time for particles along that segment
                     tt = 0.0;
                     n = 0;
@@ -334,6 +337,9 @@ namespace Gtfs {
 
                     _segment_travel_times.at (_current_segment) = round (tt);
                     segs.at (_current_segment).segment->push_data (tt, err, _timestamp);
+#if VERBOSE > 0
+                    std::cout << ": " << round (tt) << " (" << err << ")";
+#endif
                     _current_segment++;
                 }
                 
