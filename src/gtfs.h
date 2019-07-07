@@ -22,7 +22,7 @@
 #include "RcppThread.h"
 
 #ifndef VERBOSE
-#define VERBOSE 0
+#define VERBOSE 1
 #endif
 
 #ifndef SIMULATION
@@ -669,6 +669,9 @@ namespace Gtfs
             latlng& position ();
             uint64_t timestamp ();
             unsigned delta ();
+
+            // only for use in testing!
+            void override_timestamp (uint64_t ts);
 
             par* params () { return _params; }
 

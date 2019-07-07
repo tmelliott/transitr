@@ -2198,6 +2198,11 @@ namespace Gtfs
         return _delta;
     }
 
+    void Vehicle::override_timestamp (uint64_t ts)
+    {
+        _timestamp = ts;
+    }
+
     void Vehicle::add_event (Event event)
     {
         new_events.push_back (event);
@@ -2434,8 +2439,8 @@ namespace Gtfs
 
     bool Vehicle::valid ()
     {
-        return (_position.latitude != 0.0 || _position.longitude != 0.0) &&
-                _trip != nullptr && _timestamp != 0;
+        return //(_position.latitude != 0.0 || _position.longitude != 0.0) &&
+            _trip != nullptr && _timestamp != 0;
     }
 
     bool Vehicle::complete ()

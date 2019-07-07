@@ -170,7 +170,7 @@ namespace Gtfs {
                 throw std::runtime_error ("Trip not found");
             }
 
-#if VERBOSE > 0
+// #if VERBOSE > 0
             std::cout << "\n    [" << e.timestamp << "] "
                 << _trip->route ()->route_short_name ();
             if (_trip->stops ().size () == 0)
@@ -185,7 +185,7 @@ namespace Gtfs {
                     << "): ";
             }
             e.print ();
-#endif
+// #endif
 
             // is the event "bad"?
             dist_to_route = 0.0;
@@ -359,12 +359,14 @@ namespace Gtfs {
 
     void Vehicle::mutate_to (Event& e, RNG& rng)
     {
+        std::cout << "\n -> mutating to event ...";
         if (_newtrip || bad_sample)
         {
+            std::cout << " initializing";
             initialize (e, rng);
             return;
         }
-
+        std::cout << "here we go!";
         bad_sample = true;
 
         _delta = e.timestamp - _timestamp;
@@ -380,7 +382,14 @@ namespace Gtfs {
         }
 
         // move the particles
-        if (_complete || !valid () || _delta == 0) return;
+        if (_complete || !valid () || _delta == 0) 
+        {
+            std::cout << "\n ... uh oh ... ";
+            if (_complete) std::cout << "complete!";
+            if (!valid ()) std::cout << "invalid!";
+            if (_delta == 0) std::cout << "delta = 0!";
+            return;
+        }
 #if VERBOSE > 0
         std::cout << "\n     + " << _delta << " seconds";
 #endif
@@ -657,6 +666,7 @@ namespace Gtfs {
 
     void Particle::travel (int delta, Event& e, RNG& rng)
     {
+#if VERBOSE > 3
         std::cout << "\n ===> Transition particle\n"
             << " * Initial state: [d=" << distance 
             << ", s=" << speed 
@@ -676,13 +686,20 @@ namespace Gtfs {
             std::cout << (e.type == EventType::arrival ? "arrival" : "departure")
                 << " at stop " << e.stop_index;
         }
+#endif
 
         if (delta == 0 || complete || !vehicle || !vehicle->trip () || 
             !vehicle->trip ()->shape ()) 
         {
+#if VERBOSE > 3
             std::cout << "\n ** nothing to mutate, skipping particle\n";
+#endif
             return;
         }
+
+        // Necessary to clear any extrapolated stops
+        at.at (stop_index + 1) = 0;
+        dt.at (stop_index + 1) = 0;
 
         // Shape is:
         Shape* shape = vehicle->trip ()->shape ();
@@ -693,41 +710,55 @@ namespace Gtfs {
         M = stops.size ();
         L = nodes.size ();
 
+#if VERBOSE > 3
         std::cout << "\n\n * Shape: " << shape->path ().size ()
             << " with " << L << " nodes and " << M << " stops";
+#endif
 
         double Dmax (shape->path ().back ().distance);
+#if VERBOSE > 3
         std::cout << "\n * Route distance = " << Dmax << "m";
+#endif
         if (distance >= Dmax)
         {
             distance = Dmax;
             complete = true;
+#if VERBOSE > 3
             std::cout << " -> particle has finished\n\n";
+#endif
             return;
         }
 
         ShapeNode* next_node;
         next_node = &(nodes.at (segment_index + 1));
+#if VERBOSE > 3
         std::cout << "\n\n * Next node: "
             << (segment_index + 1)
             << " (" << next_node->distance << "m)";
+#endif
 
         StopTime* next_stop;
         next_stop = &(stops.at (stop_index + 1));
+#if VERBOSE > 3
         std::cout << "\n * Next stop: "
             << (stop_index + 1)
             << " (" << next_stop->distance << "m)";
+#endif
 
         if (next_node->node->node_type () == 0)
         {
             if (next_node->node->node_id () == next_stop->stop->node ()->node_id ())
             {
+#if VERBOSE > 3
                 std::cout << "\n   -> next node is the next stop!";
+#endif
             }
             else
             {
                 // something odd happening and stop/node aren't matching up :(
+#if VERBOSE > 3
                 std::cout << "\n   -> next node is a stop, but not the right one!!!\n\n";
+#endif
                 return;
             }
         }
@@ -735,21 +766,29 @@ namespace Gtfs {
         // if at a stop, we must wait there while people get on/off
         if (distance == nodes.at (segment_index).distance)
         {
+#if VERBOSE > 3
             std::cout << "\n   -> currently still at node " << segment_index;
+#endif
             double wait (0);
             if (nodes.at (segment_index).node->node_type () == 0)
             {
+#if VERBOSE > 3
                 std::cout << " which is a bus stop";
+#endif
                 wait = vehicle->gamma () +
                     vehicle->dwell_time () +
                     vehicle->dwell_time_var () * rng.rnorm ();
             }
             else
             {
+#if VERBOSE > 3
                 std::cout << " which is a generic intersection";
+#endif
                 wait = - vehicle->dwell_time () * log (rng.runif ());
             }
+#if VERBOSE > 3
             std::cout << " -> waiting " << round (wait) << "s";
+#endif
             delta -= round (wait);
         }
 
@@ -757,8 +796,10 @@ namespace Gtfs {
         
         if (vehicle->params ()->noise_model == 0)
         {
+#if VERBOSE > 3
             std::cout << "\n\n * Using noise model 0, adjusting speed:"
                 << "\n   " << speed << " -> ";
+#endif
             // add noise once per iteration, 
             // or when passing segment/stop
             double vel = speed + rng.rnorm () * vehicle->system_noise ();
@@ -778,14 +819,18 @@ namespace Gtfs {
             {
                 node_dist = next_node->distance - distance;
                 node_eta = node_dist / speed;
+#if VERBOSE > 3
                 std::cout << "\n\n * Next node is " << node_dist << "m away"
                     << "\n   -> ETA of " << node_eta << "s";
+#endif
                 if (node_eta > delta)
                 {
                     distance += delta * speed;
                     delta = 0;
                     tt.at (segment_index) += delta;
+#if VERBOSE > 3
                     std::cout << "\n   -> stopped at " << distance << "m";
+#endif
                 }
                 else
                 {
@@ -801,15 +846,22 @@ namespace Gtfs {
                         stop_index++;
                         next_stop = &(stops.at (stop_index + 1));
                     }
+#if VERBOSE > 3
                     std::cout << "\n   -> arrival at node " << (segment_index);
+#endif
                     tt.at (segment_index) = 0;
                     at.at (stop_index) = vehicle->timestamp () - delta;
+#if VERBOSE > 3
+                    std::cout << " at " << at.at (stop_index);
+#endif
 
                     if (distance >= Dmax)
                     {
                         complete = true;
                         delta = 0;
+#if VERBOSE > 3
                         std::cout << "\n\n * End of the line reached!";
+#endif
                         break;
                     }
 
@@ -819,30 +871,46 @@ namespace Gtfs {
                     {
                         if (rng.runif() < vehicle->pr_stop ())
                         {
+#if VERBOSE > 3
                             std::cout << "\n   -> dwell time at stop: ";
+#endif
                             dwell = vehicle->gamma () + 
                                 vehicle->dwell_time () +
                                 vehicle->dwell_time_var () * rng.rnorm ();
+#if VERBOSE > 3
                             std::cout << round (dwell);
+#endif
                         }
                         else
                         {
+#if VERBOSE > 3
                             std::cout << "\n   -> skipping stop";
+#endif
                         }
                         dt.at (stop_index) = at.at (stop_index) + round (dwell);
+#if VERBOSE > 3
+                        std::cout << " -> departure time = " 
+                            << dt.at (stop_index);
+#endif
                     }
                     else
                     {
                         if (rng.runif () < vehicle->pr_stop ())
                         {
+#if VERBOSE > 3
                             std::cout << "\n   -> queue time at node: ";
+#endif
                             dwell = vehicle->dwell_time () +
                                 vehicle->dwell_time_var () * rng.rnorm ();
+#if VERBOSE > 3
                             std::cout << round (dwell);
+#endif
                         }
                         else
                         {
+#if VERBOSE > 3
                             std::cout << "\n   -> not stopping";
+#endif
                         }
                     }
                     delta -= fmin (delta, round(dwell));
@@ -851,16 +919,20 @@ namespace Gtfs {
             }
         }
 
+#if VERBOSE > 3
         std::cout << "\n\n * Final state: [d=" << distance 
             << ", s=" << speed 
             << ", j=" << stop_index
             << ",l=" << segment_index
             << "]";
+#endif
 
         if (e.type != EventType::gps && behind_event (e, delta))
         {
+#if VERBOSE > 3
             std::cout << "\n * Event is a stop arrival/departure ... "
                 << "extrapolating particle's arrival/departure time";
+#endif
 
             if (at.at (stop_index + 1) == 0)
             {
@@ -868,8 +940,10 @@ namespace Gtfs {
                 stop_dist = fmax (0, next_stop->distance - distance);
                 stop_eta = stop_dist / speed;
                 at.at (stop_index + 1) = vehicle->timestamp () + stop_eta;
+#if VERBOSE > 3
                 std::cout << "\n   -> arrival: " 
                     << at.at (stop_index + 1);
+#endif
             }
 
             if (e.type == EventType::departure)
@@ -882,13 +956,17 @@ namespace Gtfs {
                         vehicle->dwell_time_var () * rng.rnorm ();
                 }
                 dt.at (stop_index + 1) = at.at (stop_index + 1) + dwell;
+#if VERBOSE > 3
                 std::cout << "\n   -> departure: " 
                     << dt.at (stop_index + 1);
+#endif
             }
         }
 
-        std::cout << "\n ==> transition complete.\n"
+#if VERBOSE > 3
+        std::cout << "\n\n ==> transition complete.\n"
             << "--------------------------\n\n";
+#endif
     }
 
     // void Particle::old_travel (int delta, Event& e, RNG& rng)

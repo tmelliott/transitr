@@ -166,6 +166,7 @@ context("Particle functions") {
         Gtfs::Event e2 (ts2, Gtfs::EventType::arrival, t, 1);
         Gtfs::Event e3 (ts3, Gtfs::EventType::departure, t, 1);
         expect_true (v.state ()->size () == 10);
+        v.override_timestamp (ts2);
         for (auto p = v.state ()->begin (); p != v.state ()->end (); ++p)
         {
             expect_true (p->get_distance () == 0);
@@ -173,11 +174,77 @@ context("Particle functions") {
 
             expect_true (p->get_distance () >= 0);
             expect_true (p->get_distance () < 30 * (ts2 - ts));
-            expect_true (p->get_arrival_time (1) > ts);
 
-            p->travel (ts3 - ts2, e3, rng);
+            // travel time is extrapolated forward, even if it doesn't reach stop
+            expect_true (p->get_arrival_time (1) > ts);
         }
 
+        v.override_timestamp (ts3);
+        for (auto p = v.state ()->begin (); p != v.state ()->end (); ++p)
+        {
+            p->travel (ts3 - ts2, e3, rng);
+            expect_true (p->get_departure_time (1) > ts);
+        }
+    }
+}
+
+context("Vehicle mutate/update") {
+    std::string dbname ("auckland_gtfs.db");
+    Gtfs::Gtfs gtfs (dbname);
+    Gtfs::par par;
+    par.n_particles = 10;
+
+    RNG rng (10);
+
+    std::string vid ("test");
+    Gtfs::Vehicle v (vid, &par);
+
+    std::string t ("1141160875-20190613111133_v80.31");
+    Gtfs::Trip* t0 = gtfs.find_trip (t);
+    uint64_t ts = 1562034647;
+    std::vector<Gtfs::StopTime> stops = t0->stops ();
+
+    v.add_event (Gtfs::Event (ts, Gtfs::EventType::arrival, t, 0));
+    v.update (&gtfs);
+    v.mutate (rng, &gtfs);
+
+    test_that("Particle weights start off OK") {
+        expect_true (v.state ()->size () == 10);
+        for (auto p = v.state ()->begin (); p != v.state ()->end (); ++p)
+        {
+            expect_true (p->get_weight () == 0.1);
+        }
+    }
+
+    double d = stops.at (1).distance - stops.at (0).distance;
+    uint64_t ts2, ts3;
+    ts2 = ts + round(d / 12.0);
+    v.add_event (Gtfs::Event (ts2, Gtfs::EventType::arrival, t, 1));
+    v.update (&gtfs);
+    v.mutate (rng, &gtfs);
+
+    test_that("Particles get resampled?") {
+        expect_true (v.state ()->size () == 10);
+        for (auto p = v.state ()->begin (); p != v.state ()->end (); ++p)
+        {
+            std::cout << "\n l(y|p) = " << exp (p->get_ll ());
+            // expect_true (exp (p->get_ll ()) > 0);
+        }
+    }
+
+    int dwell = 20;
+    ts3 = ts2 + dwell;
+    v.add_event (Gtfs::Event (ts3, Gtfs::EventType::departure, t, 1));
+    v.update (&gtfs);
+    v.mutate (rng, &gtfs);
+
+    test_that("Particles get resampled (2)?") {
+        expect_true (v.state ()->size () == 10);
+        for (auto p = v.state ()->begin (); p != v.state ()->end (); ++p)
+        {
+            std::cout << "\n l(y|p) = " << exp (p->get_ll ());
+            expect_true (exp (p->get_ll ()) > 0);
+        }
         // expect_true (1 == 2);
     }
 }
