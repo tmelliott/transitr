@@ -276,10 +276,64 @@ context("Vehicle mutate/update") {
         {
             expect_true (v.segment_travel_time (i) > 0);
         }
+    }
+}
 
-        // expect_true (1 == 2);
+
+context("Vehicle mutate/update from GPS obs") {
+    std::string dbname ("auckland_gtfs.db");
+    Gtfs::Gtfs gtfs (dbname);
+    Gtfs::par par;
+    par.n_particles = 1000;
+    par.gps_error = 20.0;
+    par.system_noise = 2;
+
+    RNG rng (10);
+
+    std::string vid ("test");
+    Gtfs::Vehicle v (vid, &par);
+
+    std::string t ("1141160875-20190613111133_v80.31");
+    Gtfs::Trip* t0 = gtfs.find_trip (t);
+    Gtfs::Shape* shape = t0->shape ();
+    double Dmax = shape->path ().back ().distance;
+    uint64_t ts = 1562034647;
+    
+    std::vector<double> x {0.1, 0.18, 0.2, 0.3, 0.35, 0.5, 0.8, 0.9, 1.0};
+    // std::vector<double> xdot {12,   14,  10,  10,   20,  18,  17,  10};
+    double xdot = 12;
+    // let's assume the bus never stops ...
+    double xi = Dmax * x.at (0);
+    latlng pos = shape->coordinates_of (xi);
+
+    v.add_event (Gtfs::Event (ts, Gtfs::EventType::gps, t, pos));
+    v.update (&gtfs);
+    v.mutate (rng, &gtfs);
+
+    double xi1;
+    int delta;
+    test_that ("Vehicle initialized OK from GPS obs") {
+        expect_true (v.state ()->size () == par.n_particles);
+
+        for (int i=1; i<x.size (); i++)
+        {
+            xi1 = xi;
+            xi = Dmax * x.at (i);
+            delta = (xi - xi1) / xdot; //.at (i-1);
+            pos = shape->coordinates_of (xi);
+            ts += delta;
+            v.add_event (Gtfs::Event (ts, Gtfs::EventType::gps, t, pos));
+            v.update (&gtfs);
+            v.mutate (rng, &gtfs);
+        }
+        for (int i=3; i<40; i++)
+        {
+            expect_true (v.segment_travel_time (i) > 0);
+        }
+        
+        // expect_true (1 == 0);
     }
 
-
-
+    // test_that ("Travel times estimated for all segments") {
+    // }
 }
