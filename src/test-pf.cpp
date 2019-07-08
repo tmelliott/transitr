@@ -266,18 +266,20 @@ context("Vehicle mutate/update") {
 
     int M = stops.size () - 1;
     d = stops.at (M).distance - stops.at (2).distance;
-    uint64_t ts5 = ts4 + round (d / 1.0) + 100 * M;
+    uint64_t ts5 = ts4 + round (d * 2) + 100 * M;
     v.add_event (Gtfs::Event (ts5, Gtfs::EventType::arrival, t, M));
     v.update (&gtfs);
     v.mutate (rng, &gtfs);
 
     test_that ("All travel times get computed ...") {
-        for (int i=0; i<M; i++)
+        for (int i=0; i<M-1; i++)
         {
             expect_true (v.segment_travel_time (i) > 0);
         }
 
-        expect_true (1 == 2);
+        // expect_true (1 == 2);
     }
+
+
 
 }

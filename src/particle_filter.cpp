@@ -287,6 +287,7 @@ namespace Gtfs {
                 std::cout << " -> from stop "
                     << _current_segment << " to stop ";
 #endif
+                // this should be SEGMENT index
                 int m = find_stop_index (dmin, &(_trip->stops ()));
 #if VERBOSE > 0
                 std::cout << m;
@@ -311,12 +312,9 @@ namespace Gtfs {
                     n = 0;
                     for (auto p = _state.begin (); p != _state.end (); ++p)
                     {
-                        ttp = p->get_travel_time (_current_segment) * p->get_weight ();
-                        if (ttp > 0)
-                        {
-                            tt += ttp;
-                            n++;
-                        }
+                        if (p->get_travel_time (_current_segment) == 0) continue;
+                        tt += p->get_travel_time (_current_segment) * p->get_weight ();
+                        n++;
                     }
                     if (n < _N)
                     {
@@ -837,8 +835,8 @@ namespace Gtfs {
                 if (node_eta > delta)
                 {
                     distance += delta * speed;
-                    delta = 0;
                     tt.at (segment_index) += delta;
+                    delta = 0;
 #if VERBOSE > 3
                     std::cout << "\n   -> stopped at " << distance << "m";
 #endif
