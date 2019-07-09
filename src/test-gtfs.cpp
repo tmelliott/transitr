@@ -81,6 +81,14 @@ context("GTFS classes") {
         std::vector<Gtfs::ShapeSegment> segs = s->segments ();
         expect_true (segs.size () == s->nodes ().size () - 1);
     }
+
+    test_that("Path length is valid") {
+        std::string t ("1141160875-20190613111133_v80.31");
+        Gtfs::Trip* t0 = gtfs.find_trip (t);
+        std::vector<Gtfs::StopTime> stops = t0->stops ();
+        Gtfs::Shape* s = &(gtfs.shapes ().begin (0)->second);
+        expect_true (s->path ().back ().distance == stops.back ().distance);
+    }
 }
 
 

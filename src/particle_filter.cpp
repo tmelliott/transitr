@@ -275,20 +275,23 @@ namespace Gtfs {
 #endif
                 // NETWORK STUFF
                 double dmin = _trip->shape ()->path ().back ().distance;
+                std::cout << " -> dmin = " << dmin;
                 for (auto p = _state.begin (); p != _state.end (); ++p)
                 {
                     if (p->get_distance () < dmin)
                     {
+                        std::cout << " and now its " << p->get_distance ();
                         dmin = p->get_distance ();
                     }
                 }
                 std::vector<ShapeSegment>& segs = _trip->shape ()->segments ();
 #if VERBOSE > 0
-                std::cout << " -> from stop "
-                    << _current_segment << " to stop ";
+                std::cout << " -> dist = " << dmin;
+                std::cout << " -> from segment "
+                    << _current_segment << " to segment ";
 #endif
                 // this should be SEGMENT index
-                int m = find_stop_index (dmin, &(_trip->stops ()));
+                int m = find_segment_index (dmin, &segs);
 #if VERBOSE > 0
                 std::cout << m;
 #endif
@@ -402,10 +405,11 @@ namespace Gtfs {
         double dbar = 0.0, vbar = 0.0, 
             dbar2 = 0.0, vbar2 = 0.0, ddbar = 0.0,
             dtbar = 0;
+        int firstN = 20;
         for (auto& p : _state)
         {
 #if VERBOSE > 0
-            if (_N < 20)
+            if (firstN > 0)
                 std::cout << "\n      [" << p.get_distance () 
                     << ", " << p.get_speed ()
                     << ", " << (p.get_stop_index () + 1)
@@ -417,25 +421,30 @@ namespace Gtfs {
 
             p.travel (_delta, e, rng);
 
-            if (p.is_complete ()) 
-            {
-#if VERBOSE > 0
-                if (_N < 20) std::cout << " -> complete";
-#endif
-                continue;
-            }
             // if any aren't complete, prevent vehicle from finishing trip
             all_complete = false;
 #if VERBOSE > 0
-            if (_N < 20)
+            if (firstN > 0) {
                 std::cout << " -> [" << p.get_distance () 
                     << ", " << p.get_speed () 
                     << ", " << (p.get_stop_index () + 1)
                     << "]";
+            }
 #endif
-            
+
             dbar2 += p.get_distance () * p.get_weight ();
             vbar2 += p.get_speed () * p.get_weight ();
+
+            if (p.is_complete ()) 
+            {
+#if VERBOSE > 0
+                if (firstN > 0) {
+                    // firstN--;
+                    std::cout << " -> complete";
+                }
+#endif
+                // continue;
+            }
 
             // calculate particle likelihood
             switch (e.type)
@@ -460,8 +469,10 @@ namespace Gtfs {
             }
 
 #if VERBOSE > 0
-            if (_N < 20)
+            if (firstN > 0) {
+                firstN--;
                 std::cout << " => l(Y|Xi) = " << exp (p.get_ll ());
+            }
 #endif
         }
 
@@ -817,7 +828,12 @@ namespace Gtfs {
 
         // now begin travelling
         double node_dist, node_eta;
-        while (delta > 0) //behind_event (e, delta))
+
+        // if it's the last stop, gotta go to the end
+        bool complete_route 
+            (e.type != EventType::gps && e.stop_index == stops.size () - 1);
+
+        while ((complete_route && !complete) || delta > 0)
         {
             // noise model 0
             // jump straight to node/
@@ -832,7 +848,8 @@ namespace Gtfs {
                     << "\n   -> ETA of " << node_eta << "s, delta = "
                     << delta;
 #endif
-                if (node_eta > delta)
+                // if trying to complete route, don't use this method
+                if (node_eta > delta && !complete_route)
                 {
                     distance += delta * speed;
                     tt.at (segment_index) += delta;
@@ -855,7 +872,7 @@ namespace Gtfs {
                     {
                         stop_index++;
                         // next_stop = nullptr;
-                        if (distance < Dmax) &(stops.at (stop_index + 1));
+                        if (distance < Dmax) next_stop = &(stops.at (stop_index + 1));
                     }
 #if VERBOSE > 3
                     std::cout << "\n   -> arrival at node " << (segment_index);
@@ -934,7 +951,7 @@ namespace Gtfs {
         std::cout << "\n\n * Final state: [d=" << distance 
             << ", s=" << speed 
             << ", j=" << stop_index
-            << ",l=" << segment_index
+            << ", l=" << segment_index
             << "]";
 #endif
 
