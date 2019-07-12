@@ -274,27 +274,29 @@ namespace Gtfs {
                 std::cout << "\n    ** estimating travel times";
 #endif
                 // NETWORK STUFF
-                double dmin = _trip->shape ()->path ().back ().distance;
-                std::cout << " -> dmin = " << dmin;
-                for (auto p = _state.begin (); p != _state.end (); ++p)
-                {
-                    if (p->get_distance () < dmin)
-                    {
-                        std::cout << " and now its " << p->get_distance ();
-                        dmin = p->get_distance ();
-                    }
-                }
+                // double dmin = _trip->shape ()->nodes ().back ().distance;
+                // double ShapeLen = dmin;
+                // std::cout << " -> dmin = " << dmin;
+                // for (auto p = _state.begin (); p != _state.end (); ++p)
+                // {
+                //     if (p->get_distance () < dmin)
+                //     {
+                //         std::cout << " and now its " << p->get_distance ();
+                //         dmin = p->get_distance ();
+                //     }
+                // }
                 std::vector<ShapeSegment>& segs = _trip->shape ()->segments ();
-#if VERBOSE > 0
-                std::cout << " -> dist = " << dmin;
-                std::cout << " -> from segment "
-                    << _current_segment << " to segment ";
-#endif
+// #if VERBOSE > 0
+//                 std::cout << " -> dist = " << dmin;
+//                 std::cout << " -> from segment "
+//                     << _current_segment << " to segment ";
+// #endif
                 // this should be SEGMENT index
-                int m = find_segment_index (dmin, &segs);
-#if VERBOSE > 0
-                std::cout << m;
-#endif
+                // int m = find_segment_index (dmin, &segs);
+// #if VERBOSE > 0
+//                 std::cout << m;
+//                 std::cout << "  ==> dist to end = " << (ShapeLen - dmin);
+// #endif
                 //  << "; of "
                 //     << segs.size () << " segments, on segment ";
                 // std::cout.flush (); 
@@ -305,23 +307,24 @@ namespace Gtfs {
                 // update segment travel times for intermediate ones ...
                 double tt, ttp, err;
                 int n;
-                while (_current_segment < m)
+                int M = segs.size ();
+                                
+                for (_current_segment=0; _current_segment<M; _current_segment++)
                 {
-#if VERBOSE > 0
-                    std::cout << "\n  - segment " << _current_segment;
-#endif
+                    if (_segment_travel_times.at (_current_segment) > 0) continue;
+
                     // get the average travel time for particles along that segment
                     tt = 0.0;
                     n = 0;
                     for (auto p = _state.begin (); p != _state.end (); ++p)
                     {
                         if (p->get_travel_time (_current_segment) == 0) continue;
+                        if (p->get_segment_index () == _current_segment) continue;
                         tt += p->get_travel_time (_current_segment) * p->get_weight ();
                         n++;
                     }
-                    if (n < _N)
+                    if (n < _N || tt <= 0)
                     {
-                        _current_segment++;
                         continue;
                     }
 
@@ -339,9 +342,9 @@ namespace Gtfs {
                     _segment_travel_times.at (_current_segment) = round (tt);
                     segs.at (_current_segment).segment->push_data (tt, err, _timestamp);
 #if VERBOSE > 0
+                    std::cout << "\n  - segment " << _current_segment;
                     std::cout << ": " << round (tt) << " (" << err << ")";
 #endif
-                    _current_segment++;
                 }
                 
                 // NOTE: need to ignore segment if previous segment travel time is 0

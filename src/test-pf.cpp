@@ -299,7 +299,7 @@ context("Vehicle mutate/update from GPS obs") {
     double Dmax = shape->path ().back ().distance;
     uint64_t ts = 1562034647;
     
-    std::vector<double> x {0.1, 0.18, 0.2, 0.3, 0.35, 0.5, 0.8, 0.9, 0.99};
+    std::vector<double> x {0.1, 0.18, 0.2, 0.3, 0.35, 0.5, 0.8, 0.9, 0.95};
     // std::vector<double> xdot {12,   14,  10,  10,   20,  18,  17,  10};
     double xdot = 12;
     // let's assume the bus never stops ...
@@ -339,11 +339,10 @@ context("Vehicle mutate/update from GPS obs") {
         );
         v.update (&gtfs);
         v.mutate (rng, &gtfs);
-        std::cout << t0->shape ()->path ().back ().distance << "m long";
         for (int i=4; i<t0->shape ()->segments ().size (); i++)
         {
             std::cout << "\n seg " << i << " = " << v.segment_travel_time (i);
-            // expect_true (v.segment_travel_time (i) > 0);
+            expect_true (v.segment_travel_time (i) > 0);
         }
 
         // expect_true (1 == 0);
