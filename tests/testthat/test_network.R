@@ -35,6 +35,12 @@ test_that("network gets constructed correctly", {
     expect_equal(dim(load_road_segments(nw)), c(362, 4))
     expect_equal(dim(load_intersections(nw)), c(0, 3))
     expect_equal(dim(load_shape_nodes(nw)), c(569, 4))
+
+    # node shapes should have same max as stops and shape
+    expect_true(
+        all(abs(with(load_shape_nodes(nw), tapply(distance_traveled, shape_id, max)) -
+            sapply(load_shapes(nw), function(x) max(x[,3]))) < 0.05)
+    )
 })
 
-## file.copy(nw$database, "tests/testthat/auckland_gtfs.db", overwrite = TRUE)
+## system(sprintf("cp %s tests/testthat/auckland_gtfs.db", nw$database))

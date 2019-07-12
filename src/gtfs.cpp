@@ -896,7 +896,13 @@ namespace Gtfs
 
         // now load stop distances ...
         std::vector<ShapeNode> nodes = _shape->nodes ();
+        for (int i=0; i<nodes.size (); i++)
+        {
+            std::cout << "\n [" << i << "] " << 
+                nodes.at (i).distance;
+        }
         int ni = 0;
+        int si = 0;
         for (auto st = _stops.begin (); st != _stops.end (); ++st)
         {
             // find next stop node
@@ -904,8 +910,11 @@ namespace Gtfs
             if (nodes.at (ni).node->node_id () == st->stop->node ()->node_id ())
             {
                 st->distance = nodes.at (ni).distance;
+                std::cout << "\n si = " << si << ", ni = " << ni
+                    << " -> distance = " << st->distance;
                 ni++;
             }
+            si++;
             // something went wrong ... 
             // else if (st->stop && _shape && st->distance == 0)
             // {

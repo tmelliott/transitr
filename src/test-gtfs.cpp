@@ -83,11 +83,30 @@ context("GTFS classes") {
     }
 
     test_that("Path length is valid") {
-        std::string t ("1141160875-20190613111133_v80.31");
-        Gtfs::Trip* t0 = gtfs.find_trip (t);
-        std::vector<Gtfs::StopTime> stops = t0->stops ();
-        Gtfs::Shape* s = &(gtfs.shapes ().begin (0)->second);
-        expect_true (s->path ().back ().distance == stops.back ().distance);
+        for (auto t = gtfs.trips ().begin (); t != gtfs.trips ().end (); ++t)
+        {
+            Gtfs::Trip* t0 = &(t->second);
+            std::vector<Gtfs::StopTime> stops = t0->stops ();
+            Gtfs::Shape* s = t0->shape ();
+            std::cout << "\n";
+            double d (0);
+            latlng *p1, *p2;
+            p2 = &(s->path ().at (0).pt);
+            for (int i=1; i<s->path ().size (); i++)
+            {
+                p1 = p2;
+                p2 = &(s->path ().at (i).pt);
+
+                d += distanceEarth (*p1, *p2);
+                expect_true (d == s->path ().at (i).distance);
+            }
+
+            std::cout << "\n stops len = " << stops.back ().distance;
+            std::cout << "\n nodes len = " << s->nodes ().back ().distance;
+            std::cout << "\n path len = " << s->path ().back ().distance;
+            expect_true (s->path ().back ().distance - stops.back ().distance < 0.1);
+            expect_true (s->path ().back ().distance - s->nodes ().back ().distance < 0.5);
+        }
     }
 }
 
