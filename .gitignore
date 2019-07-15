@@ -3,6 +3,7 @@
 
 windows
 fulldata.db
+at_gtfs.db
 *.log
 *.out
 *.csv

@@ -148,6 +148,7 @@ construct_network <- function(nw, node_threshold = 0.01) {
         )
         if (max(shape_nodes$distance_traveled) != max(shape$shape_dist_traveled)) {
             print("ERROR ERROR ERROR")
+            print(tail(shape))
             print(shape_nodes)
             next
         }
