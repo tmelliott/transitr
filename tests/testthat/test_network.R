@@ -15,6 +15,7 @@ test_that("network shapes makes sense", {
 test_that("network tables get constructed", {
     create_network_tables(nw)
     con <- db_connect(nw$database)
+    on.exit(db_close(con))
     expect_true(dbExistsTable(con, "road_segments"))
     expect_true(dbExistsTable(con, "intersections"))
     expect_true(dbExistsTable(con, "shape_nodes"))
