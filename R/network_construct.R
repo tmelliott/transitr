@@ -54,7 +54,10 @@ construct_network <- function(nw, node_threshold = 0.01) {
     }
     if (exists("pb")) close(pb)
     RSQLite::dbWriteTable(con, "nodes", nodes, overwrite = TRUE)
-    RSQLite::dbWriteTable(con, "stops", stops, overwrite = TRUE)
+    # field types: 
+    stoptbl <- RSQLite::dbGetQuery(con, "PRAGMA table_info(stops)")
+    RSQLite::dbGetQuery(con, "DELETE FROM stops")
+    RSQLite::dbWriteTable(con, "stops", stops, append = TRUE)
     rm("stops")
 
     ## For each SHAPE that doesn't exist in shape_segments
@@ -66,6 +69,8 @@ construct_network <- function(nw, node_threshold = 0.01) {
         cat("\n * Processing shapes ...\n")
         pb <- utils::txtProgressBar(0, length(shapes), style = 3)
     }
+
+    rownames(nodes) <- nodes$node_id
     for (shape_id in shapes) {
         if (interactive()) pb$up(pb$getVal() + 1)
         # - load
@@ -91,50 +96,54 @@ construct_network <- function(nw, node_threshold = 0.01) {
         # - use all nodes that are STOPS, and
         # - find all nodes that are INTERSECTIONS within ~5m of shape
         
+        # There's an issue with CIRCULAR routes,
+        # so need to actually fetch the stops and THEN the nodes ...
+        
         qry <- RSQLite::dbSendQuery(con, 
-            paste0(
-                "SELECT node_id FROM stops WHERE stop_id IN (",
-                "  SELECT stop_id FROM stop_times WHERE trip_id=(",
+            paste(sep = "\n",
+                "SELECT node_id FROM stop_times",
+                "INNER JOIN stops ON stops.stop_id = stop_times.stop_id ",
+                "WHERE trip_id=(",
                 "    SELECT trip_id FROM trips WHERE shape_id=? LIMIT 1",
-                "  )",
-                ")"
+                ")",
+                "ORDER BY stop_sequence"
             )
         )
         RSQLite::dbBind(qry, list(shape_id))
         stop_node_ids <- RSQLite::dbFetch(qry)$node_id
         RSQLite::dbClearResult(qry)
 
-        stop_nodes <- nodes[nodes$node_id %in% stop_node_ids, ]
+        stop_nodes <- nodes[as.character(stop_node_ids),]
         NodeMatrix <- stop_nodes[, c("node_lon", "node_lat")]
+        # with(NodeMatrix, points(node_lon, node_lat))
+        dmin <- 0
         node_dist <- apply(NodeMatrix, 1, function(n) {
             # d <- geosphere::distGeo(n, ShapeMat)
             # use equirectangular instead
             d <- sqrt(((rad(ShapeMat[,1]) - rad(n[1])) * cos(rad(n[2])))^2 +
                 (rad(ShapeMat[,2]) - rad(n[2]))^2) * 6371000
-            if (min(d) > 5) return(NA)
             # - compute shape dist travelled of found nodes
-            shape$shape_dist_traveled[which.min(d)]
+            d[shape$shape_dist_traveled < dmin] <- NA
+            dmin <<- shape$shape_dist_traveled[which.min(d)]
+            dmin
         })
+        if (any(is.na(node_dist))) {
+            print(shape_id)
+            print(stop_nodes)
+            print(node_dist)
+        }
+        if (any(diff(node_dist) < 0)) {
+            print("ERROR ERROR THERE'S AN ERROR")
+            print(stop_nodes)
+            print(node_dist)
+        }
         ShapeNodes <- stop_nodes[!is.na(node_dist), ]
         node_dist <- node_dist[!is.na(node_dist)]
 
         # with(ShapeNodes, points(node_lon, node_lat, cex = 0.5, pch = 21, bg="red"))
-
-        ## Filter out unscheduled stops
-        # qry <- RSQLite::dbSendQuery(con, 
-        #     paste_nl(
-        #         "SELECT node_id FROM stops WHERE stop_id IN ",
-        #         "  (SELECT stop_id FROM stop_times",
-        #         "  WHERE trip_id=(SELECT trip_id FROM trips WHERE shape_id=? LIMIT 1))"
-        #     )
-        # )
-        # RSQLite::dbBind(qry, list(shape_id))
-        # stopnodes <- RSQLite::dbFetch(qry)$node_id
-        # RSQLite::dbClearResult(qry)
         ShapeNodes$dist <- node_dist
-        # ShapeNodes <- ShapeNodes[ShapeNodes$node_id %in% stopnodes | ShapeNodes$node_type == 1L,]
         if (nrow(ShapeNodes) == 0) next
-        ShapeNodes <- ShapeNodes[order(ShapeNodes$dist),]
+        #ShapeNodes <- ShapeNodes[order(ShapeNodes$dist),]
         ShapeNodes$seq <- seq_along(1:nrow(ShapeNodes))
 
         # with(ShapeNodes, points(node_lon, node_lat, cex = 0.5, pch = 21, bg="white"))
@@ -147,10 +156,15 @@ construct_network <- function(nw, node_threshold = 0.01) {
             distance_traveled = ShapeNodes$dist
         )
         if (max(shape_nodes$distance_traveled) != max(shape$shape_dist_traveled)) {
-            print("ERROR ERROR ERROR")
-            print(tail(shape))
-            print(shape_nodes)
-            next
+            if (abs(max(shape_nodes$distance_traveled) - max(shape$shape_dist_traveled)) < 50)
+                shape_nodes$distance_traveled[nrow(shape_nodes)] <- 
+                    max(shape$shape_dist_traveled)
+            else {
+                print("ERROR ERROR ERROR")
+                print(tail(shape))
+                print(shape_nodes)
+                next
+            }
         }
 
         # - insert into shape_nodes

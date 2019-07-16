@@ -39,7 +39,9 @@ check_tables <- function(db) {
     res <- sapply(c(gtfs_tables(), "vehicles"), function(tbl) {
         eval(parse(text = sprintf("check_%s", tbl)))(db)
     })
-    all(res)
+    out <- all(res)
+    attr(out, "which") <- res
+    out
 }
 
 ##' Load an existing GTFS database into R for use with transitr.
@@ -52,7 +54,8 @@ check_tables <- function(db) {
 ##' @export
 load_gtfs <- function(db, output = "predictions.pb") {
     if (!check_tables(db)) {
-        stop("Oops, some of the tables aren't right...")
+        print(attr(check_tables(db), "which"))
+        stop("Oops, some of the tables aren't right...\n")
     }
 
     structure(
