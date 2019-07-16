@@ -227,12 +227,20 @@ namespace Gtfs {
                     {
                         // this is tricky ...
                         _trip->set_arrival_time (e.stop_index, e.timestamp);
+                        // if (e.stop_index == _trip->stops ().size () - 1)
+                        // {
+                        //     _complete = true;
+                        // }
                         break;
                     }
                 case EventType::departure :
                     {
                         // no checks
                         _trip->set_departure_time (e.stop_index, e.timestamp);
+                        // if (e.stop_index == _trip->stops ().size () - 1)
+                        // {
+                        //     _complete = true;
+                        // }
                         break;
                     }
             }
@@ -705,6 +713,23 @@ namespace Gtfs {
                 << " at stop " << e.stop_index;
         }
 #endif
+        // Shape is:
+        Shape* shape = vehicle->trip ()->shape ();
+        std::vector<ShapeNode>& nodes = shape->nodes ();
+        std::vector<StopTime>& stops = vehicle->trip ()->stops ();
+
+        int M, L;
+        M = stops.size ();
+        L = nodes.size ();
+#if VERBOSE > 3
+        std::cout << "\n * Shape: " << shape->path ().size ()
+            << " with " << L << " nodes and " << M << " stops";
+#endif
+
+        if (stop_index == M - 1 || segment_index == L - 1) 
+        {
+            complete = true;
+        }
 
         if (delta == 0 || complete || !vehicle || !vehicle->trip () || 
             !vehicle->trip ()->shape ()) 
@@ -718,20 +743,6 @@ namespace Gtfs {
         // Necessary to clear any extrapolated stops
         at.at (stop_index + 1) = 0;
         dt.at (stop_index + 1) = 0;
-
-        // Shape is:
-        Shape* shape = vehicle->trip ()->shape ();
-        std::vector<ShapeNode>& nodes = shape->nodes ();
-        std::vector<StopTime>& stops = vehicle->trip ()->stops ();
-
-        int M, L;
-        M = stops.size ();
-        L = nodes.size ();
-
-#if VERBOSE > 3
-        std::cout << "\n\n * Shape: " << shape->path ().size ()
-            << " with " << L << " nodes and " << M << " stops";
-#endif
 
         double Dmax (shape->path ().back ().distance);
 #if VERBOSE > 3
@@ -849,7 +860,7 @@ namespace Gtfs {
                     << "(" << next_node->distance << " - " << distance << ") = "
                     << node_dist << "m away"
                     << "\n   -> ETA of " << node_eta << "s, delta = "
-                    << delta;
+                    << delta << ", j = " << stop_index << ", l = " << segment_index;
 #endif
                 // if trying to complete route, don't use this method
                 if (node_eta > delta && !complete_route)
@@ -861,40 +872,48 @@ namespace Gtfs {
                     std::cout << "\n   -> stopped at " << distance << "m";
 #endif
                 }
+                else if (segment_index == L - 2)
+                {
+                    delta -= node_eta;
+#if VERBOSE > 3
+                    std::cout << " -> arrived at last node";
+#endif
+                    tt.at (segment_index) += node_eta;
+                    distance = Dmax;
+                    stop_index++;
+                    at.at (stop_index) = vehicle->timestamp () - delta;
+#if VERBOSE > 3
+                    std::cout << " at " << at.at (stop_index);
+#endif
+                    segment_index++;
+                    complete = true;
+                    delta = 0;
+                    break;
+                }
                 else
                 {
                     delta -= node_eta;
                     tt.at (segment_index) += node_eta;
                     distance = next_node->distance;
                     segment_index++;
-                    // next_node = nullptr;
-                    if (distance < Dmax) next_node = &(nodes.at (segment_index + 1));
+                    next_node = &(nodes.at (segment_index + 1));
+
                     bool is_stop;
                     is_stop = next_node->node->node_type () == 0;
                     if (is_stop)
                     {
                         stop_index++;
-                        // next_stop = nullptr;
-                        if (distance < Dmax) next_stop = &(stops.at (stop_index + 1));
+                        next_stop = &(stops.at (stop_index + 1));
                     }
+
 #if VERBOSE > 3
                     std::cout << "\n   -> arrival at node " << (segment_index);
 #endif
-                    if (distance < Dmax) tt.at (segment_index) = 0;
+                    tt.at (segment_index) = 0;
                     at.at (stop_index) = vehicle->timestamp () - delta;
 #if VERBOSE > 3
                     std::cout << " at " << at.at (stop_index);
 #endif
-
-                    if (distance >= Dmax)
-                    {
-                        complete = true;
-                        delta = 0;
-#if VERBOSE > 3
-                        std::cout << "\n\n * End of the line reached!";
-#endif
-                        break;
-                    }
 
                     // now handle stopping behaviour
                     double dwell = 0.0;

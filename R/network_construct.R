@@ -53,10 +53,11 @@ construct_network <- function(nw, node_threshold = 0.01) {
         stops$node_id[i] <- node_id
     }
     if (exists("pb")) close(pb)
+
+
     RSQLite::dbWriteTable(con, "nodes", nodes, overwrite = TRUE)
-    # field types: 
-    stoptbl <- RSQLite::dbGetQuery(con, "PRAGMA table_info(stops)")
-    RSQLite::dbGetQuery(con, "DELETE FROM stops")
+    res <- RSQLite::dbSendQuery(con, "DELETE FROM stops")
+    RSQLite::dbClearResult(res)
     RSQLite::dbWriteTable(con, "stops", stops, append = TRUE)
     rm("stops")
 

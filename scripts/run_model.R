@@ -45,6 +45,6 @@ if (file.exists("config.json")) {
 } else {
     ## run with defaults
     cat(" +++ No config.json file found - running with defaults +++\n")
-    nw %>% set_parameters(n_core = 2) %>% model 
+    nw %>% set_parameters(n_core = 1) %>% model 
 }
 

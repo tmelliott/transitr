@@ -54,7 +54,6 @@ check_tables <- function(db) {
 ##' @export
 load_gtfs <- function(db, output = "predictions.pb") {
     if (!check_tables(db)) {
-        print(attr(check_tables(db), "which"))
         stop("Oops, some of the tables aren't right...\n")
     }
 
