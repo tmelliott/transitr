@@ -35,7 +35,8 @@ create_network_tables <- function(nw) {
     on.exit(db_close(con))
     if (RSQLite::dbExistsTable(con, "road_segments") ||
         RSQLite::dbExistsTable(con, "intersections") ||
-        RSQLite::dbExistsTable(con, "trip_segments")) {
+        RSQLite::dbExistsTable(con, "shape_nodes") ||
+        RSQLite::dbExistsTable(con, "nodes")) {
         return()
     }
     
@@ -44,9 +45,9 @@ create_network_tables <- function(nw) {
         paste_nl(
             "CREATE TABLE road_segments (",
             "  road_segment_id INTEGER PRIMARY KEY,",
-            "  int_from INTEGER,",
-            "  int_to INTEGER,",
-            "  length DOUBLE",
+            "  node_from INTEGER,",
+            "  node_to INTEGER,",
+            "  length DOUBLE",  # only used for segment operations
             ")"))
     RSQLite::dbClearResult(res)
         
@@ -63,12 +64,25 @@ create_network_tables <- function(nw) {
     res <- RSQLite::dbSendQuery(
         con,
         paste_nl(
-            "CREATE TABLE shape_segments (",
+            "CREATE TABLE shape_nodes (",
             "  shape_id TEXT,",
-            "  road_segment_id INTEGER,",
-            "  shape_road_sequence INTEGER,",
+            "  node_id INTEGER,",
+            "  node_sequence INTEGER,",
             "  distance_traveled DOUBLE",
             ")"))
+    RSQLite::dbClearResult(res)
+
+    res <- RSQLite::dbSendQuery(
+        con,
+        paste_nl(
+            "CREATE TABLE nodes (",
+            "  node_id INTEGER PRIMARY KEY,",
+            "  node_type INTEGER,", # 0 = stop, 1 = intersection
+            "  node_lat DOUBLE,",
+            "  node_lon DOUBLE",
+            ")"                                    
+        )
+    )
     RSQLite::dbClearResult(res)
 }
 
@@ -86,6 +100,10 @@ load_intersections <- function(nw) {
     load_table(nw, "intersections")
 }
 
-load_shape_segments <- function(nw) {
-    load_table(nw, "shape_segments")
+load_shape_nodes <- function(nw) {
+    load_table(nw, "shape_nodes")
+}
+
+load_nodes <- function(nw) {
+    load_table(nw, "nodes")
 }

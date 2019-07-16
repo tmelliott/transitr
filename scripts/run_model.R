@@ -20,10 +20,11 @@ outdated <- function(url) {
     FALSE
 }
 
-if (!file.exists("fulldata.db")) {
-    nw <- create_gtfs(url, db = "fulldata.db", output = "at_predictions.pb") %>% construct()
+database <- "at_gtfs.db"
+if (!file.exists(database)) {
+    nw <- create_gtfs(url, db = database, output = "at_predictions.pb") %>% construct()
 } else {
-    nw <- load_gtfs("fulldata.db", output = "at_predictions.pb")
+    nw <- load_gtfs(database, output = "at_predictions.pb")
     if (outdated(url)) {
         try(nw %>% update(url))
         nw %>% construct()
@@ -44,6 +45,6 @@ if (file.exists("config.json")) {
 } else {
     ## run with defaults
     cat(" +++ No config.json file found - running with defaults +++\n")
-    nw %>% set_parameters(n_core = 2) %>% model 
+    nw %>% set_parameters(n_core = 1) %>% model 
 }
 
