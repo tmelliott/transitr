@@ -6,11 +6,11 @@ download.file(url, fzip, quiet = TRUE)
 unzip(fzip, exdir = fdir)
 
 ROUTES <- c('881', '27H', '27W', '25L', '25B', '70', '75')
-VERSION <- '67.28'
 
 routes <- read.csv(file.path(fdir, 'routes.txt'))
 routes <- routes[routes$route_short_name %in% ROUTES,]
 routeids <- routes$route_id
+VERSION <- max(as.numeric(gsub(".+_v", "", routeids)))
 routeids <- as.character(routeids[grepl(VERSION, routeids)])
 
 trips <- read.csv(file.path(fdir, 'trips.txt'), stringsAsFactors = FALSE)
@@ -28,7 +28,7 @@ shapes <- shapes[shapes$shape_id %in% unique(trips$shape_id), ]
 
 stop_times <- read.csv(file.path(fdir, 'stop_times.txt'))
 stop_times <- stop_times[stop_times$trip_id %in% tripids, ]
-stop_times$stop_id <- gsub("-moved", "", stop_times$stop_id)
+# stop_times$stop_id <- gsub("-moved", "", stop_times$stop_id)
 
 stops <- read.csv(file.path(fdir, 'stops.txt'))
 stops <- stops[stops$stop_id %in% stop_times$stop_id, ]
@@ -39,6 +39,10 @@ calendar <- calendar[calendar$service_id %in% trips$service_id, ]
 calendar_dates <- read.csv(file.path(fdir, 'calendar_dates.txt'))
 calendar_dates <- calendar_dates[1:10, ]
 
+if (!all(stop_times$stop_id %in% stops$stop_id)) {
+    stop("Something weird went on here .... !!!")
+}
+
 ## rewrite everything
 write.csv(routes, file.path(fdir, 'route.txt'), quote = FALSE)
 write.csv(trips, file.path(fdir, 'trips.txt'), quote = FALSE)
@@ -47,12 +51,10 @@ write.csv(stops, file.path(fdir, 'stops.txt'), quote = FALSE)
 write.csv(stop_times, file.path(fdir, 'stop_times.txt'), quote = FALSE)
 write.csv(calendar, file.path(fdir, 'calendar.txt'), quote = FALSE)
 write.csv(calendar_dates, file.path(fdir, 'calendar_dates.txt'), quote = FALSE)
-
 d <- getwd()
-setwd(fdir)
-path <- file.path(system.file('inst', 'extdata', package = 'transitr'),
-                  'auckland_gtfs.zip')
+path <- file.path(d, "inst", "extdata", "auckland_gtfs.zip")
 unlink(path)
+setwd(fdir)
 zip(path, list.files())
 setwd(d)
 
