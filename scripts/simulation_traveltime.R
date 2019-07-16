@@ -1,7 +1,7 @@
 source("scripts/common.R")
 
 ## --- load a route and its stops (for a trip)
-db <- "fulldata.db"
+db <- "at_gtfs.db"
 con <- dbConnect(SQLite(), db)
 route <- con %>% tbl("routes") %>% 
     filter(
@@ -28,8 +28,8 @@ shape <- con %>% tbl("shapes") %>%
     arrange(shape_pt_sequence) %>% collect() %>%
     mutate(
         shape_dist_traveled = c(0, 
-            cbind(shape_pt_lon, shape_pt_lat) %>%
-                geosphere::distGeo()
+            (cbind(shape_pt_lon, shape_pt_lat) %>%
+                geosphere::distGeo())[-n()]
         ) %>% cumsum
     )
 dbDisconnect(con)
@@ -160,7 +160,7 @@ if (dir.exists("history")) unlink("history", recursive = TRUE, force = TRUE)
 dir.create("history")
 
 # config
-nw <- load_gtfs("../../fulldata.db", output = "etas.pb") %>%
+nw <- load_gtfs("../../at_gtfs.db", output = "etas.pb") %>%
     realtime_feed(sprintf("http://localhost:3000/sim_tt_01/trip_updates_only"),
                   response = "protobuf") %>%
     set_parameters(
@@ -173,6 +173,21 @@ RCurl::getURL(sprintf("localhost:3000/%s/reset", "sim_tt_01"))
 
 model(nw)
 
-print(travel_times)
-
 ## --- examine estimation accuracy
+segfiles <- list.files("history", pattern = "segment_", full = T)
+segtt <- lapply(segfiles, read_csv, 
+    col_types = "iinn", 
+    col_names = c("segment_id", "timestamp", "travel_time", "error")) %>%
+    bind_rows() %>%
+    mutate(truth = travel_times[-1])
+
+# need nodes
+con <- dbConnect(SQLite(), nw$database)
+nodes <- con %>% tbl("shape_nodes") %>% filter(shape_id==!!shape$shape_id[1])
+segs <- con %>% tbl("road_segments") %>% 
+    filter(road_segment_id %in% !!segtt$segment_id)
+
+segdata <- inner_join(nodes, segs, by = c("node_id" = "node_from")) %>%
+    inner_join(segtt, by = c("road_segment_id" = "segment_id"), copy = TRUE) %>%
+    arrange(node_sequence) %>% 
+    select(road_segment_id, travel_time, error, truth)
