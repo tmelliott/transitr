@@ -320,10 +320,19 @@ namespace Gtfs {
                 double tt, ttp, err;
                 int n;
                 int M = segs.size ();
-                                
+
+#if SIMULATION
+                std::ofstream fout;
+                fout.open ("particle_travel_times.csv", std::ofstream::app);
+#endif
                 for (_current_segment=0; _current_segment<M; _current_segment++)
                 {
                     if (_segment_travel_times.at (_current_segment) > 0) continue;
+#if VERBOSE > 0
+                    std::cout << "\n  - segment " 
+                        << (_current_segment + 1)
+                        << " of " << _segment_travel_times.size ();
+#endif
 
                     // get the average travel time for particles along that segment
                     tt = 0.0;
@@ -337,8 +346,26 @@ namespace Gtfs {
                     }
                     if (n < _N || tt <= 0)
                     {
+                        // std::cout << " - only "
+                        //     << n << " of " << _N << " particles completed";
+                        // for (auto p = _state.begin (); p != _state.end (); ++p)
+                        // {
+                        //     std::cout << "\n  -- tt for seg "
+                        //         << p->get_segment_index () << " = "
+                        //         << p->get_travel_time (_current_segment);
+                        // }
                         continue;
                     }
+
+#if SIMULATION
+                    for (auto p = _state.begin (); p != _state.end (); ++p)
+                    {
+                        fout << _timestamp 
+                            << "," << _current_segment
+                            << "," << p->get_travel_time (_current_segment)
+                            << "," << p->get_weight () << "\n";
+                    }
+#endif
 
                     // let error be fixed for the segment
                     err = segs.at (_current_segment).segment->length () / 30;
@@ -354,10 +381,12 @@ namespace Gtfs {
                     _segment_travel_times.at (_current_segment) = round (tt);
                     segs.at (_current_segment).segment->push_data (tt, err, _timestamp);
 #if VERBOSE > 0
-                    std::cout << "\n  - segment " << _current_segment;
                     std::cout << ": " << round (tt) << " (" << err << ")";
 #endif
                 }
+#if SIMULATION
+                fout.close ();
+#endif
                 
                 // NOTE: need to ignore segment if previous segment travel time is 0
                 // (i.e., can't be sure that the current segment travel time is complete)
@@ -826,7 +855,11 @@ namespace Gtfs {
             delta -= round (wait);
         }
 
-        if (delta == 0) return;
+        // if it's the last stop, gotta go to the end
+        bool complete_route 
+            (e.type != EventType::gps && e.stop_index == stops.size () - 1);
+
+        if (delta < 0 && !complete_route) return;
         
         if (vehicle->params ()->noise_model == 0)
         {
@@ -847,11 +880,6 @@ namespace Gtfs {
 
         // now begin travelling
         double node_dist, node_eta;
-
-        // if it's the last stop, gotta go to the end
-        bool complete_route 
-            (e.type != EventType::gps && e.stop_index == stops.size () - 1);
-
         while ((complete_route && !complete) || delta > 0)
         {
             // noise model 0
@@ -890,8 +918,11 @@ namespace Gtfs {
 #if VERBOSE > 3
                     std::cout << " at " << at.at (stop_index);
 #endif
-                    segment_index++;
+                    std::cout << "\n   -> last segment travel time is "
+                        << tt.back ()
+                        << " (segment " << segment_index << ")";
                     complete = true;
+                    segment_index++;
                     delta = 0;
                     break;
                 }
@@ -988,7 +1019,6 @@ namespace Gtfs {
             std::cout << "\n * Event is a stop arrival/departure ... "
                 << "extrapolating particle's arrival/departure time";
 #endif
-
             if (at.at (stop_index + 1) == 0)
             {
                 double stop_dist, stop_eta;
@@ -1319,11 +1349,8 @@ namespace Gtfs {
 
     bool Particle::behind_event (Event& e, double delta)
     {
+        if (complete) return false;
         if (delta > 0) return true;
-        if (complete)
-        {
-            return false;
-        }
 
         switch (e.type)
         {

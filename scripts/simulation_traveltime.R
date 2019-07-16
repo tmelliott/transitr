@@ -173,21 +173,40 @@ RCurl::getURL(sprintf("localhost:3000/%s/reset", "sim_tt_01"))
 
 model(nw)
 
-## --- examine estimation accuracy
-segfiles <- list.files("history", pattern = "segment_", full = T)
-segtt <- lapply(segfiles, read_csv, 
-    col_types = "iinn", 
-    col_names = c("segment_id", "timestamp", "travel_time", "error")) %>%
-    bind_rows() %>%
-    mutate(truth = travel_times[-1])
 
-# need nodes
-con <- dbConnect(SQLite(), nw$database)
-nodes <- con %>% tbl("shape_nodes") %>% filter(shape_id==!!shape$shape_id[1])
-segs <- con %>% tbl("road_segments") %>% 
-    filter(road_segment_id %in% !!segtt$segment_id)
+# ## --- examine estimation accuracy
+# pf_times <- read_csv("particle_travel_times.csv",
+#     col_types = list(
+#         col_integer(), col_factor(ordered = TRUE),
+#         col_double(), col_double()
+#     ),
+#     col_names = c("timestamp", "segment_index", "time", "weight")) %>%
+#     mutate(timestamp = as.POSIXct(timestamp, origin = "1970-01-01"))
 
-segdata <- inner_join(nodes, segs, by = c("node_id" = "node_from")) %>%
-    inner_join(segtt, by = c("road_segment_id" = "segment_id"), copy = TRUE) %>%
-    arrange(node_sequence) %>% 
-    select(road_segment_id, travel_time, error, truth)
+# ggplot(pf_times, aes(segment_index, time)) +
+#     geom_violin(adjust = 2) +
+#     geom_point(data = tibble(
+#         segment_index = seq_along(travel_times),
+#         time = travel_times
+#     ))
+
+
+
+# ## silly way
+# segfiles <- list.files("history", pattern = "segment_", full = T)
+# segtt <- lapply(segfiles, read_csv, 
+#     col_types = "iinn", 
+#     col_names = c("segment_id", "timestamp", "travel_time", "error")) %>%
+#     bind_rows() %>%
+#     mutate(truth = travel_times[-1])
+
+# # need nodes
+# con <- dbConnect(SQLite(), nw$database)
+# nodes <- con %>% tbl("shape_nodes") %>% filter(shape_id==!!shape$shape_id[1])
+# segs <- con %>% tbl("road_segments") %>% 
+#     filter(road_segment_id %in% !!segtt$segment_id)
+
+# segdata <- inner_join(nodes, segs, by = c("node_id" = "node_from")) %>%
+#     inner_join(segtt, by = c("road_segment_id" = "segment_id"), copy = TRUE) %>%
+#     arrange(node_sequence) %>% 
+#     select(road_segment_id, travel_time, error, truth)

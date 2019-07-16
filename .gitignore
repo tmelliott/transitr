@@ -13,6 +13,8 @@ at_gtfs.db
 *.rda
 *.zip
 
+scripts/simulation_traveltime_*
+
 config.json
 .running_pid
 
