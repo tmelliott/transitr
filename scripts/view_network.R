@@ -13,7 +13,7 @@ get_data <- function(f = "segment_observations.csv") {
 }
 
 get_segment_data <- function(routes) {
-    con <- dbConnect(SQLite(), "fulldata.db")
+    con <- dbConnect(SQLite(), "at_gtfs.db")
     on.exit(dbDisconnect(con))
     if (missing(routes)) {
         segments <- con %>% tbl("road_segments")
@@ -32,11 +32,11 @@ get_segment_data <- function(routes) {
         segments <- con %>% tbl("road_segments") %>%
             filter(road_segment_id %in% segids)
     }
-    intersections <- con %>% tbl("intersections")
+    nodes <- con %>% tbl("nodes")
     segments <- segments %>% 
-        inner_join(intersections, by = c("int_from" = "intersection_id"), suffix = c("", "_start")) %>%
-        inner_join(intersections, by = c("int_to" = "intersection_id"), suffix = c("", "_end")) %>%
-        select(road_segment_id, length, intersection_lat, intersection_lon, intersection_lat_end, intersection_lon_end) %>%
+        inner_join(nodes, by = c("node_from" = "node_id"), suffix = c("", "_start")) %>%
+        inner_join(nodes, by = c("node_to" = "node_id"), suffix = c("", "_end")) %>%
+        select(road_segment_id, length, node_lat, node_lon, node_lat_end, node_lon_end) %>%
         collect
     segments
 }
@@ -74,10 +74,12 @@ view_segment_states <- function(f = "segment_states.csv", o, segment, n = 12, sp
                 mutate(speed = speed * 3.6, .y = speed, .e = sqrt(est_error * 3.6^2))
     } else {
         data <- data %>% mutate(.y = travel_time, .e = uncertainty)
+
         if (show.data)
             obs <- obs %>% mutate(.y = obs_tt, .e = sqrt(est_error))
     }
-    yr <- extendrange(data$.y, f = 0.5)
+    # yr <- range(data$.y) * c(1, 1.5)
+    # yr <- extendrange(data$.y, f = 0.5)
     p <- ggplot(data, aes(timestamp, .y)) + 
         geom_linerange(aes(ymin = .y - .e, ymax = .y + .e),  color = 'gray') +
         geom_point() +
@@ -92,7 +94,7 @@ view_segment_states <- function(f = "segment_states.csv", o, segment, n = 12, sp
             #     color = 'pink', lwd = 0.5) +
             geom_point(data = obs, colour = "red", cex = 0.5)
     }
-    if (speed) p <- p + ylim(0, 100) else p <- p + ylim(yr[1], yr[2])
+    if (speed) p <- p + ylim(0, 100) #else p <- p + ylim(yr[1], yr[2])
     p
 }
 
@@ -112,8 +114,8 @@ map_segments <- function(f = "segment_states.csv", t = max(data$timestamp)) {
                                      speed < 70 ~ "55-70 kmh",
                                      TRUE ~ "70+ kmh"))
 
-    p <- ggplot(data, aes(intersection_lon, intersection_lat, 
-                     xend = intersection_lon_end, yend = intersection_lat_end)) +
+    p <- ggplot(data, aes(node_lon, node_lat, 
+                     xend = node_lon_end, yend = node_lat_end)) +
         geom_segment(data = segdata, colour = "black", alpha = 0.05) + 
         geom_segment(aes(color = speed)) +
         coord_fixed(1.2) +
@@ -164,9 +166,9 @@ read_segment_data <- function(sim) {
 }
 
 ## segment lengths?
-con <- dbConnect(SQLite(), "fulldata.db")
+con <- dbConnect(SQLite(), "at_gtfs.db")
 seglens <- con %>% tbl("road_segments") %>% 
-    select(road_segment_id, length, int_from, int_to) %>% collect %>%
+    select(road_segment_id, length, node_from, node_to) %>% collect %>%
     mutate(road_segment_id = as.character(road_segment_id))
 dbDisconnect(con)
 
@@ -391,3 +393,12 @@ ggplot(shape[1:100,], aes(shape_pt_lon, shape_pt_lat)) +
 
 
 
+
+### BURP
+pf_times <- read_csv("simulations/sim000/particle_travel_times.csv",
+    col_types = list(
+        col_integer(), col_factor(ordered = TRUE),
+        col_double(), col_double()
+    ),
+    col_names = c("timestamp", "segment_index", "time", "weight")) %>%
+    mutate(timestamp = as.POSIXct(timestamp, origin = "1970-01-01"))

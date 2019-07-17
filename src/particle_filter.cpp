@@ -321,18 +321,13 @@ namespace Gtfs {
                 int n;
                 int M = segs.size ();
 
-#if SIMULATION
-                std::ofstream fout;
-                fout.open ("particle_travel_times.csv", std::ofstream::app);
-#endif
+// #if SIMULATION
+//                 std::ofstream fout;
+//                 fout.open ("particle_travel_times.csv", std::ofstream::app);
+// #endif
                 for (_current_segment=0; _current_segment<M; _current_segment++)
                 {
                     if (_segment_travel_times.at (_current_segment) > 0) continue;
-#if VERBOSE > 0
-                    std::cout << "\n  - segment " 
-                        << (_current_segment + 1)
-                        << " of " << _segment_travel_times.size ();
-#endif
 
                     // get the average travel time for particles along that segment
                     tt = 0.0;
@@ -357,26 +352,37 @@ namespace Gtfs {
                         continue;
                     }
 
-#if SIMULATION
-                    for (auto p = _state.begin (); p != _state.end (); ++p)
-                    {
-                        fout << _timestamp 
-                            << "," << _current_segment
-                            << "," << p->get_travel_time (_current_segment)
-                            << "," << p->get_weight () << "\n";
-                    }
+// #if SIMULATION
+//                     for (auto p = _state.begin (); p != _state.end (); ++p)
+//                     {
+//                         fout << _timestamp 
+//                             << "," << _current_segment
+//                             << "," << p->get_travel_time (_current_segment)
+//                             << "," << p->get_weight () << "\n";
+//                     }
+// #endif
+
+#if VERBOSE > 0
+                    std::cout << "\n  - segment " 
+                        << (_current_segment + 1)
+                        << " of " << _segment_travel_times.size ();
 #endif
-
                     // let error be fixed for the segment
-                    err = segs.at (_current_segment).segment->length () / 30;
+                    // err = segs.at (_current_segment).segment->length () / 30;
 
-                    // err = std::accumulate (_state.begin (), _state.end (), 0.0,
-                    //                        [=](double a, Particle& p) {
-                    //                             return a + p.get_weight () * pow(p.get_travel_time (_current_segment) - tt, 2);
-                    //                        });
+                    err = std::accumulate (
+                        _state.begin (), 
+                        _state.end (), 
+                        0.0,
+                        [=](double a, Particle& p) {
+                            return a + p.get_weight () * 
+                                pow (p.get_travel_time (_current_segment) - tt, 2);
+                        }
+                    );
 
-                    // // if the error is effectively 0 ...
-                    // if (err < 0.001) err = 10.0;
+                    // if the error is effectively 0 ...
+                    if (err < 1) 
+                        err = segs.at (_current_segment).segment->length () / 30;
 
                     _segment_travel_times.at (_current_segment) = round (tt);
                     segs.at (_current_segment).segment->push_data (tt, err, _timestamp);
@@ -384,9 +390,9 @@ namespace Gtfs {
                     std::cout << ": " << round (tt) << " (" << err << ")";
 #endif
                 }
-#if SIMULATION
-                fout.close ();
-#endif
+// #if SIMULATION
+//                 fout.close ();
+// #endif
                 
                 // NOTE: need to ignore segment if previous segment travel time is 0
                 // (i.e., can't be sure that the current segment travel time is complete)
@@ -917,10 +923,10 @@ namespace Gtfs {
                     at.at (stop_index) = vehicle->timestamp () - delta;
 #if VERBOSE > 3
                     std::cout << " at " << at.at (stop_index);
-#endif
                     std::cout << "\n   -> last segment travel time is "
                         << tt.back ()
                         << " (segment " << segment_index << ")";
+#endif
                     complete = true;
                     segment_index++;
                     delta = 0;
