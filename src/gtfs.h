@@ -782,6 +782,8 @@ namespace Gtfs
         int get_travel_time (int i);
         int get_travel_time_prediction (int i);
 
+        void init_travel_time (int i);
+
         void travel (int delta, Event& e, RNG& rng);
         bool bus_stop (uint64_t time, RNG& rng);
         bool behind_event (Event& e, double delta);

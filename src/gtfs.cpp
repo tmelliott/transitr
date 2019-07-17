@@ -2446,8 +2446,7 @@ namespace Gtfs
 
     bool Vehicle::valid ()
     {
-        return //(_position.latitude != 0.0 || _position.longitude != 0.0) &&
-            _trip != nullptr && _timestamp != 0;
+        return _trip != nullptr && _timestamp != 0;
     }
 
     bool Vehicle::complete ()
@@ -2721,6 +2720,17 @@ namespace Gtfs
     {
         if (i >= ttpred.size ()) return 0;
         return ttpred.at (i);
+    }
+
+    /**
+     * Initialize travel time in the specified segment. Currently used for initialization from
+     * a trip update.
+     * @param i segment index to start at
+     */
+    void Particle::init_travel_time (int i)
+    {
+        if (i >= tt.size ()) return;
+        tt.at (i) = 0;
     }
 
 

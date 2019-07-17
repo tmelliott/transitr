@@ -1,6 +1,7 @@
 
 # Created by https://www.gitignore.io/api/r,linux,macos,emacs
 
+*.sqlite
 windows
 fulldata.db
 at_gtfs.db
@@ -11,6 +12,8 @@ at_gtfs.db
 *.pb
 *.rda
 *.zip
+
+scripts/simulation_traveltime_*
 
 config.json
 .running_pid
