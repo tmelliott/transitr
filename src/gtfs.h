@@ -5,6 +5,7 @@
 #include <memory>
 #include <unordered_map>
 #include <ctime>
+#include <fstream>
 #include <mutex>
 
 #include "eigen3/Eigen/Dense"
@@ -21,7 +22,7 @@
 #include "RcppThread.h"
 
 #ifndef VERBOSE
-#define VERBOSE 0
+#define VERBOSE 4
 #endif
 
 #ifndef SIMULATION
@@ -39,6 +40,7 @@ namespace Gtfs
 
     struct ShapePt;
     struct ShapeSegment;
+    struct ShapeNode;
     struct StopTime;
     struct CalendarDate;
 
@@ -51,6 +53,7 @@ namespace Gtfs
     class Intersection;
     class Stop;
     class Calendar;
+    class Node;
 
     class Vehicle;
     class Particle;
@@ -85,6 +88,7 @@ namespace Gtfs
     {
         int n_core = 1;
         int n_particles = 1000;
+        int noise_model = 0; // [0=once per iteration/segment/stop; 1=each second]
         float system_noise = 5;  // std. dev. of speed variance/second
         float pr_stop = 0.5;
         float dwell_time = 20.0;
@@ -96,6 +100,7 @@ namespace Gtfs
         float nw_system_noise = 0.001;
         float nw_measurement_error = 50;
         bool save_timings = false;
+        int reset_method = 1;
         par () {}
         par (Rcpp::List parameters);
 
@@ -114,6 +119,13 @@ namespace Gtfs
         double distance;
         ShapeSegment ();
         ShapeSegment (Segment* s, double d);
+    };
+    struct ShapeNode
+    {
+        Node* node;
+        double distance;
+        ShapeNode ();
+        ShapeNode (Node* n, double d);
     };
     struct StopTime
     {
@@ -277,6 +289,7 @@ namespace Gtfs
         std::string _shape_id;
         std::vector<ShapePt> _path;
         std::vector<ShapeSegment> _segments;
+        std::vector<ShapeNode> _nodes;
         float _version;
 
         std::mutex load_mutex;
@@ -294,6 +307,7 @@ namespace Gtfs
         std::string& shape_id ();
         std::vector<ShapePt>& path ();
         std::vector<ShapeSegment>& segments ();
+        std::vector<ShapeNode>& nodes ();
         float version ();
 
         double distance_of (latlng& pt);
@@ -305,8 +319,8 @@ namespace Gtfs
     private:
         Gtfs* gtfs;
         int _segment_id;
-        Intersection* _from;
-        Intersection* _to;
+        Node* _from;
+        Node* _to;
         double _length;
 
         std::mutex load_mutex;
@@ -334,8 +348,8 @@ namespace Gtfs
         bool is_loaded ();
 
         int segment_id ();
-        Intersection* from ();
-        Intersection* to ();
+        Node* from ();
+        Node* to ();
         double length ();
 
         std::vector<std::pair<int, double> >& data ();
@@ -392,6 +406,7 @@ namespace Gtfs
         std::string _zone_id;
         std::string _parent_station;
         int _location_type;
+        Node* _node;
         std::vector<Trip*> _trips;
         float _version;
 
@@ -415,6 +430,7 @@ namespace Gtfs
         std::string& zone_id ();
         std::string& parent_station ();
         int location_type ();
+        Node* node ();
         std::vector<Trip*>& trips ();
         float version ();
 
@@ -468,6 +484,33 @@ namespace Gtfs
     };
 
 
+    class Node
+    {
+    private:
+        Gtfs* gtfs;
+        int _node_id;
+        int _node_type;
+        latlng _node_position;
+
+        std::mutex load_mutex;
+
+        bool loaded = false;
+        bool completed = false;
+
+    public:
+        Node (int id, Gtfs* gtfs);
+
+        void load ();
+        void unload ();
+        void unload (bool complete);
+
+        int node_id ();
+        int node_type ();
+        latlng& node_position ();
+
+    };
+
+
     class Gtfs 
     {
     private:
@@ -484,6 +527,7 @@ namespace Gtfs
         std::unordered_map<std::string, Shape> _shapes;
         std::unordered_map<int, Segment> _segments;
         std::unordered_map<int, Intersection> _intersections;
+        std::unordered_map<int, Node> _nodes;
         std::unordered_map<std::string, Stop> _stops;
         std::unordered_map<std::string, Calendar> _calendar;
 
@@ -502,6 +546,7 @@ namespace Gtfs
         std::unordered_map<std::string, Shape>& shapes ();
         std::unordered_map<int, Segment>& segments ();
         std::unordered_map<int, Intersection>& intersections ();
+        std::unordered_map<int, Node>& nodes ();
         std::unordered_map<std::string, Stop>& stops ();
         std::unordered_map<std::string, Calendar>& calendar ();
 
@@ -512,6 +557,7 @@ namespace Gtfs
         Shape* find_shape (std::string& id);
         Segment* find_segment (int id);
         Intersection* find_intersection (int id);
+        Node* find_node (int id);
         Stop* find_stop (std::string& id);
         Calendar* find_calendar (std::string& id);
 
@@ -562,6 +608,9 @@ namespace Gtfs
             int _stop_index;
             uint64_t _timestamp = 0;
             unsigned _delta;
+
+            par* _params;
+
             float _gpserror;
             float _systemnoise;
             float _prstop;
@@ -572,10 +621,14 @@ namespace Gtfs
             float _arrival_error = 5.0;
             float _departure_error = 5.0;
 
+            // reset method:
+            // 1 = reset state completely
+            // 2 = undo previous obs reweighting
+            int reset_method = 1;
+
             std::vector<Event> new_events;  /** these get sorted and moved to time_events */
             std::vector<Event> time_events;
             unsigned current_event_index = 0; // almost makes `Event.used` redundant
-
 
             bool _newtrip = true;
             bool _complete = false;
@@ -595,6 +648,7 @@ namespace Gtfs
             bool bad_sample;
             bool resample;
             int resample_count = 0;
+            std::string action = "";
 
             std::vector<unsigned int> _segment_travel_times; // segment travel times
             std::vector<uint64_t> _stop_arrival_times;       // stop arrival times
@@ -608,13 +662,18 @@ namespace Gtfs
 
 
         public:
-            Vehicle (std::string& id, par* params);
+            Vehicle (std::string& id, par* pars);
 
             std::string& vehicle_id ();
             Trip* trip ();
             latlng& position ();
             uint64_t timestamp ();
             unsigned delta ();
+
+            // only for use in testing!
+            void override_timestamp (uint64_t ts);
+
+            par* params () { return _params; }
 
             int get_n () const { return _N; };
 
@@ -647,6 +706,8 @@ namespace Gtfs
             etavector get_etas ();
             void reset ();
 
+            void revert_state ();
+
             double distance ();
             double speed ();
             int progress ();
@@ -668,6 +729,13 @@ namespace Gtfs
             int current_stop ();
 
             Time& trip_start_time (); // the time the trip started (using schedule)
+
+#if SIMULATION
+            std::ofstream f;
+            std::string store_name = "";
+            bool store_created = false;
+            void store_state (std::string type);
+#endif
     };
 
     class Particle {
@@ -713,6 +781,8 @@ namespace Gtfs
         void set_departure_time (int i, uint64_t t);
         int get_travel_time (int i);
         int get_travel_time_prediction (int i);
+
+        void init_travel_time (int i);
 
         void travel (int delta, Event& e, RNG& rng);
         bool bus_stop (uint64_t time, RNG& rng);

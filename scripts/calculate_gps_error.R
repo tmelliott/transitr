@@ -115,3 +115,27 @@ leaflet(vps %>%
   ) %>%
   addTiles() %>%
   addCircles(~lon, ~lat, radius = 5, weight = 0)
+
+
+
+
+
+
+
+### simulation
+z <- matrix(rnorm(2*1e6), nrow = 2)
+r <- z * 5
+d <- sqrt(colSums(r^2))
+
+
+hist(d^2, 50, freq=F)
+curve(dexp(x, 0.5 / 5^2), 0, 600, add=T, col='red')
+xx <- seq(0, 600, length = 101)
+yy <- (1 / (2*5^2)) * exp(-xx / (2*5^2))
+lines(xx, yy, col='blue')
+
+## Exponential with rate 1/2 (mean = 1/(1/2) = 2)
+hist(colSums(z^2), 50)
+mean(colSums(z^2))
+
+hist(colSums(z^2) * 5^2, 50)

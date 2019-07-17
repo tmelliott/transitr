@@ -39,7 +39,9 @@ check_tables <- function(db) {
     res <- sapply(c(gtfs_tables(), "vehicles"), function(tbl) {
         eval(parse(text = sprintf("check_%s", tbl)))(db)
     })
-    all(res)
+    out <- all(res)
+    attr(out, "which") <- res
+    out
 }
 
 ##' Load an existing GTFS database into R for use with transitr.
@@ -52,7 +54,7 @@ check_tables <- function(db) {
 ##' @export
 load_gtfs <- function(db, output = "predictions.pb") {
     if (!check_tables(db)) {
-        stop("Oops, some of the tables aren't right...")
+        stop("Oops, some of the tables aren't right...\n")
     }
 
     structure(
@@ -66,6 +68,7 @@ load_gtfs <- function(db, output = "predictions.pb") {
                 n_particles = 1000L, 
                 # vehicle parameters
                 # -- transition 
+                noise_model = 0L,
                 system_noise = 1.0,
                 pr_stop = 0.5,
                 dwell_time = 20.0,
@@ -79,7 +82,8 @@ load_gtfs <- function(db, output = "predictions.pb") {
                 nw_system_noise = 0.001,
                 nw_measurement_error = 50,
                 # other ...
-                save_timings = FALSE
+                save_timings = FALSE,
+                reset_method = 1L
             )
         ),
         class = "trgtfs"

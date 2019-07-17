@@ -11,7 +11,7 @@
 AC_PREREQ(2.69)
 
 # Process this file with autoconf to produce a configure script.
-AC_INIT([transitr],[0.0.0.9000])
+AC_INIT([transitr],[0.3.0.9000])
 
 # We are using C++
 AC_LANG(C++)

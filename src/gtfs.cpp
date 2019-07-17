@@ -211,6 +211,42 @@ namespace Gtfs
             sqlite3_finalize (stmt);
             std::cout << " + Created " << _segments.size () << " segments\n";
         }
+        // load NODES
+        {
+            qry = "SELECT count(node_id) FROM nodes";
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
+            {
+                Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+                    << sqlite3_errmsg (db) << "\n";
+                sqlite3_finalize (stmt);
+                close_connection ();
+                return;
+            }
+            _nodes.reserve (sqlite3_column_int (stmt, 0));
+            sqlite3_finalize (stmt);
+
+            qry ="SELECT node_id FROM nodes";
+            qrystr = qry.c_str ();
+            if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
+            {
+                Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+                    << sqlite3_errmsg (db) << "\n";
+                sqlite3_finalize (stmt);
+                close_connection ();
+                return;
+            }
+            int iid;
+            while (sqlite3_step (stmt) == SQLITE_ROW)
+            {
+                iid = sqlite3_column_int (stmt, 0);
+                _nodes.emplace (std::piecewise_construct,
+                                std::forward_as_tuple (iid),
+                                std::forward_as_tuple (iid, this));
+            }
+            sqlite3_finalize (stmt);
+            std::cout << " + Created " << _nodes.size () << " nodes\n";
+        }
         // load INTERSECTIONS
         {
             qry = "SELECT count(intersection_id) FROM intersections";
@@ -400,6 +436,10 @@ namespace Gtfs
     {
         return _intersections;
     }
+    std::unordered_map<int, Node>& Gtfs::nodes ()
+    {
+        return _nodes;
+    }
     std::unordered_map<std::string, Stop>& Gtfs::stops ()
     {
         return _stops;
@@ -473,6 +513,16 @@ namespace Gtfs
     {
         auto search = _stops.find (id);
         if (search != _stops.end ())
+        {
+            return &(search->second);
+        }
+        return nullptr;
+    }
+
+    Node* Gtfs::find_node (int id)
+    {
+        auto search = _nodes.find (id);
+        if (search != _nodes.end ())
         {
             return &(search->second);
         }
@@ -845,12 +895,29 @@ namespace Gtfs
         gtfs->close_connection ();
 
         // now load stop distances ...
+        std::vector<ShapeNode> nodes = _shape->nodes ();
+        // for (int i=0; i<nodes.size (); i++)
+        // {
+        //     std::cout << "\n [" << i << "] " << 
+        //         nodes.at (i).distance;
+        // }
+        int ni = 0;
+        int si = 0;
         for (auto st = _stops.begin (); st != _stops.end (); ++st)
         {
-            if (st->stop && _shape && st->distance == 0)
+            // find next stop node
+            while (nodes.at (ni).node->node_type () == 1) ni++;
+            if (nodes.at (ni).node->node_id () == st->stop->node ()->node_id ())
             {
-                st->distance = _shape->distance_of (st->stop->stop_position ());
+                st->distance = nodes.at (ni).distance;
+                ni++;
             }
+            si++;
+            // something went wrong ... 
+            // else if (st->stop && _shape && st->distance == 0)
+            // {
+            //     st->distance = _shape->distance_of (st->stop->stop_position ());
+            // }
         }
 
         // set start time
@@ -1024,6 +1091,18 @@ namespace Gtfs
     }
 
 
+    /***************************************************** ShapeNode */
+    ShapeNode::ShapeNode ()
+    {
+        
+    }
+    ShapeNode::ShapeNode (Node* n, double d) 
+    {
+        node = n;
+        distance = d;
+    }
+
+
     /***************************************************** Shape */
     Shape::Shape (std::string& id, Gtfs* gtfs) : 
         gtfs (gtfs), _shape_id (id) {}
@@ -1107,8 +1186,8 @@ namespace Gtfs
         }
         _version = (float)sqlite3_column_double (stmt, 3);
 
-        // and then load the shape segments 
-        qry = "SELECT count(shape_id) FROM shape_segments WHERE shape_id=?";
+        // and then load the shape nodes 
+        qry = "SELECT count(shape_id) FROM shape_nodes WHERE shape_id=?";
         qrystr = qry.c_str ();
         if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {
@@ -1134,10 +1213,10 @@ namespace Gtfs
             gtfs->close_connection ();
             return;
         }
-        _segments.reserve (sqlite3_column_int (stmt, 0));
+        _nodes.reserve (sqlite3_column_int (stmt, 0));
         sqlite3_finalize (stmt);
 
-        qry = "SELECT road_segment_id, distance_traveled FROM shape_segments WHERE shape_id=? ORDER BY shape_road_sequence";
+        qry = "SELECT node_id, distance_traveled FROM shape_nodes WHERE shape_id=? ORDER BY node_sequence";
         qrystr = qry.c_str ();
         if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {
@@ -1156,16 +1235,65 @@ namespace Gtfs
             return; 
         }
 
-        Segment* segi;
+        Node* nodei;
         double di;
         while (sqlite3_step (stmt) == SQLITE_ROW)
         {
-            segi = gtfs->find_segment (sqlite3_column_int (stmt, 0));
+            nodei = gtfs->find_node (sqlite3_column_int (stmt, 0));
             di = sqlite3_column_double (stmt, 1);
-            _segments.emplace_back (segi, di);
+            _nodes.emplace_back (nodei, di);
         }
 
         sqlite3_finalize (stmt);
+
+        // now load the road segments
+        _segments.reserve (_nodes.size () - 1);
+        Segment* segi;
+        qry = "SELECT road_segment_id FROM road_segments WHERE node_from=? AND node_to=?";
+        qrystr = qry.c_str ();
+        if (sqlite3_prepare_v2 (db, qrystr, -1, &stmt, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+        for (int i=0; i<_nodes.size ()-1; i++)
+        {
+            if (sqlite3_bind_int (stmt, 1, _nodes.at (i).node->node_id ()) != SQLITE_OK)
+            {
+                Rcpp::Rcerr << " x Can't bind FROM node to query\n  "
+                    << sqlite3_errmsg (db) << "\n";
+                sqlite3_finalize (stmt);
+                gtfs->close_connection ();
+                return; 
+            }
+            if (sqlite3_bind_int (stmt, 2, _nodes.at (i+1).node->node_id ()) != SQLITE_OK)
+            {
+                Rcpp::Rcerr << " x Can't bind TO node to query\n  "
+                    << sqlite3_errmsg (db) << "\n";
+                sqlite3_finalize (stmt);
+                gtfs->close_connection ();
+                return; 
+            }
+            if (sqlite3_step (stmt) != SQLITE_ROW)
+            {
+                Rcpp::Rcerr << " x Couldn't get row count from db\n  "
+                    << sqlite3_errmsg (db) << "\n";
+                sqlite3_finalize (stmt);
+                gtfs->close_connection ();
+                return;
+            }
+            segi = gtfs->find_segment (sqlite3_column_int (stmt, 0));
+            _segments.emplace_back (segi, _nodes.at (i).distance);
+            sqlite3_reset (stmt);
+        }
+    
+        _segments.reserve (sqlite3_column_int (stmt, 0));
+        sqlite3_finalize (stmt);
+
+        // sqlite3_finalize (stmt);
         gtfs->close_connection ();
 
         loaded = true;
@@ -1198,6 +1326,12 @@ namespace Gtfs
         return _segments;
     }
 
+    std::vector<ShapeNode>& Shape::nodes ()
+    {
+        if (!loaded) load ();
+        return _nodes;
+    }
+
     float Shape::version () { 
         if (!loaded) load ();
         return _version; 
@@ -1207,7 +1341,7 @@ namespace Gtfs
     {
         if (!loaded) load ();
         int closest = 0;
-        double dmin = 100000;
+        double dmin = 1e6;
         double di;
         for (unsigned int i=0; i<_path.size (); ++i)
         {
@@ -1224,30 +1358,63 @@ namespace Gtfs
             return _path[closest].distance;
         }
 
-        // pA -> pB -> pC
-        // p0B is closest, but on AB or BC?
-        bool forward (true);
-        if (closest >= _path.size () - 1)
+        // closest point is the first point? must be on the first piece!
+        if (closest == 0)
         {
-            forward = false;
+            return alongTrackDistance(x, _path[0].pt, _path[1].pt);
+        } 
+        
+        // closest point is the last point? must be on the last piece!
+        if (closest == _path.size () - 1)
+        {
+            return _path[closest - 1].distance +
+                alongTrackDistance(x, _path[closest - 1].pt, _path[closest].pt);
         }
-        else if (closest != 0)
+        
+        // compute the ALONG TRACK DISTANCE for
+        // segments either side of closest point
+        // to determing where the point lies
+        double a1, a2, d1, d2;
+        a1 = alongTrackDistance(x, _path[closest - 1].pt, _path[closest].pt);
+        a2 = alongTrackDistance(x, _path[closest].pt, _path[closest + 1].pt);
+        d1 = _path[closest].distance - _path[closest - 1].distance;
+        d2 = _path[closest + 1].distance - _path[closest].distance;
+
+        if (a1 >= 0 && a1 < d1)
         {
-            double dA = distanceEarth (_path[closest-1].pt, x);
-            double dB = distanceEarth (_path[closest+1].pt, x);
-            forward = dB <= dA;
+            return _path[closest - 1].distance + a1;
+        }
+        if (a2 >= 0 && a2 < d2)
+        {
+            return _path[closest].distance + a2;
         }
 
-        if (forward)
-        {
-            return _path[closest].distance + 
-                alongTrackDistance(x, _path[closest].pt, _path[closest+1].pt);
-        }
-        else
-        {
-            return _path[closest-1].distance +
-                alongTrackDistance(x, _path[closest-1].pt, _path[closest].pt);
-        }
+        return 0.0;
+
+        // pA -> pB -> pC
+        // p0B is closest, but on AB or BC?
+        // bool forward (true);
+        // if (closest >= _path.size () - 1)
+        // {
+        //     forward = false;
+        // }
+        // else if (closest != 0)
+        // {
+        //     double dA = distanceEarth (_path[closest-1].pt, x);
+        //     double dB = distanceEarth (_path[closest+1].pt, x);
+        //     forward = dB <= dA;
+        // }
+
+        // if (forward)
+        // {
+        //     return _path[closest].distance + 
+        //         alongTrackDistance(x, _path[closest].pt, _path[closest+1].pt);
+        // }
+        // else
+        // {
+        //     return _path[closest-1].distance +
+        //         alongTrackDistance(x, _path[closest-1].pt, _path[closest].pt);
+        // }
     }
 
     latlng Shape::coordinates_of (double& d)
@@ -1305,7 +1472,7 @@ namespace Gtfs
         sqlite3_stmt* stmt;
         const char* qrystr;
 
-        std::string qry = "SELECT int_from, int_to, length FROM road_segments WHERE road_segment_id=?";
+        std::string qry = "SELECT node_from, node_to, length FROM road_segments WHERE road_segment_id=?";
         qrystr = qry.c_str ();
         if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {
@@ -1333,9 +1500,9 @@ namespace Gtfs
         }
 
         int fromid = sqlite3_column_int (stmt, 0);
-        _from = gtfs->find_intersection (fromid);
+        _from = gtfs->find_node (fromid);
         int toid = sqlite3_column_int (stmt, 1);
-        _to = gtfs->find_intersection (toid);
+        _to = gtfs->find_node (toid);
         _length = sqlite3_column_double (stmt, 2);
 
         sqlite3_finalize (stmt);
@@ -1360,12 +1527,12 @@ namespace Gtfs
         return _segment_id; 
     }
 
-    Intersection* Segment::from ()
+    Node* Segment::from ()
     {
         if (!loaded) load ();
         return _from;
     }
-    Intersection* Segment::to ()
+    Node* Segment::to ()
     {
         if (!loaded) load ();
         return _to;
@@ -1510,7 +1677,7 @@ namespace Gtfs
 
         sqlite3_stmt* stmt;
         const char* qrystr;
-        std::string qry = "SELECT stop_lat, stop_lon, stop_code, stop_name, stop_desc, zone_id, parent_station, location_type, version FROM stops WHERE stop_id=?";
+        std::string qry = "SELECT stop_lat, stop_lon, stop_code, stop_name, stop_desc, zone_id, parent_station, location_type, node_id, version FROM stops WHERE stop_id=?";
         qrystr = qry.c_str ();
         if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {
@@ -1565,7 +1732,9 @@ namespace Gtfs
         {
             _location_type = sqlite3_column_int (stmt, 7);
         }
-        _version = (float)sqlite3_column_double (stmt, 8);
+        int nodeid = sqlite3_column_int (stmt, 8);
+        _node = gtfs->find_node (nodeid);
+        _version = (float)sqlite3_column_double (stmt, 9);
 
         sqlite3_finalize (stmt);
         gtfs->close_connection ();
@@ -1625,6 +1794,11 @@ namespace Gtfs
     {
         if (!loaded) load ();
         return _location_type;
+    }
+    Node* Stop::node ()
+    {
+        if (!loaded) load ();
+        return _node;
     }
     std::vector<Trip*>& Stop::trips ()
     {
@@ -1806,6 +1980,89 @@ namespace Gtfs
             _thursday && _friday;
     }
 
+    /***************************************************** Calendar */
+    Node::Node (int id, Gtfs* gtfs) :
+        gtfs (gtfs), _node_id (id)
+    {
+    }
+
+    void Node::load () 
+    {
+        std::lock_guard<std::mutex> lk (load_mutex);
+        if (loaded) return;
+        sqlite3* db = gtfs->get_connection ();
+        if (db == nullptr)
+        {
+            Rcpp::Rcerr << " x Unable to connect to database\n  "
+                << sqlite3_errmsg (db) << "\n";
+            gtfs->close_connection ();
+            return;
+        }
+
+        sqlite3_stmt* stmt;
+        const char* qrystr;
+        std::string qry = "SELECT node_type, node_lat, node_lon FROM nodes WHERE node_id=?";
+        qrystr = qry.c_str ();
+        if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+        if (sqlite3_bind_int (stmt, 1, _node_id) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't bind intersection id to query\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return; 
+        }
+        if (sqlite3_step (stmt) != SQLITE_ROW)
+        {
+            Rcpp::Rcerr << " x Couldn't get intersection from db\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+
+        _node_type = sqlite3_column_int (stmt, 0);
+        _node_position = latlng (sqlite3_column_double (stmt, 1),
+                                 sqlite3_column_double (stmt, 2));
+
+        sqlite3_finalize (stmt);
+        gtfs->close_connection ();
+
+        loaded = true;
+    }
+
+    void Node::unload (bool complete)
+    {
+        completed = complete;
+        loaded = false;
+    }
+
+    void Node::unload () { unload (false); }
+
+    int Node::node_id ()
+    {
+        return _node_id;
+    }
+
+    int Node::node_type ()
+    {
+        if (!loaded) load ();
+        return _node_type;
+    }
+
+    latlng& Node::node_position ()
+    {
+        if (!loaded) load ();
+        return _node_position;
+    }
+
 
     /***************************************************** Parameters */
     par::par (Rcpp::List parameters)
@@ -1813,6 +2070,7 @@ namespace Gtfs
         // fetch the parameters
         Rcpp::IntegerVector nc = parameters["n_core"];
         Rcpp::IntegerVector np = parameters["n_particles"];
+        Rcpp::IntegerVector noisem = parameters["noise_model"];
         Rcpp::NumericVector sigx = parameters["system_noise"];
         Rcpp::NumericVector prstop = parameters["pr_stop"];
         Rcpp::NumericVector dwell = parameters["dwell_time"];
@@ -1824,10 +2082,12 @@ namespace Gtfs
         Rcpp::NumericVector signwx = parameters["nw_system_noise"];
         Rcpp::NumericVector signwy = parameters["nw_measurement_error"];
         Rcpp::LogicalVector tim = parameters["save_timings"];
+        Rcpp::IntegerVector resm = parameters["reset_method"];
 
         // set the parameters
         n_core = (int) nc[0];
         n_particles = (int) np[0];
+        noise_model = (int) noisem[0];
         system_noise = (float) sigx[0];
         pr_stop = (float) prstop[0];
         dwell_time = (float) dwell[0];
@@ -1839,6 +2099,7 @@ namespace Gtfs
         nw_system_noise = (float) signwx[0];
         nw_measurement_error = (float) signwy[0];
         save_timings = (bool) tim[0];
+        reset_method = (int) resm[0];
     }
 
     void par::print ()
@@ -1897,19 +2158,26 @@ namespace Gtfs
     }
 
     /***************************************************** Vehicle */
-    Vehicle::Vehicle (std::string& id, par* params) : 
+    Vehicle::Vehicle (std::string& id, par* pars) : 
     _vehicle_id (id)
     {
         // set the parameters here
-        _gpserror = params->gps_error;
-        _systemnoise = params->system_noise;
-        _prstop = params->pr_stop;
-        _dwelltime = params->dwell_time;
-        _dwelltimevar = params->dwell_time_var;
-        _gamma = params->gamma;
-        _arrival_error = params->arrival_error;
-        _departure_error = params->departure_error;
-        _N = params->n_particles;
+        _params = pars;
+        _gpserror = _params->gps_error;
+        _systemnoise = _params->system_noise;
+        _prstop = _params->pr_stop;
+        _dwelltime = _params->dwell_time;
+        _dwelltimevar = _params->dwell_time_var;
+        _gamma = _params->gamma;
+        _arrival_error = _params->arrival_error;
+        _departure_error = _params->departure_error;
+        _N = _params->n_particles;
+        reset_method = _params->reset_method;
+#if SIMULATION
+        std::ostringstream x;
+        x << "history/vehicle_" << _vehicle_id << ".csv";
+        store_name = x.str ();
+#endif
     }
 
     std::string& Vehicle::vehicle_id ()
@@ -1935,6 +2203,11 @@ namespace Gtfs
     unsigned Vehicle::delta ()
     {
         return _delta;
+    }
+
+    void Vehicle::override_timestamp (uint64_t ts)
+    {
+        _timestamp = ts;
     }
 
     void Vehicle::add_event (Event event)
@@ -2173,8 +2446,7 @@ namespace Gtfs
 
     bool Vehicle::valid ()
     {
-        return (_position.latitude != 0.0 || _position.longitude != 0.0) &&
-                _trip != nullptr && _timestamp != 0;
+        return _trip != nullptr && _timestamp != 0;
     }
 
     bool Vehicle::complete ()
@@ -2277,6 +2549,47 @@ namespace Gtfs
     {
         return &_state;
     };
+
+    void Vehicle::revert_state ()
+    {
+        switch(reset_method)
+        {
+            case 1:
+                {
+                    _skip_observation = true;
+                    action = "skip";
+#if SIMULATION
+                    this->store_state ("revert");
+#endif
+                    break;
+                }
+            case 2:
+                {
+                    action = "revert_state";
+#if SIMULATION
+                    this->store_state ("revert");
+#endif
+                    _state = _previous_state;
+                    // set timestamp to previous obs
+                    if (current_event_index > 0)
+                        _timestamp = time_events.at (current_event_index - 1).timestamp;
+                    else
+                        _timestamp = 0;
+#if SIMULATION
+                    this->store_state("reverted");
+#endif
+                    bad_sample = false;
+                    break;
+                }
+            case 3:
+                {
+                    // reset just the weights
+                    break;
+                }
+        }
+
+        // recalculate Neff, etc
+    }
 
 
 
@@ -2407,6 +2720,17 @@ namespace Gtfs
     {
         if (i >= ttpred.size ()) return 0;
         return ttpred.at (i);
+    }
+
+    /**
+     * Initialize travel time in the specified segment. Currently used for initialization from
+     * a trip update.
+     * @param i segment index to start at
+     */
+    void Particle::init_travel_time (int i)
+    {
+        if (i >= tt.size ()) return;
+        tt.at (i) = 0;
     }
 
 
