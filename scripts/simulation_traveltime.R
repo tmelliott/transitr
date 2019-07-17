@@ -175,38 +175,49 @@ model(nw)
 
 
 # ## --- examine estimation accuracy
-# pf_times <- read_csv("particle_travel_times.csv",
-#     col_types = list(
-#         col_integer(), col_factor(ordered = TRUE),
-#         col_double(), col_double()
-#     ),
-#     col_names = c("timestamp", "segment_index", "time", "weight")) %>%
-#     mutate(timestamp = as.POSIXct(timestamp, origin = "1970-01-01"))
+pf_times <- read_csv("particle_travel_times.csv",
+    col_types = list(
+        col_integer(), col_factor(ordered = TRUE),
+        col_double(), col_double()
+    ),
+    col_names = c("timestamp", "segment_index", "time", "weight")) %>%
+    mutate(timestamp = as.POSIXct(timestamp, origin = "1970-01-01"))
 
-# ggplot(pf_times, aes(segment_index, time)) +
-#     geom_violin(adjust = 2) +
-#     geom_point(data = tibble(
-#         segment_index = seq_along(travel_times),
-#         time = travel_times
-#     ))
+ttdat <- tibble(
+    segment_index = factor(seq_along(travel_times) - 1, ordered = TRUE),
+    time = travel_times
+)
+ggplot(pf_times, aes(segment_index, time)) +
+    geom_violin(adjust = 2) +
+    geom_point(data = ttdat)
+
+ggplot(pf_times, aes(time)) +
+    geom_histogram(aes(y = ..density..)) +
+    geom_vline(aes(xintercept = time, colour = "True travel time (sec)"), 
+        data = ttdat) +
+    facet_wrap(segment_index~., scales = "free") +
+    xlab("Travel time (sec)") + ylab("P(T|Y)") +
+    scale_colour_manual(name = "", values = c("True travel time (sec)" = "orangered")) +
+    theme(legend.position = "bottom")
 
 
 
-# ## silly way
-# segfiles <- list.files("history", pattern = "segment_", full = T)
-# segtt <- lapply(segfiles, read_csv, 
-#     col_types = "iinn", 
-#     col_names = c("segment_id", "timestamp", "travel_time", "error")) %>%
-#     bind_rows() %>%
-#     mutate(truth = travel_times[-1])
 
-# # need nodes
-# con <- dbConnect(SQLite(), nw$database)
-# nodes <- con %>% tbl("shape_nodes") %>% filter(shape_id==!!shape$shape_id[1])
-# segs <- con %>% tbl("road_segments") %>% 
-#     filter(road_segment_id %in% !!segtt$segment_id)
+## silly way
+segfiles <- list.files("history", pattern = "segment_", full = T)
+segtt <- lapply(segfiles, read_csv, 
+    col_types = "iinn", 
+    col_names = c("segment_id", "timestamp", "travel_time", "error")) %>%
+    bind_rows() %>%
+    mutate(truth = travel_times[-1])
 
-# segdata <- inner_join(nodes, segs, by = c("node_id" = "node_from")) %>%
-#     inner_join(segtt, by = c("road_segment_id" = "segment_id"), copy = TRUE) %>%
-#     arrange(node_sequence) %>% 
-#     select(road_segment_id, travel_time, error, truth)
+# need nodes
+con <- dbConnect(SQLite(), nw$database)
+nodes <- con %>% tbl("shape_nodes") %>% filter(shape_id==!!shape$shape_id[1])
+segs <- con %>% tbl("road_segments") %>% 
+    filter(road_segment_id %in% !!segtt$segment_id)
+
+segdata <- inner_join(nodes, segs, by = c("node_id" = "node_from")) %>%
+    inner_join(segtt, by = c("road_segment_id" = "segment_id"), copy = TRUE) %>%
+    arrange(node_sequence) %>% 
+    select(road_segment_id, travel_time, error, truth)
