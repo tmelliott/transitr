@@ -1,3 +1,7 @@
+# 0.4.9000
+
+
+
 # 0.4 - fourth beta release
 
 - now using NODES for the network, which can be stops or intersections
