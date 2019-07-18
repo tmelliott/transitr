@@ -101,7 +101,7 @@ namespace Gtfs {
                 std::cout << "\n  => Z = "
                     << dj->first << ", R = " << dj->second
                     << " -> err = " << errj;
-#endifq
+#endif
                 I += H.transpose () * (1 / errj) * H;
                 i += H.transpose () * (dj->first / errj);
             }

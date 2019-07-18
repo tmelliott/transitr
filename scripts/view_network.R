@@ -402,3 +402,113 @@ pf_times <- read_csv("simulations/sim000/particle_travel_times.csv",
     ),
     col_names = c("timestamp", "segment_index", "time", "weight")) %>%
     mutate(timestamp = as.POSIXct(timestamp, origin = "1970-01-01"))
+
+
+
+### OKAY lets look at coming up with a proper model thing ...
+library(rjags)
+library(tidybayes)
+
+segdata <- get_data("simulations/sim000/segment_observations.csv") %>%
+    filter(segment_id == 285)
+
+p0 <- ggplot(segdata, aes(timestamp, obs_tt)) +
+    geom_pointrange(
+        aes(ymin = obs_tt - sqrt(est_error), ymax = obs_tt + sqrt(est_error))
+    )
+p0
+
+# layout the data
+jags.data <- 
+    list(
+        # the observations
+        b = segdata$obs_tt,
+        # the observation errors,
+        e = sqrt(segdata$est_error),
+        # the timestamp INDEX
+        t = as.integer(as.factor(segdata$timestamp)),
+        # the first timestamp (not used yet)
+        # T0 = min(segdata$timestamp),
+        # time differences
+        delta = diff(unique(segdata$timestamp)),
+        # number of observations
+        N = nrow(segdata),
+        # number of timestamps
+        M = length(unique(segdata$timestamp))
+    )
+
+jags.fit <- 
+    jags.model("scripts/nw_model_obs.jags",
+        data = jags.data,
+        n.chains = 4,
+        n.adapt = 10000,
+        inits = function() {
+            list(
+                beta = rep(mean(segdata$obs_tt), jags.data$M),
+                log_epsilon = log(runif(1, 1, 5))
+            )
+        }
+    )
+
+samples <- 
+    coda.samples(jags.fit,
+        variable.names = c("beta", "kappa", "epsilon", "psi"),
+        n.iter = 10000,
+        thin = 10
+    )
+
+
+
+## just the BETA values
+beta.samples <- samples %>% spread_draws(beta[t]) %>%
+    mutate(timestamp = unique(segdata$timestamp)[t])
+
+ggplot(beta.samples, aes(timestamp, beta)) +
+    geom_point(size = 0.2) +
+    facet_wrap(~.chain) + 
+    geom_pointrange(
+        aes(
+            y = obs_tt, 
+            ymin = obs_tt - sqrt(est_error), 
+            ymax = obs_tt + sqrt(est_error)
+        ),
+        data = segdata,
+        colour = "red"
+    )
+
+
+
+samples %>% spread_draws(epsilon) %>% 
+    ggplot(aes(.iteration, epsilon, group = .chain, colour = as.factor(.chain))) +
+    geom_path() 
+
+samples %>% spread_draws(kappa[t]) %>%
+    mutate(timestamp = unique(segdata$timestamp)[t]) %>%
+    ggplot(aes(timestamp, kappa)) + 
+    geom_point() +
+    facet_wrap(~.chain)
+
+samples %>% spread_draws(beta[t], kappa[t]) %>% 
+    mutate(timestamp = unique(segdata$timestamp)[t]) %>%
+    mutate(beta_min = beta - 2*kappa, beta_max = beta + 2*kappa) %>%
+    ggplot(aes(timestamp, beta)) +
+    geom_linerange(aes(y=NULL, ymin = beta_min, ymax = beta_max)) +
+    facet_wrap(~.chain)
+
+     + 
+    geom_pointrange(
+        aes(
+            y = obs_tt, 
+            ymin = obs_tt - sqrt(est_error), 
+            ymax = obs_tt + sqrt(est_error)
+        ),
+        data = segdata,
+        colour = "red"
+    )
+
+
+samples %>% spread_draws(psi) %>% 
+    ggplot(aes(.iteration, psi, group = .chain, colour = as.factor(.chain))) +
+    geom_path() 
+
+
