@@ -424,7 +424,7 @@ jags.data <-
         # the observations
         b = segdata$obs_tt,
         # the observation errors,
-        e = sqrt(segdata$est_error),
+        e = pmax(10, segdata$est_error),
         # the timestamp INDEX
         t = as.integer(as.factor(segdata$timestamp)),
         # the first timestamp (not used yet)
@@ -441,18 +441,24 @@ jags.fit <-
     jags.model("scripts/nw_model_obs.jags",
         data = jags.data,
         n.chains = 4,
-        n.adapt = 10000,
+        n.adapt = 5000,
         inits = function() {
             list(
-                beta = rep(mean(segdata$obs_tt), jags.data$M),
-                log_epsilon = log(runif(1, 1, 5))
+                beta = rnorm(jags.data$M,
+                    tapply(segdata$obs_tt, segdata$timestamp, mean),
+                    sd(segdata$obs_tt)
+                )
+                # B = rnorm(jags.data$N, jags.data$b, jags.data$e)
+                # log_epsilon = log(runif(1, 1, 5))
             )
         }
     )
 
 samples <- 
     coda.samples(jags.fit,
-        variable.names = c("beta", "kappa", "epsilon", "psi"),
+        # variable.names = c("beta", "kappa", "epsilon", "psi"),
+        # variable.names = c("beta", "kappa", "psi", "B"),
+        variable.names = c("beta", "B", "kappa", "psi", "epsilon"),
         n.iter = 10000,
         thin = 10
     )
@@ -473,7 +479,8 @@ ggplot(beta.samples, aes(timestamp, beta)) +
             ymax = obs_tt + sqrt(est_error)
         ),
         data = segdata,
-        colour = "red"
+        colour = "red",
+        size = 0.2
     )
 
 
@@ -482,7 +489,10 @@ samples %>% spread_draws(epsilon) %>%
     ggplot(aes(.iteration, epsilon, group = .chain, colour = as.factor(.chain))) +
     geom_path() 
 
-samples %>% spread_draws(kappa[t]) %>%
+samples %>% spread_draws(kappa) %>% 
+    ggplot(aes(.iteration, kappa, colour = as.factor(.chain))) + geom_path()
+
+samples %>% spread_draws(kappa[t]) %>% 
     mutate(timestamp = unique(segdata$timestamp)[t]) %>%
     ggplot(aes(timestamp, kappa)) + 
     geom_point() +
@@ -511,4 +521,18 @@ samples %>% spread_draws(psi) %>%
     ggplot(aes(.iteration, psi, group = .chain, colour = as.factor(.chain))) +
     geom_path() 
 
-
+samples %>% spread_draws(B[i]) %>% 
+    mutate(timestamp = segdata$timestamp[i]) %>%
+    ggplot(aes(timestamp, B)) +
+    geom_point() +
+    facet_wrap(~.chain) +
+    geom_pointrange(
+        aes(
+            y = obs_tt, 
+            ymin = obs_tt - sqrt(est_error), 
+            ymax = obs_tt + sqrt(est_error)
+        ),
+        data = segdata,
+        colour = "red",
+        size = 0.5
+    )
