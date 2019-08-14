@@ -40,7 +40,7 @@ update_stops <- function(object, file) {
         parent_station = as.character(tbl$parent_station),
         location_type = as.integer(tbl$location_type),
         node_id = NA,
-        version = as.numeric(gsub(".+_v", "", tbl$stop_id))
+        version = as.numeric(gsub(".+_v|-moved$", "", tbl$stop_id))
     )
     stops <- stops[!stops$stop_id %in% existing, ]
     RSQLite::dbWriteTable(con, "stops", stops, append = TRUE)
