@@ -21,6 +21,7 @@ addons:
       - libeigen3-dev
 
 before_install:
+  - python -c "import fcntl; fcntl.fcntl(1, fcntl.F_SETFL, 0)"  # https://github.com/travis-ci/travis-ci/issues/8920
   - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
   - sudo apt-get update -q
   - sudo apt-get install g++-4.9 -y
@@ -30,8 +31,10 @@ after_success:
   - Rscript -e 'covr::codecov()'
 
 after_failure:
+  #- python -c "import fcntl; fcntl.fcntl(1, fcntl.F_SETFL, 0)"  # https://github.com/travis-ci/travis-ci/issues/8920
   - if [ -f tests/tests.log ]; then cat tests/tests.log && sleep 10; fi
   - cat /home/travis/build/tmelliott/transitr/transitr.Rcheck/00install.out
+  - if [ -f tests/tests.log ]; then cat tests/tests.log && sleep 10; fi
 
 notifications:
   email:
