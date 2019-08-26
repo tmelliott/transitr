@@ -4,6 +4,7 @@
 *.sqlite
 windows
 fulldata.db
+at_gtfs.db
 *.log
 *.out
 *.csv
@@ -11,6 +12,8 @@ fulldata.db
 *.pb
 *.rda
 *.zip
+
+scripts/simulation_traveltime_*
 
 config.json
 .running_pid

@@ -13,7 +13,7 @@ get_data <- function(f = "segment_observations.csv") {
 }
 
 get_segment_data <- function(routes) {
-    con <- dbConnect(SQLite(), "fulldata.db")
+    con <- dbConnect(SQLite(), "at_gtfs.db")
     on.exit(dbDisconnect(con))
     if (missing(routes)) {
         segments <- con %>% tbl("road_segments")
@@ -32,11 +32,11 @@ get_segment_data <- function(routes) {
         segments <- con %>% tbl("road_segments") %>%
             filter(road_segment_id %in% segids)
     }
-    intersections <- con %>% tbl("intersections")
+    nodes <- con %>% tbl("nodes")
     segments <- segments %>% 
-        inner_join(intersections, by = c("int_from" = "intersection_id"), suffix = c("", "_start")) %>%
-        inner_join(intersections, by = c("int_to" = "intersection_id"), suffix = c("", "_end")) %>%
-        select(road_segment_id, length, intersection_lat, intersection_lon, intersection_lat_end, intersection_lon_end) %>%
+        inner_join(nodes, by = c("node_from" = "node_id"), suffix = c("", "_start")) %>%
+        inner_join(nodes, by = c("node_to" = "node_id"), suffix = c("", "_end")) %>%
+        select(road_segment_id, length, node_lat, node_lon, node_lat_end, node_lon_end) %>%
         collect
     segments
 }
@@ -74,10 +74,12 @@ view_segment_states <- function(f = "segment_states.csv", o, segment, n = 12, sp
                 mutate(speed = speed * 3.6, .y = speed, .e = sqrt(est_error * 3.6^2))
     } else {
         data <- data %>% mutate(.y = travel_time, .e = uncertainty)
+
         if (show.data)
             obs <- obs %>% mutate(.y = obs_tt, .e = sqrt(est_error))
     }
-    yr <- extendrange(data$.y, f = 0.5)
+    # yr <- range(data$.y) * c(1, 1.5)
+    # yr <- extendrange(data$.y, f = 0.5)
     p <- ggplot(data, aes(timestamp, .y)) + 
         geom_linerange(aes(ymin = .y - .e, ymax = .y + .e),  color = 'gray') +
         geom_point() +
@@ -92,7 +94,7 @@ view_segment_states <- function(f = "segment_states.csv", o, segment, n = 12, sp
             #     color = 'pink', lwd = 0.5) +
             geom_point(data = obs, colour = "red", cex = 0.5)
     }
-    if (speed) p <- p + ylim(0, 100) else p <- p + ylim(yr[1], yr[2])
+    if (speed) p <- p + ylim(0, 100) #else p <- p + ylim(yr[1], yr[2])
     p
 }
 
@@ -112,8 +114,8 @@ map_segments <- function(f = "segment_states.csv", t = max(data$timestamp)) {
                                      speed < 70 ~ "55-70 kmh",
                                      TRUE ~ "70+ kmh"))
 
-    p <- ggplot(data, aes(intersection_lon, intersection_lat, 
-                     xend = intersection_lon_end, yend = intersection_lat_end)) +
+    p <- ggplot(data, aes(node_lon, node_lat, 
+                     xend = node_lon_end, yend = node_lat_end)) +
         geom_segment(data = segdata, colour = "black", alpha = 0.05) + 
         geom_segment(aes(color = speed)) +
         coord_fixed(1.2) +
@@ -164,9 +166,9 @@ read_segment_data <- function(sim) {
 }
 
 ## segment lengths?
-con <- dbConnect(SQLite(), "fulldata.db")
+con <- dbConnect(SQLite(), "at_gtfs.db")
 seglens <- con %>% tbl("road_segments") %>% 
-    select(road_segment_id, length, int_from, int_to) %>% collect %>%
+    select(road_segment_id, length, node_from, node_to) %>% collect %>%
     mutate(road_segment_id = as.character(road_segment_id))
 dbDisconnect(con)
 
@@ -390,4 +392,307 @@ ggplot(shape[1:100,], aes(shape_pt_lon, shape_pt_lat)) +
 
 
 
+
+
+### BURP
+pf_times <- read_csv("simulations/sim000/particle_travel_times.csv",
+    col_types = list(
+        col_integer(), col_factor(ordered = TRUE),
+        col_double(), col_double()
+    ),
+    col_names = c("timestamp", "segment_index", "time", "weight")) %>%
+    mutate(timestamp = as.POSIXct(timestamp, origin = "1970-01-01"))
+
+
+
+### OKAY lets look at coming up with a proper model thing ...
+library(rjags)
+library(tidybayes)
+
+segdata_all <- get_data("simulations/sim000/segment_observations.csv") %>%
+    filter(segment_id %in% 
+        (table(segment_id) %>% sort %>% tail(8) %>% names)
+    ) %>%
+    group_by(segment_id) %>%
+    do(
+        (.) %>% 
+            filter(obs_tt < 5 * median(obs_tt)) %>%
+            filter(est_error < 2 * max(obs_tt))
+            # mutate(
+            #     est_error = pmin(est_error, max(obs_tt))
+            # )
+    )
+
+ggplot(segdata_all, aes(obs_tt)) + geom_histogram() + facet_wrap(~segment_id)
+p0 <- ggplot(segdata_all, aes(timestamp, obs_tt)) +
+    geom_pointrange(
+        aes(ymin = obs_tt - sqrt(est_error), ymax = obs_tt + sqrt(est_error))
+    ) +
+    facet_wrap(~segment_id, ncol = 2, scales = "free")
+p0
+
+# layout the data for a single segment
+segdata <- segdata_all %>% filter(segment_id == 295)
+ggplot(segdata, aes(timestamp, obs_tt)) +
+    geom_pointrange(
+        aes(ymin = obs_tt - sqrt(est_error), ymax = obs_tt + sqrt(est_error))
+    )
+jags.data <- 
+    list(
+        # the observations
+        b = segdata$obs_tt,
+        # the observation errors,
+        e = pmax(10, segdata$est_error),
+        # the timestamp INDEX
+        t = as.integer(as.factor(segdata$timestamp)),
+        # the first timestamp (not used yet)
+        # T0 = min(segdata$timestamp),
+        # time differences
+        delta = diff(unique(segdata$timestamp)),
+        # number of observations
+        N = nrow(segdata),
+        # number of timestamps
+        M = length(unique(segdata$timestamp))
+    )
+
+jags.fit <- 
+    jags.model("scripts/nw_model_obs.jags",
+        data = jags.data,
+        n.chains = 4,
+        n.adapt = 5000,
+        inits = function() {
+            list(
+                beta = rnorm(jags.data$M,
+                    tapply(segdata$obs_tt, segdata$timestamp, mean),
+                    sd(segdata$obs_tt)
+                )
+                # B = rnorm(jags.data$N, jags.data$b, jags.data$e)
+                # log_epsilon = log(runif(1, 1, 5))
+            )
+        }
+    )
+
+samples <- 
+    coda.samples(jags.fit,
+        # variable.names = c("beta", "kappa", "epsilon", "psi"),
+        # variable.names = c("beta", "kappa", "psi", "B"),
+        variable.names = c("beta", "B", "kappa", "psi", "epsilon"),
+        n.iter = 10000,
+        thin = 10
+    )
+
+
+
+## just the BETA values
+beta.samples <- samples %>% spread_draws(beta[t]) %>%
+    mutate(timestamp = unique(segdata$timestamp)[t])
+
+ggplot(beta.samples, aes(timestamp, beta)) +
+    geom_point(size = 0.2) +
+    facet_wrap(~.chain) + 
+    geom_pointrange(
+        aes(
+            y = obs_tt, 
+            ymin = obs_tt - sqrt(est_error), 
+            ymax = obs_tt + sqrt(est_error)
+        ),
+        data = segdata,
+        colour = "red",
+        size = 0.2
+    )
+
+
+
+samples %>% spread_draws(epsilon) %>% 
+    ggplot(aes(.iteration, epsilon, group = .chain, colour = as.factor(.chain))) +
+    geom_path() 
+
+samples %>% spread_draws(kappa) %>% 
+    ggplot(aes(.iteration, kappa, colour = as.factor(.chain))) + geom_path()
+
+samples %>% spread_draws(kappa[t]) %>% 
+    mutate(timestamp = unique(segdata$timestamp)[t]) %>%
+    ggplot(aes(timestamp, kappa)) + 
+    geom_point() +
+    facet_wrap(~.chain)
+
+samples %>% spread_draws(beta[t], kappa[t]) %>% 
+    mutate(timestamp = unique(segdata$timestamp)[t]) %>%
+    mutate(beta_min = beta - 2*kappa, beta_max = beta + 2*kappa) %>%
+    ggplot(aes(timestamp, beta)) +
+    geom_linerange(aes(y=NULL, ymin = beta_min, ymax = beta_max)) +
+    facet_wrap(~.chain)
+
+     + 
+    geom_pointrange(
+        aes(
+            y = obs_tt, 
+            ymin = obs_tt - sqrt(est_error), 
+            ymax = obs_tt + sqrt(est_error)
+        ),
+        data = segdata,
+        colour = "red"
+    )
+
+
+samples %>% spread_draws(psi) %>% 
+    ggplot(aes(.iteration, psi, group = .chain, colour = as.factor(.chain))) +
+    geom_path() 
+
+samples %>% spread_draws(B[i]) %>% 
+    mutate(timestamp = segdata$timestamp[i]) %>%
+    ggplot(aes(timestamp, B)) +
+    geom_point() +
+    facet_wrap(~.chain) +
+    geom_pointrange(
+        aes(
+            y = obs_tt, 
+            ymin = obs_tt - sqrt(est_error), 
+            ymax = obs_tt + sqrt(est_error)
+        ),
+        data = segdata,
+        colour = "red",
+        size = 0.5
+    )
+
+
+## Now another model, which uses max speed ...
+con <- dbConnect(SQLite(), "at_gtfs.db")
+seglens <- con %>% tbl("road_segments") %>% 
+    filter(road_segment_id %in% !!unique(segdata$segment_id)) %>%
+    collect() %>%
+    pluck("length")
+
+jags.data <- 
+    list(
+        # the observations
+        b = segdata$obs_tt,
+        # the observation errors,
+        e = pmax(10, segdata$est_error),
+        # the timestamp INDEX
+        t = as.integer(as.factor(segdata$timestamp)),
+        # the first timestamp (not used yet)
+        # T0 = min(segdata$timestamp),
+        # time differences
+        delta = diff(unique(segdata$timestamp)),
+        # number of observations
+        N = nrow(segdata),
+        # number of timestamps
+        M = length(unique(segdata$timestamp)),
+        # segment length
+        length = seglens
+    )
+
+jags.fit <- 
+    jags.model("scripts/nw_model_obs_length.jags",
+        data = jags.data,
+        inits = function() {
+            list(
+                #Bmin = runif(1, 40, 60),
+                speed_i = 3,
+                beta = truncnorm::rtruncnorm(jags.data$M,
+                    a = 0, b = Inf,
+                    tapply(segdata$obs_tt, segdata$timestamp, mean),
+                    sd(segdata$obs_tt)
+                )
+                # B = rnorm(jags.data$N, jags.data$b, jags.data$e)
+                # log_epsilon = log(runif(1, 1, 5))
+            )
+        },
+        n.chains = 4,
+        n.adapt = 1000,
+    )
+
+samples <- 
+    coda.samples(jags.fit,
+        # variable.names = c("beta", "kappa", "epsilon", "psi"),
+        # variable.names = c("beta", "kappa", "psi", "B"),
+        variable.names = c("beta", "B", "kappa", "psi", "epsilon", "Bmin", "max_speed"),
+        n.iter = 1000,
+        thin = 1
+    )
+
+samples %>% spread_draws(Bmin) %>%
+    ggplot(aes(.iteration, Bmin, group = .chain, colour = as.factor(.chain))) +
+    geom_path() 
+
+samples %>% spread_draws(max_speed) %>%
+    ggplot(aes(.iteration, max_speed, group = .chain, colour = as.factor(.chain))) +
+    geom_path() 
+
+ggplot(segdata, aes(timestamp, jags.data$length / obs_tt / 1000 * 60 * 60)) +
+    geom_point()
+
+
+## just the BETA values
+beta.samples <- samples %>% spread_draws(beta[t], Bmin) %>%
+    mutate(timestamp = unique(segdata$timestamp)[t])
+
+ggplot(beta.samples, aes(timestamp, Bmin + beta)) +
+    geom_point(size = 0.2) +
+    facet_wrap(~.chain) + 
+    geom_pointrange(
+        aes(
+            y = obs_tt, 
+            ymin = obs_tt - sqrt(est_error), 
+            ymax = obs_tt + sqrt(est_error)
+        ),
+        data = segdata,
+        colour = "red",
+        size = 0.2
+    )
+
+
+
+samples %>% spread_draws(epsilon) %>% 
+    ggplot(aes(.iteration, epsilon, group = .chain, colour = as.factor(.chain))) +
+    geom_path() 
+
+samples %>% spread_draws(kappa) %>% 
+    ggplot(aes(.iteration, kappa, colour = as.factor(.chain))) + geom_path()
+
+samples %>% spread_draws(kappa[t]) %>% 
+    mutate(timestamp = unique(segdata$timestamp)[t]) %>%
+    ggplot(aes(timestamp, kappa)) + 
+    geom_point() +
+    facet_wrap(~.chain)
+
+samples %>% spread_draws(beta[t], kappa[t]) %>% 
+    mutate(timestamp = unique(segdata$timestamp)[t]) %>%
+    mutate(beta_min = beta - 2*kappa, beta_max = beta + 2*kappa) %>%
+    ggplot(aes(timestamp, beta)) +
+    geom_linerange(aes(y=NULL, ymin = beta_min, ymax = beta_max)) +
+    facet_wrap(~.chain)
+
+     + 
+    geom_pointrange(
+        aes(
+            y = obs_tt, 
+            ymin = obs_tt - sqrt(est_error), 
+            ymax = obs_tt + sqrt(est_error)
+        ),
+        data = segdata,
+        colour = "red"
+    )
+
+
+samples %>% spread_draws(psi) %>% 
+    ggplot(aes(.iteration, psi, group = .chain, colour = as.factor(.chain))) +
+    geom_path() 
+
+samples %>% spread_draws(B[i]) %>% 
+    mutate(timestamp = segdata$timestamp[i]) %>%
+    ggplot(aes(timestamp, B)) +
+    facet_wrap(~.chain) +
+    geom_pointrange(
+        aes(
+            y = obs_tt, 
+            ymin = obs_tt - sqrt(est_error), 
+            ymax = obs_tt + sqrt(est_error)
+        ),
+        data = segdata,
+        colour = "red",
+        size = 0.5
+    ) +
+    geom_point(size = 0.2) 
 

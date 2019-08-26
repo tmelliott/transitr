@@ -1,3 +1,15 @@
+# 0.4.9000
+
+
+
+# 0.4 - fourth beta release
+
+- now using NODES for the network, which can be stops or intersections
+  (currently only stops are working, but hopefully flexible to extend later)
+- major improvements to particle filter, now correctly estimating 
+  travel times for all segments
+
+
 # 0.3 - third beta release
 
 - particle filter running better

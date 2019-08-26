@@ -73,7 +73,8 @@ void run_realtime_model (List nw)
     params.print ();
     gtfs.set_parameters (params);
 
-    // Allow the program to be stopped gracefully    
+    // Allow the program to be stopped gracefully
+    ongoing = 1;
     signal (SIGINT, intHandler);
     signal (SIGTERM, intHandler);
     Timer timer;

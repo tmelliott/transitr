@@ -1,0 +1,50 @@
+model {
+    # the data
+    for (i in 1:N) {
+        e_pr[i] <- pow(e[i], -1)
+        b[i] ~ dnorm(B[i], e_pr[i])
+    }
+
+    # the underlying true travel times
+    for (i in 1:N) {
+        B[i] <- Bmin + Bstar[i]
+        #B[i] ~ dnorm(beta[t[i]], kappa[t[i]])
+        Bstar[i] ~ dgamma(gam.alpha[t[i]], gam.beta[t[i]])
+    }
+    for (j in 1:M) {
+        gam.alpha[j] <- pow(beta[j], 2) * pow(kappa[j], -2)
+        gam.beta[j] <- beta[j] * pow(kappa[j], -2)
+    }
+
+    # the recursive travel time
+    beta[1] ~ dunif(0, 1000)
+    for (j in 2:M) {
+        beta[j] ~ dnorm(beta[j-1], delta[j-1] * epsilon_pr)T(0,)
+    }
+
+
+    # between-vehicle variablility
+    kappa[1] ~ dlnorm(0, 10)
+    kappa_pr[1] <- pow(kappa[1], -2)
+    for (j in 2:M) {
+        kappa[j] ~ dnorm(kappa[j-1], delta[j-1] * psi_pr)T(0,)
+        kappa_pr[j] <- pow(kappa[j], -2)
+    }
+
+    # system noise 
+    epsilon ~ dgamma(0.01, 0.01)
+    epsilon_pr <- pow(epsilon, -2)
+    psi ~ dgamma(0.0001, 0.0001)
+    psi_pr <- pow(psi, -2)
+
+    # min travel time
+    speed_i ~ dpois(5)T(3,10)
+    max_speed <- speed_i * 10
+    max_speed_ms <- max_speed * 1000 / 60 / 60
+    #pi[1:8] ~ ddirch(alpha[1:8] + 0.001)
+    #for (i in 1:8) {
+    #    alpha[i] ~ dgamma(0.01, 0.01)
+    #}
+    Bmin <- length / max_speed_ms
+    #Bmin ~ dnorm(bmin, pow(3, -2))T(0,)
+}

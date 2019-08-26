@@ -1,0 +1,36 @@
+model {
+    # the data
+    for (i in 1:N) {
+        e_pr[i] <- pow(e[i], -1)
+        b[i] ~ dnorm(B[i], e_pr[i])
+    }
+
+    # the underlying true travel times
+    for (i in 1:N) {
+        B[i] ~ dnorm(beta[t[i]], kappa[t[i]])
+    }
+
+    # the recursive travel time
+    beta[1] ~ dunif(0, 10000)
+    # beta_dot[1] ~ dnorm(0, 1)
+    for (j in 2:M) {
+        beta[j] ~ dnorm(beta[j-1], delta[j-1] * epsilon_pr) #beta_dot[j])
+        # beta_dot[j] ~ dnorm(beta_dot[j-1], epsilon)
+    }
+
+    # between-vehicle variablility
+    kappa[1] ~ dlnorm(0, 10)
+    kappa_pr[1] <- pow(kappa[1], -2)
+    for (j in 2:M) {
+        kappa[j] ~ dnorm(kappa[j-1], delta[j-1] * psi_pr)
+        kappa_pr[j] <- pow(kappa[j], -2)
+    }
+
+    # system noise 
+    #log_epsilon ~ dnorm(0, 10)
+    epsilon ~ dgamma(0.0001, 0.0001)
+    epsilon_pr <- pow(epsilon, -2)
+    #log_psi ~ dnorm(0, 10)
+    psi ~ dgamma(0.0001, 0.0001)
+    psi_pr <- pow(psi, -2)
+}
