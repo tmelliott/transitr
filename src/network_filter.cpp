@@ -16,6 +16,9 @@ namespace Gtfs {
         _travel_time (1) = 0.0;
         _uncertainty = Eigen::Matrix2d::Zero ();
         min_tt = _length / max_speed;
+
+        // also specify the "between vehicle" variabilty
+        _state_var = pow (log (10 * min_tt), 2);
     }
 
     std::pair<Eigen::Vector2d, Eigen::Matrix2d> Segment::predict (int delta)

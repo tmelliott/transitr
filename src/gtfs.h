@@ -330,7 +330,8 @@ namespace Gtfs
         double max_speed = 100.0 * 1000 / 60 / 60; // 100kmh is the max speed of a bus (presumably)
         double min_tt = 0.0; // assuming vehicle traveling at max speed, this is the min time
         double min_err = 2.0; // minimum travel time measurement error
-        float _system_noise;
+        float _system_noise;  // rate of change of (mean) travel time
+        float _state_var;     // variance between vehicles (baseline)
         float _measurement_error;
 
         // network state

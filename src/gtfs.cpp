@@ -1507,6 +1507,11 @@ namespace Gtfs
 
         sqlite3_finalize (stmt);
         gtfs->close_connection ();
+
+        // for the "between vehicle variability"
+        // we'll use something like ...                                                                                                       
+        
+        
         loaded = true;
     }
 
