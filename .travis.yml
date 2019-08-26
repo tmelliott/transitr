@@ -30,6 +30,7 @@ after_success:
   - Rscript -e 'covr::codecov()'
 
 after_failure:
+  - if [ -f tests/tests.log ]; then cat tests/tests.log && sleep 10; fi
   - cat /home/travis/build/tmelliott/transitr/transitr.Rcheck/00install.out
 
 notifications:
