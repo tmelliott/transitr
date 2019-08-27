@@ -226,8 +226,8 @@ segdat %>%
         geom_point() + xlim(0, 7) + ylim(0, 6)
 
 # format the data 
-segdat5 <- 
-    segdat %>% filter(segment_id %in% unique(segdat$segment_id)[1:50]) %>%
+segdat5 <- segdat %>%
+    # filter(segment_id %in% unique(segdat$segment_id)[1:50]) %>%
     arrange(segment_id, timestamp) %>% 
     select(segment_id, timestamp, travel_time, error, length) %>%
     mutate(
