@@ -182,10 +182,13 @@ segd <- segdata %>% filter(segment_id %in% segids) %>%
     mutate(speed = length / travel_time)
 
 
+segdf <- segd %>% 
+    filter(travel_time >= length / 30 & travel_time <= length / 2)
+
 ggplot(segd, aes(timestamp, speed / 1000 * 60 * 60)) +
     # geom_smooth(formula = y ~ 1, method = "lm") +
     # geom_smooth(aes(timestamp, travel_time)) +
-    geom_hline(aes(yintercept = 10 / 1000 * 60 * 60), color = "orangered") +
+    # geom_hline(aes(yintercept = 10 / 1000 * 60 * 60), color = "orangered") +
     geom_point(
         # aes(ymin = pmax(0, length / (travel_time + error) / 1000 * 60 * 60), 
         #     ymax = pmin(100, length / pmax(1, travel_time - error) / 1000 * 60 * 60)),
@@ -195,13 +198,13 @@ ggplot(segd, aes(timestamp, speed / 1000 * 60 * 60)) +
 
 ggplot(segd, aes(speed / 1000 * 60 * 60)) + geom_histogram() + facet_wrap(~segment_id)
 
-ggplot(segd) +
+ggplot(segdf) +
     # geom_smooth(aes(timestamp, travel_time), formula = y ~ 1, method = "lm") +
     # geom_smooth(aes(timestamp, travel_time)) +
-    geom_hline(aes(yintercept = length / (100 * 1000 / 60 / 60)), color = "orangered") +
-    geom_hline(aes(yintercept = length / (50 * 1000 / 60 / 60)), color = "orangered", lty = 2) +
-    geom_hline(aes(yintercept = length / (30 * 1000 / 60 / 60)), color = "orangered", lty = 3) +
-    geom_hline(aes(yintercept = length / (10 * 1000 / 60 / 60)), color = "orangered", lty = 4) +
+    # geom_hline(aes(yintercept = length / (100 * 1000 / 60 / 60)), color = "orangered") +
+    # geom_hline(aes(yintercept = length / (50 * 1000 / 60 / 60)), color = "orangered", lty = 2) +
+    # geom_hline(aes(yintercept = length / (30 * 1000 / 60 / 60)), color = "orangered", lty = 3) +
+    # geom_hline(aes(yintercept = length / (10 * 1000 / 60 / 60)), color = "orangered", lty = 4) +
     geom_pointrange(
         aes(timestamp, travel_time, ymin = pmax(0, travel_time - error), ymax = travel_time + pmin(error, 30)),
         size = 0.2
@@ -209,14 +212,173 @@ ggplot(segd) +
     facet_wrap(~paste0(segment_id, " [", round(length), "m]"), scales = "free_y")
 
 
-segdat <- get_segment_data()
-segi <- 3316
-ggplot(segdat, aes(intersection_lon, intersection_lat, 
-                 xend = intersection_lon_end, yend = intersection_lat_end)) +
-    geom_segment(colour = "black", alpha = 0.05) + 
-    geom_segment(data = segdat %>% filter(road_segment_id == segi), color = "orangered") +
-    coord_fixed(1.2) +
-    xlab("") + ylab("")
+
+
+segdat <- segdata %>% 
+    left_join(seglens, by = c("segment_id" = "road_segment_id")) %>%
+    filter(travel_time >= length / 30 & travel_time <= length / 2)
+
+segdat %>%
+    group_by(segment_id) %>%
+    summarize(tt = mean(travel_time), e = sd(travel_time), n = n()) %>%
+    filter(n > 1) %>%
+    ggplot(aes(log(tt), log(e))) +
+        geom_point() + xlim(0, 7) + ylim(0, 6)
+
+# format the data 
+segdat5 <- 
+    segdat %>% filter(segment_id %in% unique(segdat$segment_id)[1:50]) %>%
+    arrange(segment_id, timestamp) %>% 
+    select(segment_id, timestamp, travel_time, error, length) %>%
+    mutate(
+        timestamp = as.POSIXct(
+            paste0(
+                format(timestamp, "%Y-%m-%d %H:%M:"),
+                30 * as.integer(format(timestamp, "%S")) %/% 30
+            )
+        ),
+        l = as.integer(as.factor(segment_id)),
+        t = as.integer(timestamp)
+    ) %>%
+    group_by(l) %>%
+    do(
+        (.) %>% mutate(
+            # t0 = as.integer(t == min(t)),
+            c = c(1, diff(t) > 0)
+        )
+    ) %>% ungroup() %>%
+    mutate(
+        c = cumsum(c)
+    )
+
+ggplot(segdat5, aes(timestamp, travel_time)) +
+    geom_point() +
+    facet_wrap(~segment_id, scales = "free_y")
+
+jdata <-
+    list(
+        b = segdat5$travel_time,
+        e = segdat5$error,
+        # identify index of the BETAs
+        ell = segdat5$l,
+        c = segdat5$c,
+        c0 = tapply(segdat5$c, segdat5$l, min) %>% as.integer,
+        c1 = tapply(segdat5$c, segdat5$l, min) %>% as.integer + 1,
+        cJ = tapply(segdat5$c, segdat5$l, max) %>% as.integer,
+        delta = do.call(c, tapply(segdat5$t, segdat5$l, function(tt) {
+                c(0, diff(unique(tt)))
+            })) %>% as.integer,
+        L = length(unique(segdat5$segment_id)),
+        N = nrow(segdat5),
+        mu = (tapply(segdat5$length, segdat5$l, min) / 30) %>% as.numeric
+    )
+jdata_t <- do.call(c, tapply(segdat5$timestamp, segdat5$l, unique))
+names(jdata_t) <- NULL
+
+model.jags <- "
+model{
+    for (i in 1:N) {
+        b[i] ~ dnorm(B[i], pow(e[i], -2))
+        B[i] ~ dnorm(mu[ell[i]] + beta[c[i]], pow(phi[ell[i]], -2))
+    }
+    
+    for (l in 1:L) {
+        beta[c0[l]] ~ dunif(0, 500)
+        for (j in c1[l]:cJ[l]) {
+            beta[j] ~ dnorm(beta[j-1], pow(delta[j] * q[l], -2))
+        }
+            
+        # log(phi) = theta0 + theta1 * log(mu) + err
+        phi[l] <- exp(log_phi[l])
+        log_phi[l] ~ dnorm(log_mu_phi_ell[l], pow(sig_phi, -2))
+        log_mu_phi_ell[l] <- theta[1] + theta[2] * log(mu[l])
+
+        log_q[l] ~ dnorm(log_mu_q, pow(sig_q, -2))
+        eq[l] <- exp(log_q[l])
+        q[l] <- pow(eq[l], 2)
+    }
+    
+    theta[1] ~ dnorm(0, 0.01)
+    theta[2] ~ dnorm(1, 0.01)
+    sig_phi ~ dgamma(0.001, 0.001)
+        
+    mu_q <- exp(log_mu_q)
+    log_mu_q ~ dnorm(0, 0.01)
+    sig_q ~ dgamma(0.001, 0.001)
+}
+"
+
+library(rjags)
+library(tidybayes)
+
+jm <- 
+    jags.model(textConnection(model.jags),
+        # quiet = TRUE
+        data = jdata,
+        n.chains = 4,
+        n.adapt = 10000
+    )
+
+n1_samples <-
+    coda.samples(jm,
+        variable.names = c("beta", "phi", "q", "theta", "sig_phi", "mu_q", "sig_q"),
+        n.iter = 5000,
+        thin = 5
+    )
+
+n1_samples %>% spread_draws(phi[l]) %>%
+    ggplot() +
+        geom_path(aes(.iteration, phi, colour = as.factor(.chain), group = .chain)) +
+        facet_wrap(~l, scales = "free_y")
+
+n1_samples %>% spread_draws(theta[k]) %>%
+    ggplot() +
+        geom_path(aes(.iteration, theta, colour = as.factor(.chain), group = .chain)) +
+        facet_wrap(~k, scales = "free_y", nrow = 2)
+
+
+n1_samples %>% spread_draws(q[l]) %>%
+    ggplot() +
+        geom_path(aes(.iteration, log(q), group = .chain)) +
+        facet_wrap(~l, scales = "free_y")
+
+n1_samples %>% spread_draws(mu_q, sig_q) %>%
+    ggplot() +
+        geom_point(aes(log(mu_q), sig_q, colour = as.factor(.chain))) 
+
+
+betas <- n1_samples %>% spread_draws(beta[i]) %>%
+    median_qi() %>%
+    mutate(
+        l = tapply(jdata$ell, jdata$c, min),
+        t = jdata_t,
+        mu = jdata$mu[l]
+    )
+
+ggplot(betas) +
+    geom_ribbon(aes(t, ymin = mu + .lower, ymax = mu + .upper)) +
+    geom_path(aes(t, mu + beta)) +
+    geom_point(aes(timestamp, travel_time), data = segdat5, 
+        colour = "red", size = 0.5) +
+    facet_wrap(~l, scales = "free_y") 
+
+bl <- tapply(jdata$ell, jdata$c, min)
+betas_all <- n1_samples %>% spread_draws(beta[i]) %>%
+    mutate(l = bl[i], t = jdata_t[i])
+
+ggplot(betas_all) +
+    geom_point(aes(t, beta)) +
+    geom_point(aes(timestamp, travel_time), data = segdat5, colour = "red") +
+    facet_wrap(~l, scales = "free_y")
+
+
+# segi <- 3316
+# ggplot(segdat, aes(intersection_lon, intersection_lat, 
+#                  xend = intersection_lon_end, yend = intersection_lat_end)) +
+#     geom_segment(colour = "black", alpha = 0.05) + 
+#     geom_segment(data = segdat %>% filter(road_segment_id == segi), color = "orangered") +
+#     coord_fixed(1.2) +
+#     xlab("") + ylab("")
 
 
 ################ networkisation

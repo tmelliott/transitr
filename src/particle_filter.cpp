@@ -286,89 +286,40 @@ namespace Gtfs {
                 std::cout << "\n    ** estimating travel times";
 #endif
                 // NETWORK STUFF
-                // double dmin = _trip->shape ()->nodes ().back ().distance;
-                // double ShapeLen = dmin;
-                // std::cout << " -> dmin = " << dmin;
-                // for (auto p = _state.begin (); p != _state.end (); ++p)
-                // {
-                //     if (p->get_distance () < dmin)
-                //     {
-                //         std::cout << " and now its " << p->get_distance ();
-                //         dmin = p->get_distance ();
-                //     }
-                // }
                 std::vector<ShapeSegment>& segs = _trip->shape ()->segments ();
-// #if VERBOSE > 0
-//                 std::cout << " -> dist = " << dmin;
-//                 std::cout << " -> from segment "
-//                     << _current_segment << " to segment ";
-// #endif
-                // this should be SEGMENT index
-                // int m = find_segment_index (dmin, &segs);
-// #if VERBOSE > 0
-//                 std::cout << m;
-//                 std::cout << "  ==> dist to end = " << (ShapeLen - dmin);
-// #endif
-                //  << "; of "
-                //     << segs.size () << " segments, on segment ";
-                // std::cout.flush (); 
-
-                // int l = find_segment_index (dmin, &segs);
-                // std::cout << l;
 
                 // update segment travel times for intermediate ones ...
                 double tt, ttp, err;
                 int n;
                 int M = segs.size ();
+                double segmin;
 
-// #if SIMULATION
-//                 std::ofstream fout;
-//                 fout.open ("particle_travel_times.csv", std::ofstream::app);
-// #endif
                 for (_current_segment=0; _current_segment<M; _current_segment++)
                 {
                     if (_segment_travel_times.at (_current_segment) > 0) continue;
+                    segmin = segs.at (_current_segment).segment->min_travel_time ();
 
                     // get the average travel time for particles along that segment
                     tt = 0.0;
                     n = 0;
                     for (auto p = _state.begin (); p != _state.end (); ++p)
                     {
-                        if (p->get_travel_time (_current_segment) == 0) continue;
+                        if (p->get_travel_time (_current_segment) <= 0) continue;
                         if (p->get_segment_index () == _current_segment) continue;
-                        tt += p->get_travel_time (_current_segment) * p->get_weight ();
+                        if (p->get_travel_time (_current_segment) < segmin) continue;
+                        tt += p->get_weight () * p->get_travel_time (_current_segment);
                         n++;
                     }
                     if (n < _N || tt <= 0)
                     {
-                        // std::cout << " - only "
-                        //     << n << " of " << _N << " particles completed";
-                        // for (auto p = _state.begin (); p != _state.end (); ++p)
-                        // {
-                        //     std::cout << "\n  -- tt for seg "
-                        //         << p->get_segment_index () << " = "
-                        //         << p->get_travel_time (_current_segment);
-                        // }
                         continue;
                     }
-
-// #if SIMULATION
-//                     for (auto p = _state.begin (); p != _state.end (); ++p)
-//                     {
-//                         fout << _timestamp 
-//                             << "," << _current_segment
-//                             << "," << p->get_travel_time (_current_segment)
-//                             << "," << p->get_weight () << "\n";
-//                     }
-// #endif
 
 #if VERBOSE > 0
                     std::cout << "\n  - segment " 
                         << (_current_segment + 1)
                         << " of " << _segment_travel_times.size ();
 #endif
-                    // let error be fixed for the segment
-                    // err = segs.at (_current_segment).segment->length () / 30;
 
                     err = std::accumulate (
                         _state.begin (), 
@@ -382,18 +333,15 @@ namespace Gtfs {
 
                     // if the error is effectively 0 ...
                     if (err < 1) 
-                        err = segs.at (_current_segment).segment->length () / 30;
+                        err = 3; //segs.at (_current_segment).segment->length () / 30;
 
-                    _segment_travel_times.at (_current_segment) = round (tt);
+                    _segment_travel_times.at (_current_segment) = (tt);
                     segs.at (_current_segment).segment->push_data (tt, err, _timestamp);
 #if VERBOSE > 0
-                    std::cout << ": " << round (tt) << " (" << err << ")";
+                    std::cout << ": " <<  (tt) << " (" << err << ")";
 #endif
                 }
-// #if SIMULATION
-//                 fout.close ();
-// #endif
-                
+            
                 // NOTE: need to ignore segment if previous segment travel time is 0
                 // (i.e., can't be sure that the current segment travel time is complete)
                 

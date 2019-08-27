@@ -31,15 +31,32 @@ namespace Gtfs {
         if (_uncertainty (0, 0) > 0)
         {
             Eigen::Matrix2d F, Q;
-            F << 1, delta, 0, 1;
-            Q << 0, 0, 0, _system_noise;
+            switch (_model_type) 
+            {
+                case 0:
+                    F << 1, 0, 0, 0;
+                    Q << pow (_system_noise * delta, 2), 0, 0, 0;
+                    break;
+                case 1:
+                    F << 1, delta, 0, 1;
+                    Q << 0, 0, 0, _system_noise;
+                    break;
+            }
             Phat = F * Phat * F.transpose () + Q;
         }
         else
         {
             Phat = Eigen::Matrix2d::Zero ();
-            Phat (0, 0) = _travel_time (0);
-            Phat (1, 1) = 100.0;
+            switch (_model_type) 
+            {
+                case 0:
+                    Phat (0, 0) = 100.0;
+                    break;
+                case 1:
+                    Phat (0, 0) = 100.0; // fix this
+                    Phat (1, 1) = 100.0;
+                    break;
+            }
         }
 
         return std::make_pair (xhat, Phat);
@@ -85,9 +102,27 @@ namespace Gtfs {
         // then update with observations
         {
             // transform to information 
-            Eigen::Matrix2d Z = Phat.inverse ();
-            Eigen::Vector2d z = Z * xhat;
+            Eigen::Matrix2d Z = Eigen::Matrix2d::Zero ();
+            Eigen::Vector2d z = Eigen::Vector2d::Zero ();
+            switch (_model_type) 
+            {
+                case 0:
+                    // only worrying about single dimension
+                    Z (0, 0) = pow (Phat (0, 0), -1);
+                    z (0, 0) = xhat (0, 0) / Phat (0, 0);
+                    break;
+                case 1:
+                    Z = Phat.inverse ();
+                    z = Z * xhat;
+                    break;
+            }
 
+#if VERBOSE > 0
+            std::cout << "\n  => U ="
+                << Z.format (inlineMat) << " and i = " << z.format (tColVec);
+#endif
+
+            // this is the same regardless of the model being used
             Eigen::MatrixXd H (1, 2);
             H << 1, 0;
 
@@ -99,7 +134,7 @@ namespace Gtfs {
             for (int j=0; j<_data.size (); j++)
             {
                 dj = &(_data.at (j));
-                errj = fmin (err, fmax (dj->first, dj->second));
+                errj = fmin (err, fmax (dj->first, dj->second)) + _state_var;
 #if VERBOSE > 0
                 std::cout << "\n  => Z = "
                     << dj->first << ", R = " << dj->second
@@ -117,9 +152,24 @@ namespace Gtfs {
             Z += I;
             z += i;
 
+#if VERBOSE > 0
+            std::cout << "\n  => U ="
+                << Z.format (inlineMat) << " and i = " << z.format (tColVec);
+#endif
+
             // reverse transform information to travel time state space
-            Phat = Z.inverse ();
-            xhat = Phat * z;
+            switch (_model_type) 
+            {
+                case 0:
+                    Phat (0, 0) = pow (Z (0, 0), -1);
+                    xhat (0, 0) = z (0, 0) / Z (0, 0);
+                    break;
+                case 1:
+                    Phat = Z.inverse ();
+                    xhat = Phat * z;
+                    break;
+            }
+
 #if VERBOSE > 0
             std::cout << "\n  => X = "
                 << xhat.format (tColVec) 
@@ -170,7 +220,7 @@ namespace Gtfs {
         double tt (-1.0);
         int tries (100);
         while (tt < min_tt && tries > 0) {
-            tt = rng.rnorm () * x.second (0, 0) + x.first (0);
+            tt = rng.rnorm () * (x.second (0, 0) + _state_var) + x.first (0);
             tries--;
         }
         return round (fmax (0.0, tt));

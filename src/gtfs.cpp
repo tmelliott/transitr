@@ -1508,10 +1508,10 @@ namespace Gtfs
         sqlite3_finalize (stmt);
         gtfs->close_connection ();
 
-        // for the "between vehicle variability"
-        // we'll use something like ...                                                                                                       
-        
-        
+        // also specify min travel time and the "between vehicle" variabilty
+        min_tt = floor (_length / max_speed);
+        _state_var = pow (log (10 * min_tt), 2);
+
         loaded = true;
     }
 
@@ -1546,6 +1546,11 @@ namespace Gtfs
     {
         if (!loaded) load ();
         return _length;
+    }
+    double Segment::min_travel_time ()
+    {
+        if (!loaded) load ();
+        return min_tt;
     }
 
     std::vector<std::pair<int, double> >& Segment::data ()

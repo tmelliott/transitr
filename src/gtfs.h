@@ -334,6 +334,12 @@ namespace Gtfs
         float _state_var;     // variance between vehicles (baseline)
         float _measurement_error;
 
+        /**
+         * type 0: just the mean travel time
+         * type 1: include the first derivative of travel time (i.e., "change")
+         */
+        int _model_type = 0; // fixed, for now ...
+
         // network state
         std::vector<std::pair<int, double> > _data; // new observations as vehicles traverse network
         std::mutex data_mutex;
@@ -352,6 +358,7 @@ namespace Gtfs
         Node* from ();
         Node* to ();
         double length ();
+        double min_travel_time ();
 
         std::vector<std::pair<int, double> >& data ();
         uint64_t timestamp ();
