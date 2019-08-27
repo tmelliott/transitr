@@ -31,8 +31,8 @@ after_success:
   - Rscript -e 'covr::codecov()'
 
 after_failure:
-  #- python -c "import fcntl; fcntl.fcntl(1, fcntl.F_SETFL, 0)"  # https://github.com/travis-ci/travis-ci/issues/8920
-  - if [ -f tests/tests.log ]; then cat tests/tests.log && sleep 10; fi
+  - python -c "import fcntl; fcntl.fcntl(1, fcntl.F_SETFL, 0)"  # https://github.com/travis-ci/travis-ci/issues/8920
+  - if [ -f tests/tests.log ]; then cat tests/tests.log && sleep 20; fi
   - cat /home/travis/build/tmelliott/transitr/transitr.Rcheck/00install.out
   - if [ -f tests/tests.log ]; then cat tests/tests.log && sleep 10; fi
 
