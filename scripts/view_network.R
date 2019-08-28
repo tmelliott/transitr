@@ -328,6 +328,8 @@ n1_samples <-
         thin = 5
     )
 
+save(n1_samples, file = "samples_fullmodel.rda")
+
 # n1_samples %>% spread_draws(phi[l]) %>%
 #     ggplot() +
 #         geom_path(aes(.iteration, phi, colour = as.factor(.chain), group = .chain)) +
