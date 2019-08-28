@@ -223,7 +223,7 @@ segdat %>%
     summarize(tt = mean(travel_time), e = sd(travel_time), n = n()) %>%
     filter(n > 1) %>%
     ggplot(aes(log(tt), log(e))) +
-        geom_point() + xlim(0, 7) + ylim(0, 6)
+        geom_point()
 
 # format the data 
 segdat5 <- segdat %>%
@@ -292,10 +292,12 @@ model{
         phi[l] <- exp(log_phi[l])
         log_phi[l] ~ dnorm(log_mu_phi_ell[l], pow(sig_phi, -2))
         log_mu_phi_ell[l] <- theta[1] + theta[2] * log(mu[l])
+    
 
-        log_q[l] ~ dnorm(log_mu_q, pow(sig_q, -2))
-        eq[l] <- exp(log_q[l])
-        q[l] <- pow(eq[l], 2)
+        q[l] ~ dnorm(mu_q, pow(sig_q, -2))T(0,)
+        #log_q[l] ~ dnorm(log_mu_q, pow(sig_q, -2))
+        #eq[l] <- exp(log_q[l])
+        #q[l] <- pow(eq[l], 2)
     }
     
     theta[1] ~ dnorm(0, 0.01)
@@ -326,10 +328,10 @@ n1_samples <-
         thin = 5
     )
 
-n1_samples %>% spread_draws(phi[l]) %>%
-    ggplot() +
-        geom_path(aes(.iteration, phi, colour = as.factor(.chain), group = .chain)) +
-        facet_wrap(~l, scales = "free_y")
+# n1_samples %>% spread_draws(phi[l]) %>%
+#     ggplot() +
+#         geom_path(aes(.iteration, phi, colour = as.factor(.chain), group = .chain)) +
+#         facet_wrap(~l, scales = "free_y")
 
 n1_samples %>% spread_draws(theta[k]) %>%
     ggplot() +
@@ -355,10 +357,12 @@ betas <- n1_samples %>% spread_draws(beta[i]) %>%
         mu = jdata$mu[l]
     )
 
-ggplot(betas) +
+lii <- table(segdat5$l) %>% sort() %>% tail(20) %>% names()
+# lii <- unique(segdat5$l)[1:20 + 80]
+ggplot(betas %>% filter(l %in% lii)) +
     geom_ribbon(aes(t, ymin = mu + .lower, ymax = mu + .upper)) +
     geom_path(aes(t, mu + beta)) +
-    geom_point(aes(timestamp, travel_time), data = segdat5, 
+    geom_point(aes(timestamp, travel_time), data = segdat5 %>% filter(l %in% lii), 
         colour = "red", size = 0.5) +
     facet_wrap(~l, scales = "free_y") 
 
