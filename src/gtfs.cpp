@@ -1506,13 +1506,66 @@ namespace Gtfs
         _length = sqlite3_column_double (stmt, 2);
 
         sqlite3_finalize (stmt);
-        gtfs->close_connection ();
-
-        // also specify min travel time and the "between vehicle" variabilty
-        min_tt = floor (_length / max_speed);
-        _state_var = pow (log (10 * min_tt), 2);
 
         loaded = true;
+
+        // attempt to fetch parameters from `segment_parameters` table
+        qry = "SELECT COUNT(type) FROM sqlite_master WHERE type='table' AND name='segment_parameters'";
+        const char* tblcheck = qry.c_str ();
+        if (sqlite3_prepare_v2 (db, tblcheck, -1, &stmt, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+        if (sqlite3_step (stmt) != SQLITE_ROW)
+        {
+            Rcpp::Rcerr << " x Couldn't get segment from db\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+        if (sqlite3_column_int (stmt, 0) == 0)
+        {
+            // segment parameters table doesn't exist
+            Rcpp::Rcout << " x No parameter table found. \n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+
+        sqlite3_finalize (stmt);
+
+        // it exists - go grab them values!
+        qry = "SELECT q, phi FROM segment_parameters WHERE segment_id=?";
+        const char* segpars = qry.c_str ();
+        if (sqlite3_prepare_v2(db, segpars, -1, &stmt, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+        if (sqlite3_bind_int (stmt, 1, _segment_id) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't bind segment_id to query\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return; 
+        }
+        if (sqlite3_step (stmt) == SQLITE_ROW)
+        {
+            _system_noise = sqlite3_column_double (stmt, 0);
+            _state_var = sqlite3_column_double (stmt, 1);
+        }
+
+        sqlite3_finalize (stmt);
+        gtfs->close_connection ();
     }
 
     void Segment::unload ()

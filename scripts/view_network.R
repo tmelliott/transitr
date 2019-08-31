@@ -357,8 +357,10 @@ phi_q_samples %>%
     write_csv(path = "segment_parameters.csv")
 
 
+library(RSQLite); library(tidyverse)
 con <- dbConnect(SQLite(), "at_gtfs.db")
-dbWriteTable(con, "segment_parameters", read_csv("segment_parameters.csv"),
+dbWriteTable(con, "segment_parameters", 
+    read_csv("segment_parameters.csv", col_types = c("inn")),
     overwrite = TRUE)
 dbDisconnect(con)
 

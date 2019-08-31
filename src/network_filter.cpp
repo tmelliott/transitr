@@ -6,12 +6,6 @@ namespace Gtfs {
     {
         if (!loaded) load ();
         // set up the initial state of the segment
-        _system_noise = params->nw_system_noise;
-        _measurement_error = params->nw_measurement_error;
-
-        // fetch prior from the database
-        // ...
-        
         _travel_time (0) = _length / 10.0;
         _travel_time (1) = 0.0;
         _uncertainty = Eigen::Matrix2d::Zero ();
@@ -20,10 +14,22 @@ namespace Gtfs {
         // also specify the "between vehicle" variabilty
         // _state_var = pow (log (10 * min_tt), 2);
 
+        if (_system_noise == 0)
+            _system_noise = params->nw_system_noise;
+
         // best estimate
         // log(phi_ell) = theta0 + theta1 * log(min_tt)
         if (_state_var == 0)
             _state_var = exp (-1.2 + 1.2 * log (min_tt));
+        
+        _measurement_error = params->nw_measurement_error;
+
+#if VERBOSE > 0
+        std::cout << "\n - using parameters [q, phi, e] = ["
+            << _system_noise
+            << ", " << _state_var 
+            << ", " << _measurement_error << "]\n\n";
+#endif
     }
 
     std::pair<Eigen::Vector2d, Eigen::Matrix2d> Segment::predict (int delta)
