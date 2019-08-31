@@ -18,7 +18,12 @@ namespace Gtfs {
         min_tt = _length / max_speed;
 
         // also specify the "between vehicle" variabilty
-        _state_var = pow (log (10 * min_tt), 2);
+        // _state_var = pow (log (10 * min_tt), 2);
+
+        // best estimate
+        // log(phi_ell) = theta0 + theta1 * log(min_tt)
+        if (_state_var == 0)
+            _state_var = exp (-1.2 + 1.2 * log (min_tt));
     }
 
     std::pair<Eigen::Vector2d, Eigen::Matrix2d> Segment::predict (int delta)

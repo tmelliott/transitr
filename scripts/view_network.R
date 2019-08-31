@@ -341,18 +341,26 @@ n1_samples %>% spread_draws(theta[k]) %>%
         geom_path(aes(.iteration, theta, colour = as.factor(.chain), group = .chain)) +
         facet_wrap(~k, scales = "free_y", nrow = 2)
 
+n1_samples %>% spread_draws(theta[k]) %>% median_qi()
+
 
 phi_q_samples <- n1_samples %>% spread_draws(q[l], phi[l]) %>%
     median_qi()
 
 segtbl <- segdat5 %>%
     group_by(l) %>% summarize(segment_id = first(segment_id))
-    
+
 phi_q_samples %>%
     left_join(segtbl) %>%
     select(segment_id, q, phi) %>%
     mutate(q = signif(q, 2), phi = signif(phi, 2)) %>%
     write_csv(path = "segment_parameters.csv")
+
+
+con <- dbConnect(SQLite(), "at_gtfs.db")
+dbWriteTable(con, "segment_parameters", read_csv("segment_parameters.csv"),
+    overwrite = TRUE)
+dbDisconnect(con)
 
 ggplot(phi_q_samples) +
         # geom_errorbar(aes(phi, ymin = q.lower, ymax = q.upper)) +
