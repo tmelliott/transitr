@@ -329,6 +329,7 @@ n1_samples <-
     )
 
 save(n1_samples, file = "samples_fullmodel.rda")
+load("samples_fullmodel.rda")
 
 # n1_samples %>% spread_draws(phi[l]) %>%
 #     ggplot() +
@@ -340,6 +341,25 @@ n1_samples %>% spread_draws(theta[k]) %>%
         geom_path(aes(.iteration, theta, colour = as.factor(.chain), group = .chain)) +
         facet_wrap(~k, scales = "free_y", nrow = 2)
 
+
+phi_q_samples <- n1_samples %>% spread_draws(q[l], phi[l]) %>%
+    median_qi()
+
+segtbl <- segdat5 %>%
+    group_by(l) %>% summarize(segment_id = first(segment_id))
+    
+phi_q_samples %>%
+    left_join(segtbl) %>%
+    select(segment_id, q, phi) %>%
+    mutate(q = signif(q, 2), phi = signif(phi, 2)) %>%
+    write_csv(path = "segment_parameters.csv")
+
+ggplot(phi_q_samples) +
+        # geom_errorbar(aes(phi, ymin = q.lower, ymax = q.upper)) +
+        # geom_errorbarh(aes(xmin = phi.lower, xmax = phi.upper, y = q)) +
+        geom_point(aes(phi, q))  + 
+        scale_x_log10() + 
+        scale_y_log10()
 
 n1_samples %>% spread_draws(q[l]) %>%
     ggplot() +
