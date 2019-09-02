@@ -292,25 +292,26 @@ namespace Gtfs {
                 double tt, ttp, err;
                 int n;
                 int M = segs.size ();
-                double segmin;
+                double segmin, segmax;
 
                 for (_current_segment=0; _current_segment<M; _current_segment++)
                 {
                     if (_segment_travel_times.at (_current_segment) > 0) continue;
                     segmin = segs.at (_current_segment).segment->min_travel_time ();
+                    segmax = segs.at (_current_segment).segment->length ();
 
                     // get the average travel time for particles along that segment
                     tt = 0.0;
                     n = 0;
                     for (auto p = _state.begin (); p != _state.end (); ++p)
                     {
-                        if (p->get_travel_time (_current_segment) <= 0) continue;
-                        if (p->get_segment_index () == _current_segment) continue;
                         if (p->get_travel_time (_current_segment) < segmin) continue;
+                        if (p->get_travel_time (_current_segment) > segmax) continue;
+                        if (p->get_segment_index () == _current_segment) continue;
                         tt += p->get_weight () * p->get_travel_time (_current_segment);
                         n++;
                     }
-                    if (n < _N || tt <= 0)
+                    if (n < _N || tt < segmin || tt > segmax)
                     {
                         continue;
                     }
@@ -705,6 +706,7 @@ namespace Gtfs {
         Shape* shape = vehicle->trip ()->shape ();
         std::vector<ShapeNode>& nodes = shape->nodes ();
         std::vector<StopTime>& stops = vehicle->trip ()->stops ();
+        std::vector<ShapeSegment>& segments = shape->segments ();
 
         int M, L;
         M = stops.size ();
@@ -887,6 +889,17 @@ namespace Gtfs {
                     distance = next_node->distance;
                     segment_index++;
                     next_node = &(nodes.at (segment_index + 1));
+
+                    // adjust speed
+                    if (segments.at (segment_index).segment->travel_time () > 0 &
+                        segments.at (segment_index).segment->uncertainty () > 0)
+                    {
+                        speed = segments.at (segment_index).segment->sample_speed (rng);
+#if VERBOSE > 3
+                        std::cout << "\n -> setting vehicle speed to " <<
+                            speed << " based on segment state";
+#endif
+                    }
 
                     bool is_stop;
                     is_stop = next_node->node->node_type () == 0;

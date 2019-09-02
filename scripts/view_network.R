@@ -76,7 +76,7 @@ view_segment_states <- function(f = "segment_states.csv", o, segment, n = 12, sp
         data <- data %>% mutate(.y = travel_time, .e = uncertainty)
 
         if (show.data)
-            obs <- obs %>% mutate(.y = obs_tt, .e = sqrt(est_error))
+            obs <- obs %>% mutate(.y = obs_tt, .e = est_error)
     }
     # yr <- range(data$.y) * c(1, 1.5)
     # yr <- extendrange(data$.y, f = 0.5)
@@ -128,7 +128,7 @@ map_segments <- function(f = "segment_states.csv", t = max(data$timestamp)) {
 }
 
 
-view_segment_states("simulations/sim000/segment_states.csv", "simulations/sim000/segment_observations.csv", n = 20)
+view_segment_states("simulations/sim000/segment_states.csv", "simulations/sim000/segment_observations.csv", n = 30)
 view_segment_states("simulations/sim000/segment_states.csv", "simulations/sim000/segment_observations.csv", speed = TRUE, n = 20)
 view_segment_states("simulations/sim000/segment_states.csv", n = 20)
 view_segment_states("simulations/sim000/segment_states.csv", speed = TRUE, n = 20)
@@ -153,6 +153,66 @@ view_segment_states("simulations/sim100/segment_states.csv", n = 20)
 view_segment_states("simulations/sim100/segment_states.csv", speed = TRUE, n = 20)
 
 map_segments("simulations/sim100/segment_states.csv")
+
+
+
+### Vehicle history thing
+vdata_files <- 
+vdata <- tibble(
+    file = list.files("simulations/sim000/history", full.names = TRUE)
+    ) %>%
+    mutate(size = file.size(file)) %>%
+    arrange(desc(size))
+
+v1 <- read_csv(vdata$file[4]) %>%
+    mutate(time = as.POSIXct(event_timestamp, origin = "1970-01-01")) %>%
+    arrange(time)
+
+v1_gps <- v1 %>% filter(event_type == "gps") 
+
+ggplot(v1, aes(time)) +
+    # geom_point(aes(y = vehicle_distance, colour = state_type)) +
+    geom_point(aes(y = event_dist_along_route, colour = event_type)) +
+    facet_wrap(~trip_id, scales = "free_x")
+
+ggplot(v1, aes(time)) +
+    geom_path(aes(y = vehicle_speed)) +
+    facet_wrap(~trip_id, scales = "free_x")
+
+ggplot(v1) +
+    geom_point()
+
+#v1$trip_id %>% table
+tid <- "473136288-20190613111133_v80.31"
+
+con <- dbConnect(SQLite(), "at_gtfs.db")
+trip_shape <- con %>% tbl("trips") %>% 
+    filter(trip_id == !!tid) %>%
+    left_join(con %>% tbl("shapes")) %>%
+    arrange(shape_pt_sequence) %>%
+    collect()
+dbDisconnect(con)
+
+egg::ggarrange(
+    ggplot(trip_shape, aes(shape_pt_lon, shape_pt_lat)) +
+        geom_path() +
+        # coord_fixed(ratio = 1.2) +
+        xlab("Longitude") + ylab("Latitude") +
+        geom_point(aes(event_longitude, event_latitude), 
+            data = v1_gps %>% filter(trip_id == tid), 
+            colour = "orangered", alpha = 0.2),
+
+    ggplot(v1_gps %>% filter(trip_id == tid), aes(time)) +
+        # geom_point(aes(y = vehicle_distance, colour = state_type)) +
+        geom_point(aes(y = event_dist_along_route)) +
+        xlab("Time") + ylab("Distance travelled (m, according to GPS)"),
+    nrow = 2,
+    heights = c(2, 1)
+)
+
+ggplot(v1 %>% filter(trip_id == tid), aes(time)) +
+    geom_path(aes(y = vehicle_speed)) +
+    facet_wrap(~trip_id, scales = "free_x")
 
 
 ### raw "data"
@@ -344,30 +404,27 @@ n1_samples %>% spread_draws(theta[k]) %>%
 n1_samples %>% spread_draws(theta[k]) %>% median_qi()
 
 
-phi_q_samples <- n1_samples %>% spread_draws(q[l], phi[l]) %>%
-    median_qi()
 
 segtbl <- segdat5 %>%
-    group_by(l) %>% summarize(segment_id = first(segment_id))
+    group_by(l) %>% 
+    summarize(segment_id = first(segment_id), length = first(length))
 
-phi_q_samples %>%
+phi_q_samples <- n1_samples %>% spread_draws(q[l], phi[l]) %>%
+    median_qi() %>%
     left_join(segtbl) %>%
-    select(segment_id, q, phi) %>%
-    mutate(q = signif(q, 2), phi = signif(phi, 2)) %>%
-    write_csv(path = "segment_parameters.csv")
+    select(segment_id, length, q, phi) %>%
+    mutate(q = signif(q, 2), phi = signif(phi, 2))
 
 
 library(RSQLite); library(tidyverse)
 con <- dbConnect(SQLite(), "at_gtfs.db")
 dbWriteTable(con, "segment_parameters", 
-    read_csv("segment_parameters.csv", col_types = c("inn")),
+    phi_q_samples %>% select(-length),
     overwrite = TRUE)
 dbDisconnect(con)
 
 ggplot(phi_q_samples) +
-        # geom_errorbar(aes(phi, ymin = q.lower, ymax = q.upper)) +
-        # geom_errorbarh(aes(xmin = phi.lower, xmax = phi.upper, y = q)) +
-        geom_point(aes(phi, q))  + 
+        geom_point(aes(length/30, phi))  + 
         scale_x_log10() + 
         scale_y_log10()
 
