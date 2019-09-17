@@ -294,6 +294,11 @@ namespace Gtfs {
                 int M = segs.size ();
                 double segmin, segmax;
 
+#if SIMULATION
+                std::ofstream fout;
+                fout.open ("particle_travel_times.csv", std::ofstream::app);
+#endif
+
                 for (_current_segment=0; _current_segment<M; _current_segment++)
                 {
                     if (_segment_travel_times.at (_current_segment) > 0) continue;
@@ -342,12 +347,25 @@ namespace Gtfs {
 #if VERBOSE > 0
                     std::cout << ": " <<  (tt) << " (" << err << ")";
 #endif
+#if SIMULATION
+                    for (auto p = _state.begin (); p != _state.end (); ++p)
+                    {
+                        fout << _timestamp
+                            << "," << _current_segment
+                            << "," << p->get_travel_time (_current_segment)
+                            << "," << p->get_weight ()
+                            << "\n";
+                    }
+#endif
                 }
             
                 // NOTE: need to ignore segment if previous segment travel time is 0
                 // (i.e., can't be sure that the current segment travel time is complete)
                 
                 
+#if SIMULATION
+                fout.close ();
+#endif
             }
 
             current_event_index++;
@@ -359,6 +377,7 @@ namespace Gtfs {
             // delete its particles, because we don't need them
             _state.clear ();
         }
+
 
 
         return;
