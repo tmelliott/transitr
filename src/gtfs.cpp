@@ -1537,7 +1537,7 @@ namespace Gtfs
         if (sqlite3_column_int (stmt, 0) == 0)
         {
             // segment parameters table doesn't exist
-            Rcpp::Rcout << " x No parameter table found. \n";
+            // Rcpp::Rcout << " x No parameter table found. \n";
             sqlite3_finalize (stmt);
             gtfs->close_connection ();
             return;
@@ -1610,6 +1610,11 @@ namespace Gtfs
     {
         if (!loaded) load ();
         return min_tt;
+    }
+    double Segment::state_var ()
+    {
+        if (!loaded) load ();
+        return _state_var;
     }
 
     std::vector<std::pair<int, double> >& Segment::data ()

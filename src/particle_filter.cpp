@@ -333,8 +333,9 @@ namespace Gtfs {
                     );
 
                     // if the error is effectively 0 ...
-                    if (err < 1) 
-                        err = 3; //segs.at (_current_segment).segment->length () / 30;
+                    // ...  handled by Segment::update ()
+                    // if (err < 1) 
+                    //     err = 3; //segs.at (_current_segment).segment->length () / 30;
 
                     _segment_travel_times.at (_current_segment) = (tt);
                     segs.at (_current_segment).segment->push_data (tt, err, _timestamp);

@@ -98,7 +98,7 @@ namespace Gtfs
         float arrival_error = 5.0;
         float departure_error = 5.0;
         float nw_system_noise = 0.001;
-        float nw_measurement_error = 50;
+        float nw_measurement_error = 3.0;
         bool save_timings = false;
         int reset_method = 1;
         par () {}
@@ -359,6 +359,7 @@ namespace Gtfs
         Node* to ();
         double length ();
         double min_travel_time ();
+        double state_var ();
 
         std::vector<std::pair<int, double> >& data ();
         uint64_t timestamp ();

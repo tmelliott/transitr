@@ -24,11 +24,11 @@ namespace Gtfs {
         
         _measurement_error = params->nw_measurement_error;
 
-#if VERBOSE > 0
-        std::cout << "\n - using parameters [q, phi, e] = ["
-            << _system_noise
-            << ", " << _state_var 
-            << ", " << _measurement_error << "]\n\n";
+#if VERBOSE > 1
+        // std::cout << "\n - using parameters [q, phi, e] = ["
+        //     << _system_noise
+        //     << ", " << _state_var 
+        //     << ", " << _measurement_error << "]\n\n";
 #endif
     }
 
@@ -145,10 +145,15 @@ namespace Gtfs {
             for (int j=0; j<_data.size (); j++)
             {
                 dj = &(_data.at (j));
-                errj = fmin (err, fmax (dj->first, dj->second)) + _state_var;
+                // "err" is the sort-of minimum error we expect 
+                // for segment's travel time observations
+                errj = fmax (err, dj->second) + _state_var;
+                // errj = fmin (err, fmax (dj->first, dj->second)) + _state_var;
 #if VERBOSE > 0
-                std::cout << "\n  => Z = "
-                    << dj->first << ", R = " << dj->second
+                std::cout 
+                    << "\n  => Z = " << dj->first 
+                    << ", R = (" << dj->second << " \u2227 " << err
+                    << ") + " << _state_var
                     << " -> err = " << errj;
 #endif
                 I += H.transpose () * (1 / errj) * H;
