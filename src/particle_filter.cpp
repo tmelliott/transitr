@@ -452,7 +452,7 @@ namespace Gtfs {
             {
                 case EventType::gps :
                     {
-                        double err = fmax (_gpserror, dist_to_route);
+                        double err = _gpserror; // fmax (_gpserror, dist_to_route);
                         p.calculate_likelihood (e.position, _trip->shape ()->path (), err);
                         double d = p.get_distance ();
                         auto pos = _trip->shape ()->coordinates_of (d);
@@ -479,9 +479,12 @@ namespace Gtfs {
 
         latlng px = latlng ();
 #if VERBOSE > 0
-        std::cout << "\n    =========================================================================\n"
+        std::cout << 
+            "\n    ========================================================================="
+            << std::endl
             << "      [" << dbar << ", " << vbar << "] -> "
             << "[" << dbar2 << ", " << vbar2<< "] => ";
+
         switch (e.type)
         {
             case EventType::gps :

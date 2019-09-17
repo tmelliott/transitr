@@ -59,10 +59,17 @@ view_segment_states <- function(f = "segment_states.csv", o, segment, n = 12, sp
         arrange(timestamp)
     }
 
+    segdata <- get_segment_data() %>% select(road_segment_id, length)
+    data <- data %>%
+        inner_join(segdata, by = c("segment_id" = "road_segment_id")) %>%
+        mutate(
+            min_tt = length / 10,
+            state_var = exp(-1.2  + 1.2 * log (min_tt))
+        )
+
     if (speed) {
-        segdata <- get_segment_data() %>% select(road_segment_id, length)
         data <- data %>% 
-            inner_join(segdata, by = c("segment_id" = "road_segment_id")) %>%
+            # inner_join(segdata, by = c("segment_id" = "road_segment_id")) %>%
             mutate(speed = length / travel_time) %>%
             filter(speed < 35) %>%
             mutate(speed = speed * 3.6, .y = speed, .e = uncertainty * 3.6^2)
@@ -81,6 +88,8 @@ view_segment_states <- function(f = "segment_states.csv", o, segment, n = 12, sp
     # yr <- range(data$.y) * c(1, 1.5)
     # yr <- extendrange(data$.y, f = 0.5)
     p <- ggplot(data, aes(timestamp, .y)) + 
+        geom_linerange(aes(ymin = .y - state_var, ymax = .y + state_var), 
+            colour = "orange") +
         geom_linerange(aes(ymin = .y - .e, ymax = .y + .e),  color = 'gray') +
         geom_point() +
         xlab("Time") + 
@@ -127,6 +136,12 @@ map_segments <- function(f = "segment_states.csv", t = max(data$timestamp)) {
     p
 }
 
+view_segment_states(
+    "simulations/sim000/segment_states.csv", 
+    "simulations/sim000/segment_observations.csv", 
+    segment = c(36, 43, 97, 155, 161, 187),
+    n = 30
+)
 
 view_segment_states("simulations/sim000/segment_states.csv", "simulations/sim000/segment_observations.csv", n = 30)
 view_segment_states("simulations/sim000/segment_states.csv", "simulations/sim000/segment_observations.csv", speed = TRUE, n = 20)
