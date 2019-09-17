@@ -339,13 +339,11 @@ context("Vehicle mutate/update from GPS obs") {
         );
         v.update (&gtfs);
         v.mutate (rng, &gtfs);
-        for (int i=4; i<t0->shape ()->segments ().size (); i++)
+        for (int i=5; i<t0->shape ()->segments ().size () - 1; i++)
         {
             std::cout << "\n seg " << i << " = " << v.segment_travel_time (i);
             expect_true (v.segment_travel_time (i) > 0);
         }
-
-        // expect_true (1 == 0);
     }
 
 

@@ -1509,6 +1509,12 @@ namespace Gtfs
 
         loaded = true;
 
+        // set up the initial state of the segment
+        _travel_time (0) = _length / 10.0;
+        _travel_time (1) = 0.0;
+        _uncertainty = Eigen::Matrix2d::Zero ();
+        min_tt = _length / max_speed;
+
         // attempt to fetch parameters from `segment_parameters` table
         qry = "SELECT COUNT(type) FROM sqlite_master WHERE type='table' AND name='segment_parameters'";
         const char* tblcheck = qry.c_str ();

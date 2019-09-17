@@ -699,7 +699,7 @@ namespace Gtfs {
         else
         {
             std::cout << (e.type == EventType::arrival ? "arrival" : "departure")
-                << " at stop " << e.stop_index;
+                << " at stop " << (e.stop_index + 1);
         }
 #endif
         // Shape is:
