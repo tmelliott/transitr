@@ -177,11 +177,13 @@ model(nw)
 # ## --- examine estimation accuracy
 pf_times <- read_csv("particle_travel_times.csv",
     col_types = list(
-        col_integer(), col_factor(ordered = TRUE),
-        col_double(), col_double()
+        col_integer(), col_character(), col_integer(), col_double(), col_double()
     ),
-    col_names = c("timestamp", "segment_index", "time", "weight")) %>%
-    mutate(timestamp = as.POSIXct(timestamp, origin = "1970-01-01"))
+    col_names = c("timestamp", "vehicle_id", "segment_id", "time", "weight")) %>%
+    mutate(
+        timestamp = as.POSIXct(timestamp, origin = "1970-01-01"),
+        segment_id = factor(segment_id, ordered = TRUE)
+    )
 
 ttdat <- tibble(
     segment_index = factor(seq_along(travel_times) - 1, ordered = TRUE),

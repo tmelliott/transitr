@@ -174,7 +174,7 @@ namespace Gtfs {
                 throw std::runtime_error ("Trip not found");
             }
 
-// #if VERBOSE > 0
+#if VERBOSE > 0
             std::cout << "\n    [" << e.timestamp << "] "
                 << _trip->route ()->route_short_name ();
             if (_trip->stops ().size () == 0)
@@ -189,7 +189,7 @@ namespace Gtfs {
                     << "): ";
             }
             e.print ();
-// #endif
+#endif
 
             // is the event "bad"?
             dist_to_route = 0.0;
@@ -351,7 +351,8 @@ namespace Gtfs {
                     for (auto p = _state.begin (); p != _state.end (); ++p)
                     {
                         fout << _timestamp
-                            << "," << _current_segment
+                            << "," << _vehicle_id
+                            << "," << segs.at (_current_segment).segment->segment_id ()
                             << "," << p->get_travel_time (_current_segment)
                             << "," << p->get_weight ()
                             << "\n";
@@ -385,14 +386,19 @@ namespace Gtfs {
 
     void Vehicle::mutate_to (Event& e, RNG& rng)
     {
-        std::cout << "\n -> mutating to event ...";
+        bool log = false;
+#if VERBOSE > 0
+        log = true;
+#endif
+        if (log) std::cout << "\n -> mutating to event ...";
+
         if (_newtrip || bad_sample)
         {
-            std::cout << " initializing";
+            if (log) std::cout << " initializing";
             initialize (e, rng);
             return;
         }
-        std::cout << "here we go!";
+        if (log) std::cout << "here we go!";
         bad_sample = true;
 
         _delta = e.timestamp - _timestamp;
@@ -410,10 +416,13 @@ namespace Gtfs {
         // move the particles
         if (_complete || !valid () || _delta == 0) 
         {
-            std::cout << "\n ... uh oh ... ";
-            if (_complete) std::cout << "complete!";
-            if (!valid ()) std::cout << "invalid!";
-            if (_delta == 0) std::cout << "delta = 0!";
+            if (log) 
+            {
+                std::cout << "\n ... uh oh ... ";
+                if (_complete) std::cout << "complete!";
+                if (!valid ()) std::cout << "invalid!";
+                if (_delta == 0) std::cout << "delta = 0!";
+            }
             return;
         }
 #if VERBOSE > 0
@@ -425,8 +434,10 @@ namespace Gtfs {
             dbar2 = 0.0, vbar2 = 0.0, ddbar = 0.0,
             dtbar = 0;
         int firstN = 20;
+        int pi = 0;
         for (auto& p : _state)
         {
+            pi++;
 #if VERBOSE > 0
             if (firstN > 0)
                 std::cout << "\n      [" << p.get_distance () 
@@ -434,11 +445,19 @@ namespace Gtfs {
                     << ", " << (p.get_stop_index () + 1)
                     << ", " << (p.get_segment_index () + 1)
                     << "]";
+            // else
+            //     std::cout << "\r                                                                               "
+            //         << "\r transitioning particle ... " << pi;
 #endif
             dbar += p.get_distance () * p.get_weight ();
             vbar += p.get_speed () * p.get_weight ();
 
             p.travel (_delta, e, rng);
+#if VERBOSE > 0
+            // if (firstN == 0)
+            //     std::cout << " complete ...";
+#endif
+  
 
             // if any aren't complete, prevent vehicle from finishing trip
             all_complete = false;
@@ -492,6 +511,8 @@ namespace Gtfs {
             if (firstN > 0) {
                 firstN--;
                 std::cout << " => l(Y|Xi) = " << exp (p.get_ll ());
+            } else {
+                // std::cout << "likelihood calculated ... done!";
             }
 #endif
         }
@@ -914,15 +935,15 @@ namespace Gtfs {
                     next_node = &(nodes.at (segment_index + 1));
 
                     // adjust speed
-                    if (segments.at (segment_index).segment->travel_time () > 0 &
-                        segments.at (segment_index).segment->uncertainty () > 0)
-                    {
-                        speed = segments.at (segment_index).segment->sample_speed (rng);
-#if VERBOSE > 3
-                        std::cout << "\n -> setting vehicle speed to " <<
-                            speed << " based on segment state";
-#endif
-                    }
+//                     if (segments.at (segment_index).segment->travel_time () > 0 &
+//                         segments.at (segment_index).segment->uncertainty () > 0)
+//                     {
+//                         speed = segments.at (segment_index).segment->sample_speed (rng);
+// #if VERBOSE > 3
+//                         std::cout << "\n -> setting vehicle speed to " <<
+//                             speed << " based on segment state";
+// #endif
+//                     }
 
                     bool is_stop;
                     is_stop = next_node->node->node_type () == 0;

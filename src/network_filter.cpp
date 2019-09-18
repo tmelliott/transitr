@@ -41,19 +41,21 @@ namespace Gtfs {
 
         if (_uncertainty (0, 0) > 0)
         {
-            Eigen::Matrix2d F, Q;
-            switch (_model_type) 
-            {
-                case 0:
-                    F << 1, 0, 0, 0;
-                    Q << pow (_system_noise * delta, 2), 0, 0, 0;
-                    break;
-                case 1:
-                    F << 1, delta, 0, 1;
-                    Q << 0, 0, 0, _system_noise;
-                    break;
-            }
-            Phat = F * Phat * F.transpose () + Q;
+            Phat (0, 0) += pow (_system_noise * delta, 2);
+            // Eigen::Matrix2d F, Q;
+            // switch (_model_type) 
+            // {
+            //     case 0:
+            //         F << 1, 0, 0, 0;
+            //         Q << pow (_system_noise * delta, 2), 0, 0, 0;
+            //         break;
+            //     case 1:
+            //         // I think this is wronggg? squares etc.
+            //         F << 1, delta, 0, 1;
+            //         Q << 0, 0, 0, _system_noise;
+            //         break;
+            // }
+            // Phat = F * Phat * F.transpose () + Q;
         }
         else
         {
@@ -61,7 +63,7 @@ namespace Gtfs {
             switch (_model_type) 
             {
                 case 0:
-                    Phat (0, 0) = 100.0;
+                    Phat (0, 0) = 1000.0;
                     break;
                 case 1:
                     Phat (0, 0) = 100.0; // fix this
@@ -96,102 +98,132 @@ namespace Gtfs {
             << " and P = " << _uncertainty.format(inlineMat);
 #endif
 
-        Eigen::Vector2d xhat;
-        Eigen::Matrix2d Phat;
-        auto res = predict (now - _timestamp);
-        xhat = res.first;
-        Phat = res.second;
+        Eigen::Vector2d xhat = _travel_time;
+        Eigen::Matrix2d Phat = _uncertainty;
+        if (Phat (0, 0) == 0) Phat (0, 0) = 1000;
+        // auto res = predict (now - _timestamp);
+        // xhat = res.first;
+        // Phat = res.second;
+        int delta = now - _timestamp;
+        if (delta > 0) 
+        {
+            Phat (0, 0) += pow(delta * _system_noise, 2);
+        }
 
+        double B, b, U, u, Z, z;
+        B = Phat (0, 0);
+        b = xhat (0);
+        U = 1 / B;
+        u = b / B;
+        Z = 0;
+        z = 0;
+        double err;
+        std::pair<int, double>* dj;
+        for (int j=0; j<_data.size (); j++)
+        {
+            dj = &(_data.at (j));
+            err = fmax (_measurement_error, dj->second) + pow (_state_var, 2);
+            Z += 1 / err;
+            z += dj->first / err;
+        }
+        U += Z;
+        u += z;
 
-#if VERBOSE > 0
-        std::cout
-            << "\n  => X = "<< xhat.format (tColVec) 
-            << " and P = " << Phat.format(inlineMat);
-#endif
+        B = 1 / U;
+        b = u / U;
+
+        Phat (0, 0) = B;
+        xhat (0) = b;
+
+// #if VERBOSE > 0
+//         std::cout
+//             << "\n  => X = "<< xhat.format (tColVec) 
+//             << " and P = " << Phat.format(inlineMat);
+// #endif
 
         
-        // then update with observations
-        {
-            // transform to information 
-            Eigen::Matrix2d Z = Eigen::Matrix2d::Zero ();
-            Eigen::Vector2d z = Eigen::Vector2d::Zero ();
-            switch (_model_type) 
-            {
-                case 0:
-                    // only worrying about single dimension
-                    Z (0, 0) = pow (Phat (0, 0), -1);
-                    z (0, 0) = xhat (0, 0) / Phat (0, 0);
-                    break;
-                case 1:
-                    Z = Phat.inverse ();
-                    z = Z * xhat;
-                    break;
-            }
+//         // then update with observations
+//         {
+//             // transform to information 
+//             Eigen::Matrix2d Z = Eigen::Matrix2d::Zero ();
+//             Eigen::Vector2d z = Eigen::Vector2d::Zero ();
+//             switch (_model_type) 
+//             {
+//                 case 0:
+//                     // only worrying about single dimension
+//                     Z (0, 0) = pow (Phat (0, 0), -1);
+//                     z (0, 0) = xhat (0, 0) / Phat (0, 0);
+//                     break;
+//                 case 1:
+//                     Z = Phat.inverse ();
+//                     z = Z * xhat;
+//                     break;
+//             }
 
-#if VERBOSE > 0
-            std::cout << "\n  => U ="
-                << Z.format (inlineMat) << " and i = " << z.format (tColVec);
-#endif
+// #if VERBOSE > 0
+//             std::cout << "\n  => U ="
+//                 << Z.format (inlineMat) << " and i = " << z.format (tColVec);
+// #endif
 
-            // this is the same regardless of the model being used
-            Eigen::MatrixXd H (1, 2);
-            H << 1, 0;
+//             // this is the same regardless of the model being used
+//             Eigen::MatrixXd H (1, 2);
+//             H << 1, 0;
 
-            double err = _measurement_error;
-            Eigen::Matrix2d I = Eigen::Matrix2d::Zero ();
-            Eigen::Vector2d i = Eigen::Vector2d::Zero ();
-            std::pair<int, double>* dj;
-            double errj;
-            for (int j=0; j<_data.size (); j++)
-            {
-                dj = &(_data.at (j));
-                // "err" is the sort-of minimum error we expect 
-                // for segment's travel time observations
-                errj = fmax (err, dj->second) + _state_var;
-                // errj = fmin (err, fmax (dj->first, dj->second)) + _state_var;
-#if VERBOSE > 0
-                std::cout 
-                    << "\n  => Z = " << dj->first 
-                    << ", R = (" << dj->second << " \u2227 " << err
-                    << ") + " << _state_var
-                    << " -> err = " << errj;
-#endif
-                I += H.transpose () * (1 / errj) * H;
-                i += H.transpose () * (dj->first / errj);
-            }
+//             double err = _measurement_error;
+//             Eigen::Matrix2d I = Eigen::Matrix2d::Zero ();
+//             Eigen::Vector2d i = Eigen::Vector2d::Zero ();
+//             std::pair<int, double>* dj;
+//             double errj;
+//             for (int j=0; j<_data.size (); j++)
+//             {
+//                 dj = &(_data.at (j));
+//                 // "err" is the sort-of minimum error we expect 
+//                 // for segment's travel time observations
+//                 errj = fmax (err, pow (dj->second, 2)) + pow (_state_var, 2);
+//                 // errj = fmin (err, fmax (dj->first, dj->second)) + _state_var;
+// #if VERBOSE > 0
+//                 std::cout 
+//                     << "\n  => Z = " << dj->first 
+//                     << ", R = (" << dj->second << " \u2227 " << err
+//                     << ") + " << _state_var
+//                     << " -> err = " << errj;
+// #endif
+//                 I += H.transpose () * (1 / errj) * H;
+//                 i += H.transpose () * (dj->first / errj);
+//             }
 
-#if VERBOSE > 0
-            std::cout << "\n  => I ="
-                << I.format (inlineMat) << " and i = " << i.format (tColVec);
-#endif
+// #if VERBOSE > 0
+//             std::cout << "\n  => I ="
+//                 << I.format (inlineMat) << " and i = " << i.format (tColVec);
+// #endif
 
-            Z += I;
-            z += i;
+//             Z += I;
+//             z += i;
 
-#if VERBOSE > 0
-            std::cout << "\n  => U ="
-                << Z.format (inlineMat) << " and i = " << z.format (tColVec);
-#endif
+// #if VERBOSE > 0
+//             std::cout << "\n  => U ="
+//                 << Z.format (inlineMat) << " and i = " << z.format (tColVec);
+// #endif
 
-            // reverse transform information to travel time state space
-            switch (_model_type) 
-            {
-                case 0:
-                    Phat (0, 0) = pow (Z (0, 0), -1);
-                    xhat (0, 0) = z (0, 0) / Z (0, 0);
-                    break;
-                case 1:
-                    Phat = Z.inverse ();
-                    xhat = Phat * z;
-                    break;
-            }
+//             // reverse transform information to travel time state space
+//             switch (_model_type) 
+//             {
+//                 case 0:
+//                     Phat (0, 0) = pow (Z (0, 0), -1);
+//                     xhat (0, 0) = z (0, 0) / Z (0, 0);
+//                     break;
+//                 case 1:
+//                     Phat = Z.inverse ();
+//                     xhat = Phat * z;
+//                     break;
+//             }
 
-#if VERBOSE > 0
-            std::cout << "\n  => X = "
-                << xhat.format (tColVec) 
-                << " and P = " << Phat.format(inlineMat);
-#endif
-        }
+// #if VERBOSE > 0
+//             std::cout << "\n  => X = "
+//                 << xhat.format (tColVec) 
+//                 << " and P = " << Phat.format(inlineMat);
+// #endif
+//         }
 
         _travel_time = xhat;
         _uncertainty = Phat;

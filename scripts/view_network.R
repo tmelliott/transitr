@@ -38,11 +38,20 @@ get_segment_data <- function(routes) {
         inner_join(nodes, by = c("node_to" = "node_id"), suffix = c("", "_end")) %>%
         select(road_segment_id, length, node_lat, node_lon, node_lat_end, node_lon_end) %>%
         collect
+    if (dbExistsTable(con, "segment_parameters")) {
+        segpars <- con %>% tbl("segment_parameters") %>% collect()
+        segments <- segments %>% 
+            left_join(segpars, by = c("road_segment_id" = "segment_id"))
+    } else {
+        segments$q <- segments$phi <- NA
+    }
     segments
 }
 
+
 view_segment_states <- function(f = "segment_states.csv", o, segment, n = 12, speed = FALSE, id) {
-    data <- get_segments(f) %>% filter(timestamp > 0)
+    data <- get_segments(f) %>% filter(timestamp > 0) %>%
+        mutate(uncertainty = pmin(200, uncertainty))
     if (!missing(id)) data <- data %>% filter(segment_id %in% id)
     show.data <- !missing(o)
     if (show.data) obs <- get_data(o) %>% filter(timestamp > 0)
@@ -59,13 +68,12 @@ view_segment_states <- function(f = "segment_states.csv", o, segment, n = 12, sp
         arrange(timestamp)
     }
 
-    segdata <- get_segment_data() %>% select(road_segment_id, length)
-    data <- data %>%
-        inner_join(segdata, by = c("segment_id" = "road_segment_id")) %>%
+    segdata <- get_segment_data() %>% select(road_segment_id, length, q, phi) %>%
         mutate(
-            min_tt = length / 10,
-            state_var = exp(-1.2  + 1.2 * log (min_tt))
+            state_var = exp(-1.2 + 1.2 * log(length / 10))
         )
+    data <- data %>%
+        inner_join(segdata, by = c("segment_id" = "road_segment_id")) 
 
     if (speed) {
         data <- data %>% 
@@ -80,27 +88,29 @@ view_segment_states <- function(f = "segment_states.csv", o, segment, n = 12, sp
                 filter(speed < 35) %>%
                 mutate(speed = speed * 3.6, .y = speed, .e = sqrt(est_error * 3.6^2))
     } else {
-        data <- data %>% mutate(.y = travel_time, .e = uncertainty)
+        data <- data %>% mutate(.y = travel_time, .e = sqrt(uncertainty))
 
         if (show.data)
-            obs <- obs %>% mutate(.y = obs_tt, .e = est_error)
+            obs <- obs %>% mutate(.y = obs_tt, .e = pmin(obs_tt/2, est_error))
     }
     # yr <- range(data$.y) * c(1, 1.5)
     # yr <- extendrange(data$.y, f = 0.5)
     p <- ggplot(data, aes(timestamp, .y)) + 
-        geom_linerange(aes(ymin = .y - state_var, ymax = .y + state_var), 
+        geom_linerange(aes(ymin = pmax(0, .y - 1.96*phi), ymax = .y + 1.96*(phi)), 
             colour = "orange") +
-        geom_linerange(aes(ymin = .y - .e, ymax = .y + .e),  color = 'gray') +
+        geom_linerange(aes(ymin = pmax(0, .y - 1.96*.e), ymax = .y + 1.96*.e),  
+            color = 'gray', lwd = 2) +
         geom_point() +
         xlab("Time") + 
         ylab(ifelse(speed, "Speed (km/h)", "Travel Time (seconds)")) +
-        facet_wrap(~segment_id, scales = ifelse(speed, "fixed", "free_y"))
+        facet_wrap(~segment_id, scales = ifelse(speed, "fixed", "free_y"),
+            ncol = 1)
     if (show.data) {
         # yr <- extendrange(c(data$.y, obs$.y))
         p <- p + 
-            # geom_linerange(aes(ymin = .y - .e, ymax = .y + .e),  
-            #     data = obs,
-            #     color = 'pink', lwd = 0.5) +
+            geom_linerange(aes(ymin = .y - .e, ymax = .y + .e),
+                data = obs,
+                color = 'pink', lwd = 0.5) +
             geom_point(data = obs, colour = "red", cex = 0.5)
     }
     if (speed) p <- p + ylim(0, 100) #else p <- p + ylim(yr[1], yr[2])
@@ -136,12 +146,49 @@ map_segments <- function(f = "segment_states.csv", t = max(data$timestamp)) {
     p
 }
 
-view_segment_states(
+# find all ROUTES that travel along these road segments:
+find_routes <- function(segment_ids) {
+    con <- dbConnect(SQLite(), "at_gtfs.db")
+    on.exit(dbDisconnect(con))
+    node_ids <- con %>% tbl("road_segments") %>%
+        filter(road_segment_id %in% segment_ids) %>% 
+        collect()
+    con %>% tbl("shape_nodes") %>%
+        mutate(
+            goes_from = node_id %in% !!node_ids$node_from,
+            goes_to = node_id %in% !!node_ids$node_to
+        ) %>%
+        group_by(shape_id) %>%
+        summarize(
+            goes_from = max(goes_from, na.rm = TRUE), 
+            goes_to = max(goes_to, na.rm = TRUE)
+        ) %>%
+        filter(goes_from + goes_to == 2) %>%
+        left_join(con %>% tbl("trips") %>% select(shape_id, route_id)) %>%
+        left_join(con %>% tbl("routes") %>% select(route_id, route_short_name)) %>%
+        collect() %>% pull(route_short_name) %>% unique()
+}
+segment_ids <- c(38, 43, 97, 155, 161, 187)
+routes <- find_routes(segment_ids)
+
+# library(tidybayes)
+# load("../phd-thesis/chapters/chapter04/hier_model_samples.rda")
+# pars <- n1_samples %>% spread_draws(q[l], phi[l]) %>% mean_qi() %>%
+#     mutate(segment_id = as.integer(segment_ids)) %>%
+#     select(segment_id, q, phi)
+# con <- dbConnect(SQLite(), "at_gtfs.db")
+# dbWriteTable(con, "segment_parameters", pars, overwrite = TRUE)
+# dbDisconnect(con)
+
+while(TRUE) {
+dev.hold(); view_segment_states(
     "simulations/sim000/segment_states.csv", 
     "simulations/sim000/segment_observations.csv", 
-    segment = c(36, 43, 97, 155, 161, 187),
+    segment = segment_ids,
     n = 30
-)
+) %>% print; dev.flush(dev.flush())
+Sys.sleep(1)
+}
 
 view_segment_states("simulations/sim000/segment_states.csv", "simulations/sim000/segment_observations.csv", n = 30)
 view_segment_states("simulations/sim000/segment_states.csv", "simulations/sim000/segment_observations.csv", speed = TRUE, n = 20)
@@ -170,6 +217,32 @@ view_segment_states("simulations/sim100/segment_states.csv", speed = TRUE, n = 2
 map_segments("simulations/sim100/segment_states.csv")
 
 
+ptt <- read_csv("simulations/sim000/particle_travel_times.csv",
+    col_types = list(
+        col_integer(), col_character(), col_integer(), col_double(), col_double()
+    ),
+    col_names = c("timestamp", "vehicle_id", "segment_id", "time", "weight")) %>%
+    mutate(
+        timestamp = as.POSIXct(timestamp, origin = "1970-01-01"),
+        segment_id = factor(segment_id, ordered = TRUE)
+    ) %>%
+    filter(segment_id %in% segment_ids)
+
+ptt.smry <- ptt %>% group_by(timestamp, vehicle_id, segment_id) %>%
+    summarize(
+        tt = sum(weight * time), 
+        e = sum(weight * (time - tt)^2)
+    ) %>%
+    rename(time = tt)
+
+ggplot(ptt, aes(timestamp, time)) +
+    geom_pointrange(aes(ymin = time - 2*sqrt(e), ymax = time + 2*sqrt(e)),
+        data = ptt.smry, size = 0.2, shape = 19, colour = "orangered") +
+    geom_jitter(size = 0.5, width = 1) +
+    facet_wrap(~segment_id) +
+    theme_classic()
+
+## now pull the data from .rda for the trip_updates estimates ... and compare? 
 
 ### Vehicle history thing
 vdata_files <- 
