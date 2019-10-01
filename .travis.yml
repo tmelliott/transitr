@@ -32,7 +32,8 @@ after_success:
 
 after_failure:
   - python -c "import fcntl; fcntl.fcntl(1, fcntl.F_SETFL, 0)"  # https://github.com/travis-ci/travis-ci/issues/8920
-  - cat /home/travis/build/tmelliott/transitr/transitr.Rcheck/00install.out
+  - sleep 20
+  - cat /home/travis/build/tmelliott/transitr/transitr.Rcheck/00install.out && sleep 20;
   - if [ -f tests/tests.log ]; then cat tests/tests.log && sleep 20; fi
   - if [ -f tests/tests.log ]; then cat tests/tests.log && sleep 10; fi
 
