@@ -37,7 +37,7 @@ context("Network filter") {
         // IKF
         double B, P, U, u, I, i;
         B = seg->travel_time ();
-        P = 100.0;
+        P = 1000.0;
 
         std::cout << "\n\n - pretend observation: "
             << obs << " \u00B1 " << err << " \u00B1 " << seg->state_var ();
@@ -51,7 +51,7 @@ context("Network filter") {
         
         U = 1 / P;
         u = B / P;
-        err = par.nw_measurement_error + seg->state_var ();
+        err = par.nw_measurement_error + pow(seg->state_var (), 2);
         I = 1 / err;
         i = obs / err;
         U += I;
@@ -63,6 +63,6 @@ context("Network filter") {
 
         std::cout << "\n----\nComplete\n\n";
 
-        expect_true (1 == 0);
+        // expect_true (1 == 0);
     }
 }
