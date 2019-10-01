@@ -1,4 +1,5 @@
 language: R
+dist: xenial
 sudo: false
 cache: packages
 latex: false
@@ -20,12 +21,14 @@ addons:
       - libgoogle-perftools-dev
       - libeigen3-dev
 
+r_github_packages:
+
 before_install:
   - python -c "import fcntl; fcntl.fcntl(1, fcntl.F_SETFL, 0)"  # https://github.com/travis-ci/travis-ci/issues/8920
-  - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-  - sudo apt-get update -q
-  - sudo apt-get install g++-5 -y
-  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-5 100
+  # - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
+  # - sudo apt-get update -q
+  # - sudo apt-get install g++-5 -y
+  # - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-5 100
 
 after_success:
   - Rscript -e 'covr::codecov()'
