@@ -265,8 +265,14 @@ void run_realtime_model (List nw)
             {
                 if (trip->second.is_active (curtime))
                 {
-#if VERBOSE > 1
-                    if (trip->second.route ()->route_short_name () != "NX1") continue;
+#if SIMULATION
+                    auto rsn = trip->second.route ()->route_short_name ();
+                    bool skip = true;
+                    for (auto rtk = routes_to_keep.begin (); rtk != routes_to_keep.end (); ++rtk)
+                    {
+                        if (rsn == *rtk) skip = false;
+                    }
+                    if (skip) continue;
 #endif
                     trip->second.update_etas (curtime, rngs.at (omp_get_thread_num ()));
 #if VERBOSE > 1

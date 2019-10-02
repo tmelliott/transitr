@@ -18,6 +18,7 @@ res <- all_sims("sim000", n = 200) %>%
     )) %>%
     ungroup() %>%
     left_join(
+        res,
         arrivaldata %>% 
             filter(type == "arrival") %>%
             select(trip_id, stop_sequence, time),
@@ -25,23 +26,27 @@ res <- all_sims("sim000", n = 200) %>%
         suffix = c('', '_actual')
     )
 
+ggplot(res, aes(timestamp, time)) +
+    geom_point()
 
+rid <- "02704-20190806160740_v82.21"
 ggplot(res,
     aes(time, stop_sequence + tx*0.8, colour = timestamp)) +
     geom_segment(aes(x = lower, xend = upper, yend = stop_sequence + tx*0.8)) +
     geom_point(
-        aes(time_actual, y = stop_sequence + 0.8, colour = NULL, group = trip_id),
-        data = res %>% select(time_actual, trip_id, stop_sequence) %>% distinct(),
-        colour = "red"
-    ) %>%
-    facet_wrap(~trip_id)
+        aes(time, y = stop_sequence + 0.8, colour = NULL, group = trip_id),
+        data = arrivaldata %>% filter(trip_id %in% res$trip_id),
+        colour = "red", size = 0.5
+    ) +
+    facet_wrap(~route_id, scales = "free") +
+    theme_minimal()
 
 
 ## can we calculate the current PREDICTION ERROR
 # i.e., predicted - actual
 # for this, we need to know the SCHEDULED ARRIVAL TIMES
 get_stop_times <- function(tid) {
-    con <- dbConnect(SQLite(), "fulldata.db")
+    con <- dbConnect(SQLite(), "at_gtfs.db")
     on.exit(dbDisconnect(con))
     con %>% tbl("stop_times") %>% filter(trip_id == tid) %>%
         select(stop_sequence, arrival_time) %>% arrange(stop_sequence) %>% collect
@@ -49,15 +54,18 @@ get_stop_times <- function(tid) {
 etatbl <- res %>% 
     group_by(trip_id) %>%
     do({
-        d <- .$timestamp[1] %>% format("%Y-%m-%d")
-        ta <- get_stop_times((.)$trip_id[1]) %>%
+        x <- (.)
+        d <- x$timestamp[1] %>% format("%Y-%m-%d")
+        ta <- get_stop_times(x$trip_id[1]) %>%
             mutate(arrival_time = as.POSIXct(paste(d, arrival_time)))
-        (.) %>% left_join(ta, by = "stop_sequence")
-    })
+        left_join(x, ta, by = "stop_sequence")
+    }) %>%
+    mutate(sched_delay = as.integer(arrival_time - time_actual))
+
+etatbl$sched_delay %>% hist()
 
 ## now need to calculate delay as a function of time
 etatbl <- etatbl %>% 
-    mutate(sched_delay = as.integer(arrival_time - time_actual)) %>%
     filter(sched_delay > -30*60 & sched_delay < 60*60)
 
 etatbl %>% ggplot(aes(sched_delay/60)) + geom_histogram()

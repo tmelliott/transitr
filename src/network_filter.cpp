@@ -21,7 +21,7 @@ namespace Gtfs {
         // best estimate
         // log(phi_ell) = theta0 + theta1 * log(min_tt)
         if (_state_var == 0)
-            _state_var = exp (-1.2 + 1.2 * log (min_tt));
+            _state_var = exp (-2.44 + 1.4 * log (min_tt));
         
         _measurement_error = params->nw_measurement_error;
 
