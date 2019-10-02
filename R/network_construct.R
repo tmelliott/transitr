@@ -35,6 +35,12 @@ construct_network <- function(nw, node_threshold = 0.01) {
         #     if (min(dists) < node_threshold)
         #         node_id <- nodes$node_id[which.min(dists)]
         # }
+        
+        stop_code <- stops$stop_code[i]
+        matching_nodes <- stops$node_id[stops$stop_code == stop_code]
+        if (length(matching_nodes))
+            node_id <- matching_nodes[1]
+        
         # if one doesn't exist, create it
         if (is.na(node_id)) {
             node_id <- max(nodes$node_id + 1L, 1L, na.rm = TRUE)

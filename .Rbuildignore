@@ -13,3 +13,5 @@
 ^.+\.pb$
 ^simulations$
 ^.running_pid$
+^old_files$
+
