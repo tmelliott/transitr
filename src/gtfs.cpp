@@ -924,6 +924,9 @@ namespace Gtfs
         _start_time = _stops.at (0).departure_time;
         _arrival_times.resize (_stops.size (), 0);
         _departure_times.resize (_stops.size (), 0);
+
+        // load schedule
+        
         
         loaded = true;
     }
@@ -2155,6 +2158,7 @@ namespace Gtfs
         Rcpp::NumericVector sigd = parameters["departure_error"];
         Rcpp::NumericVector signwx = parameters["nw_system_noise"];
         Rcpp::NumericVector signwy = parameters["nw_measurement_error"];
+        Rcpp::IntegerVector etam = parameters["eta_model"];
         Rcpp::LogicalVector tim = parameters["save_timings"];
         Rcpp::IntegerVector resm = parameters["reset_method"];
 
@@ -2172,6 +2176,7 @@ namespace Gtfs
         departure_error = (float) sigd[0];
         nw_system_noise = (float) signwx[0];
         nw_measurement_error = (float) signwy[0];
+        eta_model = (int) etam[0];
         save_timings = (bool) tim[0];
         reset_method = (int) resm[0];
     }

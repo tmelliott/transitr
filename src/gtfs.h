@@ -99,6 +99,7 @@ namespace Gtfs
         float departure_error = 5.0;
         float nw_system_noise = 0.001;
         float nw_measurement_error = 3.0;
+        int eta_model = 0; // [0=particle filter, 1=gaussian]
         bool save_timings = false;
         int reset_method = 1;
         par () {}
@@ -228,13 +229,19 @@ namespace Gtfs
         std::string _trip_headsign;
         float _version;
 
+        // trip state:
         Time _start_time;
-        Eigen::VectorXd B;
-        Eigen::MatrixXd E;
-        Eigen::MatrixXd Hseg;   // transform segment travel times to stop tts
+        // Eigen::VectorXd B;
+        // Eigen::MatrixXd E;
+        // Eigen::MatrixXd Hseg;   // transform segment travel times to stop tts
+        
         uint64_t _ts;
+        int _stop_index;
+        int _segment_index;
+
         bool state_initialised = false;
         
+        // not sure what these are for ... schedule, perhaps?
         std::vector<uint64_t> _arrival_times;
         std::vector<uint64_t> _departure_times;
 
@@ -268,15 +275,17 @@ namespace Gtfs
         void set_arrival_time (int m, uint64_t t);
         void set_departure_time (int m, uint64_t t);
 
+        void update (uint64_t& t, RNG& rng);
+
         Time& start_time ();
         uint64_t get_eta (int i);
-        void initialize_etas (RNG& rng);
-        void update_etas (uint64_t& t, RNG& rng);
-        std::pair<Eigen::VectorXd, Eigen::MatrixXd> estimate_tt ();
-        std::pair<std::vector<Time>, std::vector<double> > calculate_etas ();
+        // void initialize_etas (RNG& rng);
+        // void update_etas (uint64_t& t, RNG& rng);
+        // std::pair<Eigen::VectorXd, Eigen::MatrixXd> estimate_tt ();
+        // std::pair<std::vector<Time>, std::vector<double> > calculate_etas ();
         etavector get_etas ();
 
-        void print_etas ();
+        // void print_etas ();
 
         Vehicle* vehicle ();
         void assign_vehicle (Vehicle* vehicle);

@@ -182,92 +182,92 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
 void write_vehicles (Gtfs::vehicle_map* vehicles, std::string& file)
 {
     // create a new feed
-    transit_realtime::FeedMessage feed;
+    // transit_realtime::FeedMessage feed;
 
-    // set the header information
-    transit_realtime::FeedHeader* header;
-    header = feed.mutable_header ();
-    header->set_gtfs_realtime_version ("2.0");
-    std::time_t curtime = std::time (nullptr);
-    header->set_timestamp (curtime);
+    // // set the header information
+    // transit_realtime::FeedHeader* header;
+    // header = feed.mutable_header ();
+    // header->set_gtfs_realtime_version ("2.0");
+    // std::time_t curtime = std::time (nullptr);
+    // header->set_timestamp (curtime);
 
-    // write vehicles
-    for (auto v = vehicles->begin (); v != vehicles->end (); ++v)
-    {
-        if (v->second.complete () || !v->second.valid ()) continue;
-        transit_realtime::FeedEntity* entity = feed.add_entity ();
-        entity->set_id (v->second.vehicle_id ());
+    // // write vehicles
+    // for (auto v = vehicles->begin (); v != vehicles->end (); ++v)
+    // {
+    //     if (v->second.complete () || !v->second.valid ()) continue;
+    //     transit_realtime::FeedEntity* entity = feed.add_entity ();
+    //     entity->set_id (v->second.vehicle_id ());
 
-        // --- Vehicle Position
-        transit_realtime::VehiclePosition* vp = entity->mutable_vehicle ();
-        if (v->second.trip () != nullptr) 
-        {
-            transit_realtime::TripDescriptor* trip = vp->mutable_trip ();
-            trip->set_trip_id (v->second.trip ()->trip_id ());
-            if (v->second.trip ()->route () != nullptr) 
-            {
-                trip->set_route_id (v->second.trip ()->route ()->route_id ());
-            }
-        }
-        transit_realtime::VehicleDescriptor* vehicle = vp->mutable_vehicle ();
-        vehicle->set_id (v->second.vehicle_id ());
+    //     // --- Vehicle Position
+    //     transit_realtime::VehiclePosition* vp = entity->mutable_vehicle ();
+    //     if (v->second.trip () != nullptr) 
+    //     {
+    //         transit_realtime::TripDescriptor* trip = vp->mutable_trip ();
+    //         trip->set_trip_id (v->second.trip ()->trip_id ());
+    //         if (v->second.trip ()->route () != nullptr) 
+    //         {
+    //             trip->set_route_id (v->second.trip ()->route ()->route_id ());
+    //         }
+    //     }
+    //     transit_realtime::VehicleDescriptor* vehicle = vp->mutable_vehicle ();
+    //     vehicle->set_id (v->second.vehicle_id ());
 
-        // the observed position
-        transit_realtime::Position* position = vp->mutable_position ();
-        position->set_latitude (v->second.position ().latitude);
-        position->set_longitude (v->second.position ().longitude);
+    //     // the observed position
+    //     transit_realtime::Position* position = vp->mutable_position ();
+    //     position->set_latitude (v->second.position ().latitude);
+    //     position->set_longitude (v->second.position ().longitude);
 
-        // the modeled position
-        transit_realtime::Position* 
-        position_estimate = vp->MutableExtension (transit_network::position_estimate);
-        double dbar = v->second.distance ();
-        if (v->second.trip ()->shape () != nullptr)
-        {
-            latlng vpos = v->second.trip ()->shape ()->coordinates_of (dbar);
-            position_estimate->set_latitude (vpos.latitude);
-            position_estimate->set_longitude (vpos.longitude);
-        }
-        position_estimate->set_odometer (dbar);
-        position_estimate->set_speed (v->second.speed ());
+    //     // the modeled position
+    //     transit_realtime::Position* 
+    //     position_estimate = vp->MutableExtension (transit_network::position_estimate);
+    //     double dbar = v->second.distance ();
+    //     if (v->second.trip ()->shape () != nullptr)
+    //     {
+    //         latlng vpos = v->second.trip ()->shape ()->coordinates_of (dbar);
+    //         position_estimate->set_latitude (vpos.latitude);
+    //         position_estimate->set_longitude (vpos.longitude);
+    //     }
+    //     position_estimate->set_odometer (dbar);
+    //     position_estimate->set_speed (v->second.speed ());
 
-        // --- Trip Update (ETAs)
-        transit_realtime::TripUpdate* tu = entity->mutable_trip_update ();
-        if (v->second.trip () != nullptr)
-        {
-            transit_realtime::TripDescriptor* trip = tu->mutable_trip ();
-            trip->set_trip_id (v->second.trip ()->trip_id ());
-            if (v->second.trip ()->route () != nullptr) 
-            {
-                trip->set_route_id (v->second.trip ()->route ()->route_id ());
-            }
-        }
-        vehicle = tu->mutable_vehicle ();
-        vehicle->set_id (v->second.vehicle_id ());
+    //     // --- Trip Update (ETAs)
+    //     transit_realtime::TripUpdate* tu = entity->mutable_trip_update ();
+    //     if (v->second.trip () != nullptr)
+    //     {
+    //         transit_realtime::TripDescriptor* trip = tu->mutable_trip ();
+    //         trip->set_trip_id (v->second.trip ()->trip_id ());
+    //         if (v->second.trip ()->route () != nullptr) 
+    //         {
+    //             trip->set_route_id (v->second.trip ()->route ()->route_id ());
+    //         }
+    //     }
+    //     vehicle = tu->mutable_vehicle ();
+    //     vehicle->set_id (v->second.vehicle_id ());
 
-        // Stop Time Events
-        Gtfs::etavector etas (v->second.get_etas ());
-        for (int si=0; si<etas.size (); ++si)
-        {
-            transit_realtime::TripUpdate::StopTimeUpdate* stu = tu->add_stop_time_update ();
-            stu->set_stop_sequence (si+1);
-            transit_network::TimePrediction* tpi = stu->MutableExtension(transit_network::eta);
-            tpi->set_estimate (etas.at (si).estimate);
-            for (auto q : etas.at (si).quantiles)
-            {
-                transit_network::Quantile* qi = tpi->add_quantiles ();
-                qi->set_quantile (q.quantile);
-                qi->set_value (q.time);
-            }
-        }
+    //     // Stop Time Events
+    //     Gtfs::etavector etas (v->second.get_etas ());
+    //     for (int si=0; si<etas.size (); ++si)
+    //     {
+    //         transit_realtime::TripUpdate::StopTimeUpdate* stu = tu->add_stop_time_update ();
+    //         stu->set_stop_sequence (si+1);
+    //         transit_network::TimePrediction* tpi = stu->MutableExtension(transit_network::eta);
+    //         tpi->set_estimate (etas.at (si).estimate);
+    //         for (auto q : etas.at (si).quantiles)
+    //         {
+    //             transit_network::Quantile* qi = tpi->add_quantiles ();
+    //             qi->set_quantile (q.quantile);
+    //             qi->set_value (q.time);
+    //         }
+    //     }
 
-    }
+    // }
 
-    // write the feed to a file
-    std::fstream output (file.c_str (), std::ios::out | std::ios::trunc | std::ios::binary);
-    if (!feed.SerializeToOstream (&output)) 
-    {
-        Rcpp::Rcerr << "\n x Failed to write feed to `" << file << "`\n";
-    }
+    // // write the feed to a file
+    // std::fstream output (file.c_str (), std::ios::out | std::ios::trunc | std::ios::binary);
+    // if (!feed.SerializeToOstream (&output)) 
+    // {
+    //     Rcpp::Rcerr << "\n x Failed to write feed to `" << file << "`\n";
+    // }
 
 }
 

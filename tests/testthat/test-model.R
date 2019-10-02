@@ -42,6 +42,8 @@ test_that("Parameters are set with valid defaults", {
     expect_is(nw$parameters$nw_measurement_error, "numeric")
     expect_true(nw$parameters$nw_measurement_error > 0)
 
+    expect_is (nw$parameters$eta_model, "integer")
+
     expect_is(nw$parameters$save_timings, "logical")
 
     expect_is(nw$parameters$reset_method, "integer")
@@ -63,6 +65,7 @@ test_that("Parameters can be changed", {
         departure_error = 12,
         nw_system_noise = 0.002,
         nw_measurement_error = 50,
+        eta_model = 1L,
         save_timings = TRUE,
         reset_method = 2L
     )
@@ -83,6 +86,7 @@ test_that("Parameters can be changed", {
             departure_error = 12,
             nw_system_noise = 0.002,
             nw_measurement_error = 50,
+            eta_model = 1L,
             save_timings = TRUE,
             reset_method = 2L
         )

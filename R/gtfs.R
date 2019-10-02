@@ -81,6 +81,8 @@ load_gtfs <- function(db, output = "predictions.pb") {
                 # network parameters
                 nw_system_noise = 0.001,
                 nw_measurement_error = 50,
+                # eta parameters
+                eta_model = 0L,
                 # other ...
                 save_timings = FALSE,
                 reset_method = 1L
