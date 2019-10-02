@@ -174,7 +174,7 @@ namespace Gtfs {
                 throw std::runtime_error ("Trip not found");
             }
 
-// #if VERBOSE > 0
+#if VERBOSE > 0
             std::cout << "\n    [" << e.timestamp << "] "
                 << _trip->route ()->route_short_name ();
             if (_trip->stops ().size () == 0)
@@ -189,7 +189,7 @@ namespace Gtfs {
                     << "): ";
             }
             e.print ();
-// #endif
+#endif
 
             // is the event "bad"?
             dist_to_route = 0.0;
@@ -286,89 +286,46 @@ namespace Gtfs {
                 std::cout << "\n    ** estimating travel times";
 #endif
                 // NETWORK STUFF
-                // double dmin = _trip->shape ()->nodes ().back ().distance;
-                // double ShapeLen = dmin;
-                // std::cout << " -> dmin = " << dmin;
-                // for (auto p = _state.begin (); p != _state.end (); ++p)
-                // {
-                //     if (p->get_distance () < dmin)
-                //     {
-                //         std::cout << " and now its " << p->get_distance ();
-                //         dmin = p->get_distance ();
-                //     }
-                // }
                 std::vector<ShapeSegment>& segs = _trip->shape ()->segments ();
-// #if VERBOSE > 0
-//                 std::cout << " -> dist = " << dmin;
-//                 std::cout << " -> from segment "
-//                     << _current_segment << " to segment ";
-// #endif
-                // this should be SEGMENT index
-                // int m = find_segment_index (dmin, &segs);
-// #if VERBOSE > 0
-//                 std::cout << m;
-//                 std::cout << "  ==> dist to end = " << (ShapeLen - dmin);
-// #endif
-                //  << "; of "
-                //     << segs.size () << " segments, on segment ";
-                // std::cout.flush (); 
-
-                // int l = find_segment_index (dmin, &segs);
-                // std::cout << l;
 
                 // update segment travel times for intermediate ones ...
                 double tt, ttp, err;
                 int n;
                 int M = segs.size ();
+                double segmin, segmax;
 
-// #if SIMULATION
-//                 std::ofstream fout;
-//                 fout.open ("particle_travel_times.csv", std::ofstream::app);
-// #endif
+#if SIMULATION
+                std::ofstream fout;
+                fout.open ("particle_travel_times.csv", std::ofstream::app);
+#endif
+
                 for (_current_segment=0; _current_segment<M; _current_segment++)
                 {
                     if (_segment_travel_times.at (_current_segment) > 0) continue;
+                    segmin = segs.at (_current_segment).segment->min_travel_time ();
+                    segmax = segs.at (_current_segment).segment->length ();
 
                     // get the average travel time for particles along that segment
                     tt = 0.0;
                     n = 0;
                     for (auto p = _state.begin (); p != _state.end (); ++p)
                     {
-                        if (p->get_travel_time (_current_segment) == 0) continue;
+                        if (p->get_travel_time (_current_segment) < segmin) continue;
+                        if (p->get_travel_time (_current_segment) > segmax) continue;
                         if (p->get_segment_index () == _current_segment) continue;
-                        tt += p->get_travel_time (_current_segment) * p->get_weight ();
+                        tt += p->get_weight () * p->get_travel_time (_current_segment);
                         n++;
                     }
-                    if (n < _N || tt <= 0)
+                    if (n < _N || tt < segmin || tt > segmax)
                     {
-                        // std::cout << " - only "
-                        //     << n << " of " << _N << " particles completed";
-                        // for (auto p = _state.begin (); p != _state.end (); ++p)
-                        // {
-                        //     std::cout << "\n  -- tt for seg "
-                        //         << p->get_segment_index () << " = "
-                        //         << p->get_travel_time (_current_segment);
-                        // }
                         continue;
                     }
-
-// #if SIMULATION
-//                     for (auto p = _state.begin (); p != _state.end (); ++p)
-//                     {
-//                         fout << _timestamp 
-//                             << "," << _current_segment
-//                             << "," << p->get_travel_time (_current_segment)
-//                             << "," << p->get_weight () << "\n";
-//                     }
-// #endif
 
 #if VERBOSE > 0
                     std::cout << "\n  - segment " 
                         << (_current_segment + 1)
                         << " of " << _segment_travel_times.size ();
 #endif
-                    // let error be fixed for the segment
-                    // err = segs.at (_current_segment).segment->length () / 30;
 
                     err = std::accumulate (
                         _state.begin (), 
@@ -381,23 +338,35 @@ namespace Gtfs {
                     );
 
                     // if the error is effectively 0 ...
-                    if (err < 1) 
-                        err = segs.at (_current_segment).segment->length () / 30;
+                    // ...  handled by Segment::update ()
+                    // if (err < 1) 
+                    //     err = 3; //segs.at (_current_segment).segment->length () / 30;
 
-                    _segment_travel_times.at (_current_segment) = round (tt);
+                    _segment_travel_times.at (_current_segment) = (tt);
                     segs.at (_current_segment).segment->push_data (tt, err, _timestamp);
 #if VERBOSE > 0
-                    std::cout << ": " << round (tt) << " (" << err << ")";
+                    std::cout << ": " <<  (tt) << " (" << err << ")";
+#endif
+#if SIMULATION
+                    for (auto p = _state.begin (); p != _state.end (); ++p)
+                    {
+                        fout << _timestamp
+                            << "," << _vehicle_id
+                            << "," << segs.at (_current_segment).segment->segment_id ()
+                            << "," << p->get_travel_time (_current_segment)
+                            << "," << p->get_weight ()
+                            << "\n";
+                    }
 #endif
                 }
-// #if SIMULATION
-//                 fout.close ();
-// #endif
-                
+            
                 // NOTE: need to ignore segment if previous segment travel time is 0
                 // (i.e., can't be sure that the current segment travel time is complete)
                 
                 
+#if SIMULATION
+                fout.close ();
+#endif
             }
 
             current_event_index++;
@@ -411,19 +380,25 @@ namespace Gtfs {
         }
 
 
+
         return;
     }
 
     void Vehicle::mutate_to (Event& e, RNG& rng)
     {
-        std::cout << "\n -> mutating to event ...";
+        bool log = false;
+#if VERBOSE > 0
+        log = true;
+#endif
+        if (log) std::cout << "\n -> mutating to event ...";
+
         if (_newtrip || bad_sample)
         {
-            std::cout << " initializing";
+            if (log) std::cout << " initializing";
             initialize (e, rng);
             return;
         }
-        std::cout << "here we go!";
+        if (log) std::cout << "here we go!";
         bad_sample = true;
 
         _delta = e.timestamp - _timestamp;
@@ -441,10 +416,13 @@ namespace Gtfs {
         // move the particles
         if (_complete || !valid () || _delta == 0) 
         {
-            std::cout << "\n ... uh oh ... ";
-            if (_complete) std::cout << "complete!";
-            if (!valid ()) std::cout << "invalid!";
-            if (_delta == 0) std::cout << "delta = 0!";
+            if (log) 
+            {
+                std::cout << "\n ... uh oh ... ";
+                if (_complete) std::cout << "complete!";
+                if (!valid ()) std::cout << "invalid!";
+                if (_delta == 0) std::cout << "delta = 0!";
+            }
             return;
         }
 #if VERBOSE > 0
@@ -456,8 +434,10 @@ namespace Gtfs {
             dbar2 = 0.0, vbar2 = 0.0, ddbar = 0.0,
             dtbar = 0;
         int firstN = 20;
+        int pi = 0;
         for (auto& p : _state)
         {
+            pi++;
 #if VERBOSE > 0
             if (firstN > 0)
                 std::cout << "\n      [" << p.get_distance () 
@@ -465,11 +445,19 @@ namespace Gtfs {
                     << ", " << (p.get_stop_index () + 1)
                     << ", " << (p.get_segment_index () + 1)
                     << "]";
+            // else
+            //     std::cout << "\r                                                                               "
+            //         << "\r transitioning particle ... " << pi;
 #endif
             dbar += p.get_distance () * p.get_weight ();
             vbar += p.get_speed () * p.get_weight ();
 
             p.travel (_delta, e, rng);
+#if VERBOSE > 0
+            // if (firstN == 0)
+            //     std::cout << " complete ...";
+#endif
+  
 
             // if any aren't complete, prevent vehicle from finishing trip
             all_complete = false;
@@ -502,7 +490,7 @@ namespace Gtfs {
             {
                 case EventType::gps :
                     {
-                        double err = fmax (_gpserror, dist_to_route);
+                        double err = _gpserror; // fmax (_gpserror, dist_to_route);
                         p.calculate_likelihood (e.position, _trip->shape ()->path (), err);
                         double d = p.get_distance ();
                         auto pos = _trip->shape ()->coordinates_of (d);
@@ -523,15 +511,20 @@ namespace Gtfs {
             if (firstN > 0) {
                 firstN--;
                 std::cout << " => l(Y|Xi) = " << exp (p.get_ll ());
+            } else {
+                // std::cout << "likelihood calculated ... done!";
             }
 #endif
         }
 
         latlng px = latlng ();
 #if VERBOSE > 0
-        std::cout << "\n    =========================================================================\n"
+        std::cout << 
+            "\n    ========================================================================="
+            << std::endl
             << "      [" << dbar << ", " << vbar << "] -> "
             << "[" << dbar2 << ", " << vbar2<< "] => ";
+
         switch (e.type)
         {
             case EventType::gps :
@@ -750,13 +743,14 @@ namespace Gtfs {
         else
         {
             std::cout << (e.type == EventType::arrival ? "arrival" : "departure")
-                << " at stop " << e.stop_index;
+                << " at stop " << (e.stop_index + 1);
         }
 #endif
         // Shape is:
         Shape* shape = vehicle->trip ()->shape ();
         std::vector<ShapeNode>& nodes = shape->nodes ();
         std::vector<StopTime>& stops = vehicle->trip ()->stops ();
+        std::vector<ShapeSegment>& segments = shape->segments ();
 
         int M, L;
         M = stops.size ();
@@ -939,6 +933,17 @@ namespace Gtfs {
                     distance = next_node->distance;
                     segment_index++;
                     next_node = &(nodes.at (segment_index + 1));
+
+                    // adjust speed
+//                     if (segments.at (segment_index).segment->travel_time () > 0 &
+//                         segments.at (segment_index).segment->uncertainty () > 0)
+//                     {
+//                         speed = segments.at (segment_index).segment->sample_speed (rng);
+// #if VERBOSE > 3
+//                         std::cout << "\n -> setting vehicle speed to " <<
+//                             speed << " based on segment state";
+// #endif
+//                     }
 
                     bool is_stop;
                     is_stop = next_node->node->node_type () == 0;

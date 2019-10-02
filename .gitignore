@@ -12,6 +12,7 @@ at_gtfs.db
 *.pb
 *.rda
 *.zip
+*.backup
 
 scripts/simulation_traveltime_*
 

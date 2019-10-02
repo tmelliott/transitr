@@ -22,7 +22,7 @@
 #include "RcppThread.h"
 
 #ifndef VERBOSE
-#define VERBOSE 4
+#define VERBOSE 0
 #endif
 
 #ifndef SIMULATION
@@ -98,8 +98,8 @@ namespace Gtfs
         float arrival_error = 5.0;
         float departure_error = 5.0;
         float nw_system_noise = 0.001;
-        float nw_measurement_error = 50;
         int eta_model = 0; // [0=analytic; 1=pf]
+        float nw_measurement_error = 3.0;
         bool save_timings = false;
         int reset_method = 1;
         par () {}
@@ -329,10 +329,17 @@ namespace Gtfs
         bool loaded = false;
 
         double max_speed = 100.0 * 1000 / 60 / 60; // 100kmh is the max speed of a bus (presumably)
-        double min_tt = 0.0; // assuming vehicle traveling at max speed, this is the min time
-        double min_err = 2.0; // minimum travel time measurement error
-        float _system_noise;
+        double min_tt = 0.0;    // assuming vehicle traveling at max speed, this is the min time
+        double min_err = 2.0;   // minimum travel time measurement error
+        float _system_noise = 0.0;  // rate of change of (mean) travel time
+        float _state_var = 0.0;     // variance between vehicles (baseline)
         float _measurement_error;
+
+        /**
+         * type 0: just the mean travel time
+         * type 1: include the first derivative of travel time (i.e., "change")
+         */
+        int _model_type = 0; // fixed, for now ...
 
         // network state
         std::vector<std::pair<int, double> > _data; // new observations as vehicles traverse network
@@ -352,6 +359,8 @@ namespace Gtfs
         Node* from ();
         Node* to ();
         double length ();
+        double min_travel_time ();
+        double state_var ();
 
         std::vector<std::pair<int, double> >& data ();
         uint64_t timestamp ();
