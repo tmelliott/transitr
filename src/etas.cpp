@@ -81,6 +81,11 @@ namespace Gtfs {
         {
             std::cout << "\n\n * Forecasting ..." << std::endl;
             forecast (rng);
+
+            std::cout << "\n\n * Summarising ..." << std::endl;
+            arrival_times = get_etas ();
+
+            print_etas ();
         }
 
         std::cout << "\n\n------------------------------------------\n";
@@ -93,20 +98,35 @@ namespace Gtfs {
      */
     void Trip::forecast (RNG& rng)
     {
-        Eigen::IOFormat intMat (Eigen::StreamPrecision, 0, ", ", "\n", "  [", "]");
+        Eigen::IOFormat intMat (
+            Eigen::StreamPrecision, 0, ", ", "\n", "  [", "]"
+        );
+
+        int M = _stops.size ();
+        auto segs = _shape->segments ();
+        int L = segs.size ();
+        Eigen::MatrixXi Hseg (Eigen::MatrixXi::Zero (L, M-1));
+        int m=0;
+        for (int l=0; l<L; l++)
+        {
+            if (_stops.at (m+1).distance <= segs.at (l).distance) m++;
+            Hseg (l, m) = 1;
+        }
+        // std::cout << "\n a big matrix ...\n" << Hseg.format (intMat) << "\n";
+
+
         if (gtfs->parameters ()->eta_model == 0 && _vehicle != nullptr)
         {
             // iterate over vehicle state
             int N (_vehicle->state ()->size ());
             N = std::min (N, 10);
-            int L (_shape->segments ().size ());
-            Eigen::MatrixXd seg_tt (Eigen::MatrixXd::Zero (N, L));
-
-            auto segs = _shape->segments ();
+            Eigen::MatrixXi seg_tt (Eigen::MatrixXi::Zero (N, L));
+            Eigen::MatrixXi dwell_t (Eigen::MatrixXi::Zero (N, M));
 
             Particle* p;
             int l;
             int tt;
+            double dt;
             for (int i=0; i<N; i++)
             {
                 tt = 0;
@@ -128,8 +148,32 @@ namespace Gtfs {
                     seg_tt (i, l) = tt;
                     l++;
                 }
+
+                // first column is zeros
+                int m = find_stop_index (p->get_distance (), &(_stops))+1;
+                for (m; m<M; m++)
+                {
+                    if (rng.runif () < gtfs->parameters ()->pr_stop)
+                    {
+                        dt = -1.0;
+                        while (dt <= 0)
+                        {
+                            dt = rng.rnorm () * gtfs->parameters ()->dwell_time_var +
+                                gtfs->parameters ()->dwell_time;
+                        }
+                        dwell_t (i, m) = round (gtfs->parameters ()->gamma + dt);
+                    }
+                }
             }
-            std::cout << "\n" << seg_tt.format (intMat) << "\n";
+            // std::cout << "\n" << seg_tt.format (intMat) << "\n";
+
+            // Convert segment mat to link mat
+            Eigen::MatrixXi link_tt = seg_tt * Hseg;
+
+            // std::cout << "\n" << link_tt.format (intMat) << "\n";
+            // std::cout << "\n" << dwell_t.format (intMat) << "\n";
+
+            _eta_matrix = link_tt + dwell_t;
         }
         else
         {
@@ -140,7 +184,49 @@ namespace Gtfs {
     etavector Trip::get_etas ()
     {
         etavector etas;
+        int M (_stops.size ());
+        etas.resize (M);
+        int N (_eta_matrix.rows ());
+
+        Eigen::VectorXi col_m;
+        for (int m=_stop_index;m<M-1;m++)
+        {
+            col_m = _eta_matrix.col (m);
+            if (col_m.isZero ()) continue;
+
+            std::sort (col_m.data (), col_m.data () + col_m.size ());
+            // median
+            etas.at (m).stop_id = _stops.at (m).stop->stop_id ();
+            etas.at (m).estimate = _timestamp + col_m (floor (N/2));
+        }
+
         return etas;
+    }
+
+    void Trip::print_etas ()
+    {
+        // if (!state_initialised) return;
+
+        std::cout << "\n\n - ETAs for route "
+            << route ()->route_short_name ()
+            << " ("
+            << stops ().at (0).arrival_time
+            << ")\n"
+            << "              schedule       eta  delay  (error)";
+
+        for (int i=0; i<stops ().size (); i++)
+        {
+            if (arrival_times.at (i).estimate == 0) continue;
+            std::cout << "\n   + stop "
+                << std::setw (2) << i << ": "
+                << stops ().at (i).arrival_time << "  "
+                << arrival_times.at (i).estimate << "  "
+                << std::setw (5)
+                << (arrival_times.at (i).estimate - stops ().at (i).arrival_time)
+                << "  ("
+                // << uncertainty.at (i)
+                << ")";
+        }
     }
 
 } // namespace Gtfs

@@ -231,8 +231,10 @@ namespace Gtfs
 
         // trip state:
         Time _start_time;
-        std::vector<int> _link_times;
-        std::vector<int> _dwell_times;
+        Eigen::MatrixXi _eta_matrix;
+        etavector arrival_times;
+        // std::vector<int> _link_times;
+        // std::vector<int> _dwell_times;
 
         // Eigen::VectorXd B;
         // Eigen::MatrixXd E;
@@ -291,7 +293,7 @@ namespace Gtfs
         // std::pair<std::vector<Time>, std::vector<double> > calculate_etas ();
         etavector get_etas ();
 
-        // void print_etas ();
+        void print_etas ();
 
         Vehicle* vehicle ();
         void assign_vehicle (Vehicle* vehicle);
