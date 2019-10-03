@@ -142,6 +142,7 @@ namespace Gtfs {
             // std::cout << std::endl << " ++++ there are " << time_events.size () 
             //     << " events; requesting index " << current_event_index << std::endl;
             auto e = time_events.at (current_event_index);
+            _latest_event = &(time_events.at (current_event_index));
 
             if (_trip == nullptr || _trip->trip_id () != e.trip_id)
             {

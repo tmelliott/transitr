@@ -927,6 +927,9 @@ namespace Gtfs
 
         // load schedule
         
+        _timestamp = 0;
+        _stop_index = 0;
+        _segment_index = 0;
         
         loaded = true;
     }
@@ -2294,6 +2297,15 @@ namespace Gtfs
         new_events.push_back (event);
     }
 
+    std::vector<Event>& Vehicle::get_events ()
+    {
+         return time_events;
+    }
+    Event* Vehicle::latest_event ()
+    {
+        return _latest_event;
+    }
+
     std::vector<STU>* Vehicle::stop_time_updates ()
     {
         return &_stop_time_updates;
@@ -2616,6 +2628,13 @@ namespace Gtfs
     }
     int Vehicle::current_stop ()
     {
+        // if (_timestamp == 0) return 0;
+        // int l = _current_segment;
+        // std::cout << "\n l = " << l << ", len = "
+        //     << _trip->shape ()->segments ().size ();
+        // double d = _trip->shape ()->segments ().at (l).distance;
+        // auto stops = &(_trip->stops ());
+        // return find_stop_index (d, stops);
         return _current_stop;
     }
 
@@ -2834,7 +2853,7 @@ namespace Gtfs
          * Return the index of the segment at which the particle is now in.
          */
         if (segments->back ().distance == 0) return 0;
-        if (segments->back ().distance < distance) return segments->size () - 1;
+        if (segments->back ().distance <= distance) return segments->size () - 1;
 
         unsigned j;
         for (j = 0; j < segments->size () - 1; j++)

@@ -262,13 +262,15 @@ namespace Gtfs {
             return _length / (rng.rnorm () * 25.0 + 5.0); // [5, 30m/s]
         }
 
-        auto x = predict (delta);
+        auto x = predict (0); //delta);
 
         // truncated normal distribution
         double tt (-1.0);
         int tries (100);
-        while (tt < min_tt && tries > 0) {
-            tt = rng.rnorm () * (x.second (0, 0) + _state_var) + x.first (0);
+        while ((tt < min_tt || tt > _length) && tries > 0) {
+            tt = rng.rnorm () * 
+                (pow (x.second (0, 0), 0.5) + _state_var) + 
+                x.first (0);
             tries--;
         }
         return round (fmax (0.0, tt));

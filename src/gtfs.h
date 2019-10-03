@@ -231,13 +231,18 @@ namespace Gtfs
 
         // trip state:
         Time _start_time;
+        std::vector<int> _link_times;
+        std::vector<int> _dwell_times;
+
         // Eigen::VectorXd B;
         // Eigen::MatrixXd E;
         // Eigen::MatrixXd Hseg;   // transform segment travel times to stop tts
         
-        uint64_t _ts;
+        uint64_t _timestamp;
         int _stop_index;
         int _segment_index;
+        double _segment_progress;
+        int _event_type;
 
         bool state_initialised = false;
         
@@ -276,6 +281,7 @@ namespace Gtfs
         void set_departure_time (int m, uint64_t t);
 
         void update (uint64_t& t, RNG& rng);
+        void forecast (RNG& rng);
 
         Time& start_time ();
         uint64_t get_eta (int i);
@@ -647,6 +653,7 @@ namespace Gtfs
             std::vector<Event> new_events;  /** these get sorted and moved to time_events */
             std::vector<Event> time_events;
             unsigned current_event_index = 0; // almost makes `Event.used` redundant
+            Event* _latest_event;
 
             bool _newtrip = true;
             bool _complete = false;
@@ -696,7 +703,8 @@ namespace Gtfs
             int get_n () const { return _N; };
 
             void add_event (Event event);
-            std::vector<Event>& get_events () { return time_events; }
+            std::vector<Event>& get_events ();
+            Event* latest_event ();
 
             std::vector<STU>* stop_time_updates ();
 
@@ -769,6 +777,8 @@ namespace Gtfs
         std::vector<int> ttpred;  // predicted travel times
         std::vector<uint64_t> at; // stop arrival times
         std::vector<uint64_t> dt; // stop departure times
+        
+        std::vector<int> eta;     // predicted etas (from now)
 
         int delta_ahead = 0; // seconds AHEAD of vehicle's timestamp
 
