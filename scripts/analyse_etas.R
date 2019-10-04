@@ -47,12 +47,12 @@ eta_data <- etas %>%
         delay = as.integer(actual_arrival - scheduled_arrival)
     ) %>%
     filter(between(delay, -60*60, 60*60)) %>%
-    filter(eta < 2*60*60 & time_until_arrival >= 0)
+    filter(eta < 2*60*60 & between(time_until_arrival, 0, 60*60*2))
 
-ggplot(eta_data, aes(time_until_arrival, (eta - actual_arrival))) +
-    geom_point() +
+ggplot(eta_data, aes(time_until_arrival, as.integer(arrival_time - actual_arrival))) +
+    geom_hex()
     # facet_wrap(~route_id, scales = "free") +
-    geom_abline(colour = "orangered")
+    # geom_abline(colour = "orangered")
 
 bad_trip <- eta_data %>% 
     filter(trip_id=="51446171528-20190806160740_v82.21") %>% 
