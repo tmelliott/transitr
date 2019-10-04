@@ -22,12 +22,14 @@ public:
     Time (uint64_t& t);
 
     // let you call Time::now () anywhere
-    static Time now ();
+    static Time now ();    
 
     int hour () const;
     int minute () const;
     int second () const;
     int seconds () const;
+
+    uint64_t asUNIX (uint64_t& day) const;
 };
 
 inline int operator-(const Time& lhs, const Time& rhs)

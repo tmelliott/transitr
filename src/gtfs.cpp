@@ -1028,6 +1028,12 @@ namespace Gtfs
         return _version; 
     }
 
+    uint64_t& Trip::timestamp ()
+    {
+        if (!loaded) load ();
+        return _timestamp;
+    }
+
     void Trip::set_arrival_time (int m, uint64_t t)
     {
         if (m < 0 || m >= _arrival_times.size ()) return;

@@ -114,3 +114,11 @@ int Time::seconds () const
 {
     return _seconds;
 }
+
+uint64_t Time::asUNIX (uint64_t& day) const
+{
+    // get midnight of 'day'
+    Time today (day);
+    uint64_t t0 (day - today.seconds ());
+    return t0 + _seconds;
+}

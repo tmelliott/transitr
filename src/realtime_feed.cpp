@@ -330,6 +330,7 @@ void write_trip_updates (Gtfs::trip_map* trips, std::string& file)
 
         // --- Trip Update (ETAs)
         transit_realtime::TripUpdate* tu = entity->mutable_trip_update ();
+        tu->set_timestamp (t->second.timestamp ());
         transit_realtime::TripDescriptor* trip = tu->mutable_trip ();
         trip->set_trip_id (t->second.trip_id ());
         if (t->second.route () != nullptr) 
@@ -340,6 +341,7 @@ void write_trip_updates (Gtfs::trip_map* trips, std::string& file)
         // Stop Time Events
         for (int si=0; si<etas.size (); ++si)
         {
+            if (etas.at (si).estimate == 0) continue;
             transit_realtime::TripUpdate::StopTimeUpdate* stu = tu->add_stop_time_update ();
             stu->set_stop_sequence (si+1);
             transit_network::TimePrediction* tpi = stu->MutableExtension(transit_network::eta);

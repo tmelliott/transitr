@@ -278,6 +278,7 @@ namespace Gtfs
         bool direction_id ();
         std::string& trip_headsign ();
         float version ();
+        uint64_t& timestamp ();
 
         void set_arrival_time (int m, uint64_t t);
         void set_departure_time (int m, uint64_t t);

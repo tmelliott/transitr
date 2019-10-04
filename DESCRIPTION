@@ -28,7 +28,8 @@ Imports:
     glue,
     ggplot2,
     shiny,
-    leaflet
+    leaflet,
+    tibble
 Suggests: 
     testthat (>= 2.0.0),
     covr

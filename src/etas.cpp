@@ -214,9 +214,11 @@ namespace Gtfs {
             << ")\n"
             << "              schedule       eta  delay  (error)";
 
+        // std::string
         for (int i=0; i<stops ().size (); i++)
         {
             if (arrival_times.at (i).estimate == 0) continue;
+
             std::cout << "\n   + stop "
                 << std::setw (2) << i << ": "
                 << stops ().at (i).arrival_time << "  "
