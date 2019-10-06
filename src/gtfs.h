@@ -508,6 +508,7 @@ namespace Gtfs
         std::vector<CalendarDate*>& exceptions ();
 
         bool weekdays ();
+        bool today (uint64_t& t);
     };
 
 
@@ -611,11 +612,13 @@ namespace Gtfs
         uint64_t timestamp;
         EventType type;
         std::string trip_id;
-        latlng position; // only for type == EventType::gps
-        int stop_index;  // only for type == EventType::arrival or EventType::departure
-        bool used = false; // once incorporated into likelihood, no longer use this event
+        latlng position;    // only for type == EventType::gps
+        int stop_index;     // only for type == EventType::arrival or EventType::departure
+        int delay = 0;      // for arrival/departure events
+        bool used = false;  // once incorporated into likelihood, no longer use this event
 
         Event (uint64_t ts, EventType type, std::string trip, int index);
+        Event (uint64_t ts, EventType type, std::string trip, int index, int delay);
         Event (uint64_t ts, EventType type, std::string trip, latlng pos);
 
         bool operator < (const Event& e) const
@@ -635,6 +638,7 @@ namespace Gtfs
             int _stop_index;
             uint64_t _timestamp = 0;
             unsigned _delta;
+            int _current_delay;  // the delay in seconds at the last reported stop
 
             par* _params;
 
@@ -697,6 +701,7 @@ namespace Gtfs
             latlng& position ();
             uint64_t timestamp ();
             unsigned delta ();
+            int current_delay ();
 
             // only for use in testing!
             void override_timestamp (uint64_t ts);
@@ -712,6 +717,7 @@ namespace Gtfs
             std::vector<STU>* stop_time_updates ();
 
             void set_trip (Trip* trip);
+            void remove_trip ();
             void update (const transit_realtime::VehiclePosition& vp,
                          Gtfs* gtfs);
             void update (const transit_realtime::TripUpdate& tu,

@@ -925,8 +925,6 @@ namespace Gtfs
         _arrival_times.resize (_stops.size (), 0);
         _departure_times.resize (_stops.size (), 0);
 
-        // load schedule
-        
         _timestamp = 0;
         _stop_index = 0;
         _segment_index = 0;
@@ -967,21 +965,29 @@ namespace Gtfs
     {
         /**
          * Returns TRUE if vehicle is not null ...
+         * ACTUALLY silly because some trips start early/late 
+         * because bus is en-route
          */
-        if (_vehicle != nullptr) return true;
+        // if (_vehicle != nullptr) return true;
 
         /** 
          * ... or if it is 30 mins before scheduled start
          * and less than an hour since scheduled end.
          */
         Time t0 (t);
-        if (loaded)
-        {
-            if (stops ().front ().departure_time - t0 < 30*60) return false;
-            return t0 - stops ().back ().arrival_time < 60*60;
-        }
+        if (!loaded) load ();
 
-        // if not loaded, currently unable to subset today's trips only
+        if (_calendar->today (t))
+        {
+            // t0 between (first departure - 30min, last arrival + 60min)
+            if (t0 < Time (stops ().front ().departure_time.seconds () - 30*60) ||
+                t0 > Time (stops ().back ().arrival_time.seconds () + 60*60)) 
+                return false;
+            // vehicle associated? it's active
+            if (_vehicle != nullptr) return true;
+            // otherwise only active 1-min before trip starts
+            return t0 > Time (stops ().front ().departure_time.seconds () - 1*60);
+        }
         return false;
     }
 
@@ -1057,7 +1063,12 @@ namespace Gtfs
     }
     void Trip::assign_vehicle (Vehicle* vehicle)
     {
+        if (_vehicle != nullptr && _vehicle != vehicle)
+        {
+            _vehicle->remove_trip ();
+        }
         _vehicle = vehicle;
+        // _vehicle->set_trip (this);
     }
 
 
@@ -2066,6 +2077,27 @@ namespace Gtfs
             _thursday && _friday;
     }
 
+    bool Calendar::today (uint64_t& t)
+    {
+        if (!loaded) load ();
+
+        std::time_t tx (t);
+        struct tm *t0 = localtime (&tx);
+        int dow = t0->tm_wday;
+
+        bool running = 
+            (_sunday & dow == 0) ||
+            (_monday & dow == 1) ||
+            (_tuesday && dow == 2) ||
+            (_wednesday && dow == 3) ||
+            (_thursday && dow == 4) ||
+            (_friday && dow == 5) ||
+            (_saturday && dow == 6);
+
+        // and exceptions
+        return running;
+    }
+
     /***************************************************** Calendar */
     Node::Node (int id, Gtfs* gtfs) :
         gtfs (gtfs), _node_id (id)
@@ -2214,6 +2246,11 @@ namespace Gtfs
     {
     }
 
+    Event::Event (uint64_t ts, EventType type, std::string trip, int index, int delay) :
+        timestamp (ts), type (type), trip_id (trip), position (latlng ()), stop_index (index), delay (delay)
+    {
+    }
+
     Event::Event (uint64_t ts, EventType type, std::string trip, latlng pos) :
         timestamp (ts), type (type), trip_id (trip), position (pos), stop_index (-1)
     {
@@ -2229,7 +2266,8 @@ namespace Gtfs
         else
         {
             std::cout << (type == EventType::arrival ? "arrived" : "departed")
-                << " stop " << (stop_index + 1);
+                << " stop " << (stop_index + 1)
+                << " (" << delay << "s delay)";
         }
     }
     std::string Event::type_name ()
@@ -2293,6 +2331,11 @@ namespace Gtfs
         return _delta;
     }
 
+    int Vehicle::current_delay ()
+    {
+        return _current_delay;
+    }
+
     void Vehicle::override_timestamp (uint64_t ts)
     {
         _timestamp = ts;
@@ -2335,6 +2378,11 @@ namespace Gtfs
         }
         _trip = trip;
         _trip->assign_vehicle (this);
+    }
+
+    void Vehicle::remove_trip ()
+    {
+        _trip = nullptr;
     }
 
     void Vehicle::update (const transit_realtime::VehiclePosition& vp,
@@ -2449,10 +2497,15 @@ namespace Gtfs
             {
                 continue;
             }
-            add_event (Event (ste->time (), 
-                              (stu.has_arrival () ? EventType::arrival : EventType::departure),
-                              tu.trip ().trip_id (),
-                              stu.stop_sequence () - 1));
+            add_event (
+                Event (
+                    ste->time (), 
+                    (stu.has_arrival () ? EventType::arrival : EventType::departure),
+                    tu.trip ().trip_id (),
+                    stu.stop_sequence () - 1,
+                    (ste->has_delay () ? ste->delay () : 0)
+                )
+            );
         }
 
 

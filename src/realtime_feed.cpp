@@ -271,7 +271,7 @@ void write_vehicles (Gtfs::vehicle_map* vehicles, std::string& file)
 
 }
 
-void write_trip_updates (Gtfs::trip_map* trips, std::string& file)
+void write_trip_updates (Gtfs::trip_map* trips, std::string& file, uint64_t& curtime)
 {
     // create a new feed
     transit_realtime::FeedMessage feed;
@@ -280,13 +280,12 @@ void write_trip_updates (Gtfs::trip_map* trips, std::string& file)
     transit_realtime::FeedHeader* header;
     header = feed.mutable_header ();
     header->set_gtfs_realtime_version ("2.0");
-    std::time_t curtime = std::time (nullptr);
     header->set_timestamp (curtime);
 
     // write trips
     for (auto t = trips->begin (); t != trips->end (); ++t)
     {
-        if (!t->second.is_active ()) continue;
+        if (!t->second.is_active (curtime)) continue;
         Gtfs::etavector etas (t->second.get_etas ());
         if (etas.size () == 0) continue;
 
@@ -344,6 +343,12 @@ void write_trip_updates (Gtfs::trip_map* trips, std::string& file)
             if (etas.at (si).estimate == 0) continue;
             transit_realtime::TripUpdate::StopTimeUpdate* stu = tu->add_stop_time_update ();
             stu->set_stop_sequence (si+1);
+            if (t->second.vehicle () != nullptr)
+            {
+                stu->SetExtension (transit_network::current_delay, t->second.vehicle ()->current_delay ());
+                std::cout << "\n - vehicle " << t->second.vehicle ()->vehicle_id ()
+                    << " has delay of " << t->second.vehicle ()->current_delay () << "s";
+            }
             transit_network::TimePrediction* tpi = stu->MutableExtension(transit_network::eta);
             tpi->set_estimate (etas.at (si).estimate);
             for (auto q : etas.at (si).quantiles)

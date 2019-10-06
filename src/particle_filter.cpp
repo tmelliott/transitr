@@ -15,7 +15,6 @@ namespace Gtfs {
         initialize (rng);
         _timestamp = e.timestamp;
         _delta = 0;
-        _position = e.position;
         _Neff = _N;
 
         // initialize based on the event
@@ -35,6 +34,7 @@ namespace Gtfs {
         {
             if (_stop_index >= _trip->stops ().size ()) return;
             dist = _trip->stops ().at (_stop_index).distance;
+            // _current_delay = e.delay;
         }
         
         double d, u;
@@ -125,15 +125,34 @@ namespace Gtfs {
         if (nnew == 0) return;
 
 #if VERBOSE > 0
-        std::cout << "\n    [";
-        if (_timestamp > 0 && current_event_index > 0) 
+        if (current_event_index == 0 || _timestamp == 0)
         {
-            std::cout << _timestamp << "] "
-                << _trip->route ()->route_short_name ()
-                << " (" << _trip->stops ().at (0).departure_time << "): ";
-            time_events.at (current_event_index - 1).print ();
+            std::cout << "\n    [uninitialized]";
         }
-        else std::cout << "uninitialized]";
+        else
+        {
+            if (current_event_index > 1)
+            {
+                for (int i=0; i<(current_event_index-1); ++i)
+                {
+                    std::cout << "\n    [" << time_events.at (i).timestamp << "] ";
+                    time_events.at (i).print ();
+                }
+            }
+            std::cout << "\n    [" << _timestamp << "] ";
+            if (_trip == nullptr)
+            {
+                std::cout << "the trip is null ... ";
+            }
+            else 
+            {
+                std::cout
+                    << _trip->route ()->route_short_name ()
+                    << " (" << _trip->stops ().at (0).departure_time << "): ";
+            }
+            time_events.at (current_event_index - 1).print ();
+            std::cout << "\n ------------------";
+        }
 #endif
 
         // repeat until there are no more events
@@ -158,6 +177,7 @@ namespace Gtfs {
                 _timestamp = 0;
                 _state.clear ();
                 estimated_dist = 0.0;
+                _current_delay = 0;
 
                 // reset events!!
                 new_events.clear ();
@@ -260,6 +280,7 @@ namespace Gtfs {
             else
             {
                 _stop_index = e.stop_index;
+                _current_delay = e.delay;
                 // ----------------------------------- CHECK STOP INDEX
 #if VERBOSE > 0
                 std::cout << " - there are " << _trip->stops ().size () 
@@ -267,6 +288,7 @@ namespace Gtfs {
                     << _trip->stops ().at (_stop_index).distance << "m)";
 #endif
             }
+            std::cout << "\n - the vehicle's current delay is " << _current_delay << "s";
 
             if (!_skip_observation)
             {

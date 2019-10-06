@@ -291,13 +291,13 @@ void run_realtime_model (List nw)
         outputname_t << "etas/etas";
         if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ()) 
         {
-            outputname_t << "_" << rtfeed.feed ()->header ().timestamp ();
+            outputname_t << "_" << curtime;
         }
         outputname_t << ".pb";
         std::string oname (outputname_t.str ());
-        write_trip_updates (trips, oname);
+        write_trip_updates (trips, oname, curtime);
 #endif
-        write_trip_updates (trips, outputname);
+        write_trip_updates (trips, outputname, curtime);
         timer.report ("writing ETAs to protobuf feed");
 
 //         for (unsigned i=0; i<vehicles.bucket_count (); ++i)

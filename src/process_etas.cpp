@@ -37,6 +37,7 @@ void processFile (std::string& f, std::fstream& o, Gtfs::Gtfs* gtfs)
                 << "," << tu->trip ().route_id ()
                 << "," << t
                 << "," << stu.stop_sequence ()
+                << "," << (stu.HasExtension (transit_network::current_delay) ? stu.GetExtension (transit_network::current_delay) : 0)
                 << "," << stu.GetExtension (transit_network::eta).estimate ()
                 << "," << trip->stops ().at (stu.stop_sequence ()).
                     arrival_time.asUNIX (t)

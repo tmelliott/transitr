@@ -127,25 +127,31 @@ namespace Gtfs {
             int l;
             int tt;
             double dt;
+            double v;
+            //  vehicle speed too slow?
+            bool use_particle_speed (_vehicle->speed () < 2);
             for (int i=0; i<N; i++)
             {
                 tt = 0;
                 p = &(_vehicle->state ()->at (i));
                 // time to end of current segment
                 l = find_segment_index (p->get_distance (), &segs);
+                v = use_particle_speed ? p->get_speed () : 
+                    segs.at (l).segment->sample_speed (rng);
                 tt += 
                     round ((
                         segs.at (l).distance + 
                         segs.at (l).segment->length () - 
                         p->get_distance ()
                     ) / p->get_speed ());
-                seg_tt (i, l) = tt;
+
+                seg_tt (i, l) = fmin (tt, 60*30); // no more than 30 mins!
 
                 l++;
                 while (l < L)
                 {
                     tt += segs.at (l).segment->sample_travel_time (rng, tt);
-                    seg_tt (i, l) = tt;
+                    seg_tt (i, l) = fmin (tt, 60*60*2); // no more than 2 hours!!
                     l++;
                 }
 
@@ -156,7 +162,7 @@ namespace Gtfs {
                     if (rng.runif () < gtfs->parameters ()->pr_stop)
                     {
                         dt = -1.0;
-                        while (dt <= 0)
+                        while (dt <= 0 || dt > 5*60)
                         {
                             dt = rng.rnorm () * gtfs->parameters ()->dwell_time_var +
                                 gtfs->parameters ()->dwell_time;
@@ -170,8 +176,8 @@ namespace Gtfs {
             // Convert segment mat to link mat
             Eigen::MatrixXi link_tt = seg_tt * Hseg;
 
-            // std::cout << "\n" << link_tt.format (intMat) << "\n";
-            // std::cout << "\n" << dwell_t.format (intMat) << "\n";
+            std::cout << "\n" << link_tt.format (intMat) << "\n";
+            std::cout << "\n" << dwell_t.format (intMat) << "\n";
 
             _eta_matrix = link_tt + dwell_t;
         }
@@ -222,7 +228,7 @@ namespace Gtfs {
             std::cout << "\n   + stop "
                 << std::setw (2) << i << ": "
                 << stops ().at (i).arrival_time << "  "
-                << arrival_times.at (i).estimate << "  "
+                << Time (arrival_times.at (i).estimate) << "  "
                 << std::setw (5)
                 << (arrival_times.at (i).estimate - stops ().at (i).arrival_time)
                 << "  ("

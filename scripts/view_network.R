@@ -12,32 +12,59 @@ get_data <- function(f = "segment_observations.csv") {
         col_types = "iinn")
 }
 
-get_segment_data <- function(routes) {
+get_segment_data <- function(routes, route_ids) {
     con <- dbConnect(SQLite(), "at_gtfs.db")
     on.exit(dbDisconnect(con))
-    if (missing(routes)) {
+    if (missing(routes) && missing(route_ids)) {
         segments <- con %>% tbl("road_segments")
+        nodes <- con %>% tbl("nodes") 
+        segments <- segments %>% 
+            inner_join(nodes, by = c("node_from" = "node_id"), suffix = c("", "_start")) %>%
+            inner_join(nodes, by = c("node_to" = "node_id"), suffix = c("", "_end")) %>%
+            select(road_segment_id, length, node_lat, node_lon, node_lat_end, node_lon_end) %>%
+            collect()
     } else {
-        rids <- con %>% tbl("routes") %>%
-            filter(route_short_name %in% routes &
-                (route_long_name %like% "%To City%" |
-                 route_long_name %like% "%To Britomart%")) %>%
-            collect %>% pluck("route_id") %>% unique
+        if (missing(route_ids)) {
+            rids <- con %>% tbl("routes") %>%
+                filter(route_short_name %in% routes &
+                    (route_long_name %like% "%To City%" |
+                     route_long_name %like% "%To Britomart%")) %>%
+                collect %>% pluck("route_id") %>% unique
+        } else {
+            rids <- route_ids
+        }
         sids <- con %>% tbl("trips") %>%
             filter(route_id %in% rids) %>%
             collect %>% pluck("shape_id") %>% unique
-        segids <- con %>% tbl("shape_segments") %>% 
+        nodes <- con %>% tbl("shape_nodes") %>% 
             filter(shape_id %in% sids) %>%
-            collect %>% pluck("road_segment_id") %>% unique
-        segments <- con %>% tbl("road_segments") %>%
-            filter(road_segment_id %in% segids)
+            select(shape_id, node_id, node_sequence) %>%
+            collect()
+        segtbl <- con %>% tbl("road_segments") %>%
+            filter(node_from %in% !!nodes$node_id | node_to %in% !!nodes$node_id) %>%
+            collect()
+        segments <- nodes %>% group_by(shape_id) %>%
+            do({
+                nids <- (.) %>% arrange(node_sequence) %>% pull(node_id)
+                nids <- tibble(
+                    shape_id = (.)$shape_id[-1],
+                    from = nids[-length(nids)],
+                    to = nids[-1],
+                    seq = 1:(length(nids)-1)
+                )
+                left_join(nids, segtbl,
+                    by = c("from" = "node_from", "to" = "node_to")
+                ) %>%
+                rename(node_from = from, node_to = to)
+            }) %>%
+            ungroup()
+        nodes <- con %>% tbl("nodes") %>%
+            filter(node_id %in% !!nodes$node_id) %>% collect()
+        segments <- segments %>% 
+            inner_join(nodes, by = c("node_from" = "node_id"), suffix = c("", "_start")) %>%
+            inner_join(nodes, by = c("node_to" = "node_id"), suffix = c("", "_end")) %>%
+            select(road_segment_id, length, node_lat, node_lon, node_lat_end, node_lon_end)
     }
-    nodes <- con %>% tbl("nodes")
-    segments <- segments %>% 
-        inner_join(nodes, by = c("node_from" = "node_id"), suffix = c("", "_start")) %>%
-        inner_join(nodes, by = c("node_to" = "node_id"), suffix = c("", "_end")) %>%
-        select(road_segment_id, length, node_lat, node_lon, node_lat_end, node_lon_end) %>%
-        collect
     if (dbExistsTable(con, "segment_parameters")) {
         segpars <- con %>% tbl("segment_parameters") %>% collect()
         segments <- segments %>% 
