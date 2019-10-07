@@ -341,6 +341,10 @@ namespace Gtfs
         Node* _to;
         double _length;
 
+        /* values extracted either from the schedule or historical models */
+        double _prior_travel_time = 0.0;
+        double _prior_travel_time_var = 0.0;
+
         std::mutex load_mutex;
 
         bool loaded = false;
@@ -378,6 +382,9 @@ namespace Gtfs
         double length ();
         double min_travel_time ();
         double state_var ();
+
+        double prior_travel_time ();
+        double prior_travel_time_var ();
 
         std::vector<std::pair<int, double> >& data ();
         uint64_t timestamp ();

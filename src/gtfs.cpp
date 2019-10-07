@@ -1569,7 +1569,7 @@ namespace Gtfs
         sqlite3_finalize (stmt);
 
         // it exists - go grab them values!
-        qry = "SELECT q, phi FROM segment_parameters WHERE segment_id=?";
+        qry = "SELECT q, phi, tt, tt_var FROM segment_parameters WHERE segment_id=?";
         const char* segpars = qry.c_str ();
         if (sqlite3_prepare_v2(db, segpars, -1, &stmt, 0) != SQLITE_OK)
         {
@@ -1591,6 +1591,8 @@ namespace Gtfs
         {
             _system_noise = sqlite3_column_double (stmt, 0);
             _state_var = sqlite3_column_double (stmt, 1);
+            _prior_travel_time = sqlite3_column_double (stmt, 2);
+            _prior_travel_time_var = sqlite3_column_double (stmt, 3);
         }
 
         sqlite3_finalize (stmt);
@@ -1639,6 +1641,17 @@ namespace Gtfs
         if (!loaded) load ();
         return _state_var;
     }
+
+    double Segment::prior_travel_time ()
+    {
+        if (!loaded) load ();
+        return _prior_travel_time;
+    };
+    double Segment::prior_travel_time_var ()
+    {
+        if (!loaded) load ();
+        return _prior_travel_time_var;
+    };
 
     std::vector<std::pair<int, double> >& Segment::data ()
     {

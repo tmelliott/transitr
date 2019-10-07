@@ -24,73 +24,144 @@ ts2dt <- function(ts) as.POSIXct(ts, origin = "1970-01-01")
 etas <- etas %>% 
     mutate(
         timestamp = ts2dt(timestamp),
-        arrival_time = ts2dt(arrival_time),
-        scheduled_arrival = ts2dt(scheduled_arrival),
-        gtfs_eta = scheduled_arrival + current_delay
-    )
+        eta_prediction = ts2dt(arrival_time),
+        scheduled_arrival = ts2dt(scheduled_arrival)
+        # gtfs_eta = scheduled_arrival + current_delay
+    ) %>%
+    select(trip_id, route_id, timestamp, stop_sequence, eta_prediction,
+        current_delay)
 
-load("simulations/arrivaldata.rda")
-arrivaldata <- arrivaldata %>%
-    ungroup() %>%
-    spread(key = type, value = time) %>%
+## Load the actual arrival times?
+tudir <- file.path("simulations", "archive")
+tufiles <- list.files(tudir, pattern = "^trip_updates.+\\.pb$", full.names = TRUE)
+system.time( transitr:::processEtas(tufiles, "arrivaldata.csv", "at_gtfs.db") )
+
+system.time(
+    arrivaldata <- readr::read_csv(
+        "arrivaldata.csv",
+        col_names = c(
+            "trip_id", "route_id", "timestamp", "stop_sequence", 
+            "current_delay", "arrival_time", "scheduled_arrival"
+        ),
+        col_types = "cciiiii"
+    )
+)
+arrivaldata <- arrivaldata %>% 
     mutate(
-        actual_arrival = ts2dt(ifelse(is.na(arrival), departure, arrival))
-    )# %>% 
-    ## Add AT estimate of arrival time 
-# arrivaldata %>%
+        scheduled_arrival = ts2dt(scheduled_arrival),
+        delay = current_delay,
+        arrival_time = scheduled_arrival + delay
+    ) %>%
+    select(trip_id, route_id, stop_sequence, scheduled_arrival, arrival_time, delay) %>%
+    unique()
+
+library(RSQLite())
+con <- dbConnect(SQLite(), "at_gtfs.db")
+HMS2sec <- function(hms) {
+    sapply(strsplit(hms, ":"), function(z) {
+        sum(as.integer(z) * c(60*60, 60, 1))
+    })
+}
+t00 <- paste(format(arrivaldata$arrival_time[1], "%Y-%m-%d"), "00:00:00") %>%
+    as.POSIXct %>% as.integer
+# adata <- arrivaldata %>%
 #     group_by(trip_id) %>%
 #     do({
-#         x <- (.)
+#         x <- (.) %>% rename(actual_arrival = arrival_time)
 #         tid <- x$trip_id[1]
 #         Schedule <- con %>% tbl("stop_times") %>%
 #             filter(trip_id == !!tid) %>%
 #             select(stop_sequence, arrival_time) %>%
 #             arrange(stop_sequence) %>% collect()
-#         x2 <- left_join(Schedule, x %>% select(stop_sequence, actual_arrival)) %>%
+#         x2 <- left_join(Schedule, 
+#                 x %>% select(stop_sequence, actual_arrival),
+#                 by = "stop_sequence"
+#             ) %>%
 #             mutate(
-#                 arrival_time = 
-#                     as.POSIXct(paste(
-#                         format(actual_arrival[1], "%Y-%m-%d"), 
-#                         arrival_time
-#                     )),
-#                 arrival_delay = as.integer(actual_arrival - arrival_time)
+#                 arrival_time = ts2dt(HMS2sec(arrival_time) + t00),
+#                 arrival_delay = as.integer(actual_arrival) - as.integer(arrival_time)
 #             )
+#         if (is.na(x2$arrival_delay[1])) x2$arrival_delay[1] <- 0
+#         for (i in 2:nrow(x2)) {
+#             if (is.na(x2$arrival_delay[i])) 
+#                 x2$arrival_delay[i] <- x2$arrival_delay[i-1]
+#         }
 #         x2
 #     })
+adata <- arrivaldata %>% select(trip_id, stop_sequence, scheduled_arrival, arrival_time, delay)
 
-eta_data <- etas %>% 
-    left_join(
-        arrivaldata %>% select(trip_id, stop_sequence, actual_arrival),
+eta_data <- etas %>% select(-current_delay) %>%
+    left_join(adata %>% rename(actual_arrival = arrival_time) %>%
+            select(trip_id, stop_sequence, scheduled_arrival, actual_arrival, delay),
         by = c("trip_id", "stop_sequence")
     ) %>%
     mutate(
         time_until_arrival = as.integer(actual_arrival - timestamp),
-        eta = as.integer(arrival_time - timestamp),
-        delay = as.integer(actual_arrival - scheduled_arrival)
+        eta = as.integer(eta_prediction - timestamp)
     ) %>%
-    filter(between(delay, -60*60, 60*60) & time_until_arrival > 0)# & current_delay != 0) # %>%
-    # filter(eta < 2*60*60 & between(time_until_arrival, 0, 60*60*2))
+    group_by(trip_id, timestamp) %>%
+    do({
+        x <- (.) %>% arrange(stop_sequence)
+        # x <- eta_data %>% 
+        #     filter(trip_id=="8301168082-20190806160740_v82.21" & timestamp == "2019-08-19 05:00:11") %>% 
+        #     arrange(stop_sequence)
+        curdelay <- adata %>% 
+            filter(trip_id == x$trip_id[1] & arrival_time <= x$timestamp[1]) %>%
+            filter(!is.na(delay))
+        if (nrow(curdelay) == 0) curdelay <- 0
+        else curdelay <- curdelay$delay[which.max(curdelay$arrival_time)]
+        x %>% mutate(
+            current_delay = curdelay, 
+            gtfs_arrival_time = scheduled_arrival + current_delay,
+            gtfs_eta = as.integer(scheduled_arrival + current_delay) - as.integer(timestamp)
+        )
+    })
+
+
+    #     gtfs_eta = as.integer(scheduled_arrival + arrival_delay - timestamp)
+    # ) %>%
+    # filter(between(delay, -60*60, 60*60) & time_until_arrival > 0)# & current_delay != 0) # %>%
+    # # filter(eta < 2*60*60 & between(time_until_arrival, 0, 60*60*2))
 
 ## A VERY VERY BASIC RMSE THING
-RMSE_ME <- sqrt(mean(with(eta_data, as.integer(arrival_time - actual_arrival))^2))
-RMSE_GTFS <- sqrt(mean(with(eta_data, as.integer(gtfs_eta - actual_arrival))^2))
+RMSE <- list(
+    transitr = sqrt(mean(eta_data$eta^2)),
+    gtfs = sqrt(mean(eta_data$gtfs_eta^2, na.rm = TRUE))
+)
 
 
+for (ROUTE in unique(eta_data$route_id)) {
+    routedata <- eta_data %>% filter(grepl(ROUTE, route_id))
 
-ggplot(eta_data, aes(time_until_arrival/60, 
-    as.integer(arrival_time - actual_arrival)/60)) +
-    geom_point(aes(colour = stop_sequence)) +
-    geom_point(aes(y = as.integer(gtfs_eta - actual_arrival)/60),
-        colour = "red", size = 1) +
-    facet_wrap(~route_id, scales = "free") 
-    # geom_abline(colour = "orangered")
+    p <- ggplot(routedata %>% filter(time_until_arrival > 0), 
+        aes(time_until_arrival)) +
+        geom_point(aes(y = eta - time_until_arrival)) +
+        geom_point(aes(y = gtfs_eta - time_until_arrival), colour = "red") +
+        geom_hline(yintercept = 0, colour = "blue") +
+        facet_wrap(~trip_id,scales="free") +
+        theme(legend.position = "none")
+    print(p)
+    grid::grid.locator()
+}
 
-ggplot(eta_data, aes(timestamp, 
-    as.integer(arrival_time-timestamp)/60)) +
-    geom_point(aes(colour = as.factor(stop_sequence))) +
-    geom_point(aes(y = as.integer(gtfs_eta - timestamp)/60), colour = "red", size = 0.5)+
-    facet_wrap(~route_id)
+    # p <- ggplot(routedata, aes(time_until_arrival/60, 
+    #     as.integer(arrival_time - actual_arrival)/60)) +
+    #     geom_point(aes(colour = trip_id)) +
+    #     geom_point(aes(y = as.integer(gtfs_eta - actual_arrival)/60),
+    #         colour = "red", size = 1) +
+    #     facet_wrap(~stop_sequence)
+    #     # geom_abline(colour = "orangered")
+    # print(p)
+    # grid::grid.locator()
 
+    # p <- ggplot(routedata, aes(timestamp, 
+    #     as.integer(arrival_time-timestamp)/60)) +
+    #     geom_point(aes(colour = as.factor(stop_sequence))) +
+    #     geom_point(aes(y = as.integer(gtfs_eta - timestamp)/60), colour = "red", size = 0.5)+
+    #     facet_wrap(~stop_sequence)
+    # print(p)
+    grid::grid.locator()
+}
 
 bad_trip <- eta_data %>% 
     filter(trip_id=="51357146239-20190806160740_v82.21") %>% 

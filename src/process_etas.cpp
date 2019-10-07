@@ -30,21 +30,36 @@ void processFile (std::string& f, std::fstream& o, Gtfs::Gtfs* gtfs)
         tid = tu->trip ().trip_id ();
         trip = gtfs->find_trip (tid);
         t = tu->timestamp ();
+        int delay;
         for (auto stu : tu->stop_time_update ())
         {
+            if (stu.HasExtension (transit_network::current_delay))
+            {
+                delay = stu.GetExtension (transit_network::current_delay);
+            }
+            else if (stu.has_arrival ())
+            {
+                delay = stu.arrival ().delay ();
+            } 
+            else if (stu.has_departure ())
+            {
+                delay = stu.departure ().delay ();
+            }
+            else
+            {
+                delay = 0;
+            }
             o 
                 << tu->trip ().trip_id () 
                 << "," << tu->trip ().route_id ()
                 << "," << t
                 << "," << stu.stop_sequence ()
-                << "," << (stu.HasExtension (transit_network::current_delay) ? stu.GetExtension (transit_network::current_delay) : 0)
-                << "," << stu.GetExtension (transit_network::eta).estimate ()
-                << "," << trip->stops ().at (stu.stop_sequence ()).
-                    arrival_time.asUNIX (t)
+                << "," << delay
+                << "," << (stu.HasExtension (transit_network::eta) ? stu.GetExtension (transit_network::eta).estimate () : 0)
+                << "," << trip->stops ().at (stu.stop_sequence ()-1).arrival_time.asUNIX (t)
                 << "\n";
         }
     }
-
 }
 
 // [[Rcpp::export]]

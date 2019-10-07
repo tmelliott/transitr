@@ -6,12 +6,10 @@ namespace Gtfs {
     {
         if (!loaded) load ();
         // set up the initial state of the segment
-        _travel_time (0) = _length / 10.0;
-        _travel_time (1) = 0.0;
+        _travel_time (0) = _prior_travel_time > 0 ? _prior_travel_time : _length / 10.0;
+        _travel_time (1) = _prior_travel_time_var > 0 ? _prior_travel_time_var : 0.0;
         _uncertainty = Eigen::Matrix2d::Zero ();
         min_tt = _length / max_speed;
-
-        
 
         if (_system_noise == 0)
             _system_noise = params->nw_system_noise;
