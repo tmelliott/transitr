@@ -32,28 +32,47 @@ etas <- etas %>%
         current_delay)
 
 ## Load the actual arrival times?
-tudir <- file.path("simulations", "archive")
-tufiles <- list.files(tudir, pattern = "^trip_updates.+\\.pb$", full.names = TRUE)
-system.time( transitr:::processEtas(tufiles, "arrivaldata.csv", "at_gtfs.db") )
+# tudir <- file.path("simulations", "archive")
+# tufiles <- list.files(tudir, pattern = "^trip_updates.+\\.pb$", full.names = TRUE)
+# system.time( transitr:::processEtas(tufiles, "arrivaldata.csv", "at_gtfs.db") )
 
-system.time(
-    arrivaldata <- readr::read_csv(
-        "arrivaldata.csv",
-        col_names = c(
-            "trip_id", "route_id", "timestamp", "stop_sequence", 
-            "current_delay", "arrival_time", "scheduled_arrival"
-        ),
-        col_types = "cciiiii"
-    )
-)
-arrivaldata <- arrivaldata %>% 
-    mutate(
-        scheduled_arrival = ts2dt(scheduled_arrival),
-        delay = current_delay,
-        arrival_time = scheduled_arrival + delay
-    ) %>%
-    select(trip_id, route_id, stop_sequence, scheduled_arrival, arrival_time, delay) %>%
-    unique()
+# system.time(
+#     arrivaldata <- readr::read_csv(
+#         "arrivaldata.csv",
+#         col_names = c(
+#             "trip_id", "route_id", "timestamp", "stop_sequence", 
+#             "current_delay", "arrival_time", "scheduled_arrival"
+#         ),
+#         col_types = "cciiiii"
+#     )
+# )
+# arrivaldata <- arrivaldata %>% 
+#     mutate(
+#         scheduled_arrival = ts2dt(scheduled_arrival),
+#         delay = current_delay,
+#         arrival_time = scheduled_arrival + delay
+#     ) %>%
+#     select(trip_id, route_id, stop_sequence, scheduled_arrival, arrival_time, delay) %>%
+#     unique()
+
+
+## silly plot of the ETAs
+for (TRIP_ID in unique(etas$trip_id)) {
+    p <- ggplot(etas %>% filter(trip_id == TRIP_ID)) +
+        geom_point(aes(eta_prediction, timestamp)) +
+        geom_vline(aes(xintercept = arrival_time),
+            data = arrivaldata %>% filter(trip_id == TRIP_ID),
+            colour = "orangered"
+        ) +
+        geom_vline(aes(xintercept = scheduled_arrival),
+            data = arrivaldata %>% filter(trip_id == TRIP_ID)
+        ) +
+        ggtitle(TRIP_ID) +
+        facet_wrap(~stop_sequence)
+    print(p)
+    grid::grid.locator()
+}
+
 
 library(RSQLite())
 con <- dbConnect(SQLite(), "at_gtfs.db")
@@ -117,6 +136,7 @@ eta_data <- etas %>% select(-current_delay) %>%
         )
     })
 
+eta_data <- eta_data %>% filter(time_until_arrival > 0)
 
     #     gtfs_eta = as.integer(scheduled_arrival + arrival_delay - timestamp)
     # ) %>%
@@ -130,15 +150,16 @@ RMSE <- list(
 )
 
 
-for (ROUTE in unique(eta_data$route_id)) {
-    routedata <- eta_data %>% filter(grepl(ROUTE, route_id))
+for (TRIP in unique(eta_data$trip_id)) {
+    routedata <- eta_data %>% filter(trip_id == TRIP)
 
     p <- ggplot(routedata %>% filter(time_until_arrival > 0), 
-        aes(time_until_arrival)) +
-        geom_point(aes(y = eta - time_until_arrival)) +
-        geom_point(aes(y = gtfs_eta - time_until_arrival), colour = "red") +
-        geom_hline(yintercept = 0, colour = "blue") +
-        facet_wrap(~trip_id,scales="free") +
+        aes(timestamp)) +
+        geom_point(aes(y = eta_prediction)) +
+        geom_point(aes(y = gtfs_arrival_time), colour = "red") +
+        geom_hline(aes(yintercept = actual_arrival), colour = "blue") +
+        geom_hline(aes(yintercept = scheduled_arrival), colour = "black", lty = 2) +
+        facet_wrap(~stop_sequence,scales="free_y") +
         theme(legend.position = "none")
     print(p)
     grid::grid.locator()

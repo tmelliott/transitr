@@ -121,7 +121,7 @@ namespace Gtfs {
             int N (_vehicle->state ()->size ());
             N = std::min (N, 10);
             Eigen::MatrixXi seg_tt (Eigen::MatrixXi::Zero (N, L));
-            Eigen::MatrixXi dwell_t (Eigen::MatrixXi::Zero (N, M));
+            Eigen::MatrixXi dwell_t (Eigen::MatrixXi::Zero (N, M-1));
 
             Particle* p;
             int l;
@@ -150,15 +150,20 @@ namespace Gtfs {
                 l++;
                 while (l < L)
                 {
+                    // fetch tt from scheduled travel time ...
+                    // tt += _stops.at (l+1).arrival_time - _stops.at (l).departure_time;
                     tt += segs.at (l).segment->sample_travel_time (rng, tt);
                     seg_tt (i, l) = fmin (tt, 60*60*2); // no more than 2 hours!!
                     l++;
                 }
 
-                // first column is zeros
-                int m = find_stop_index (p->get_distance (), &(_stops))+1;
-                for (m; m<M; m++)
+                int m = find_stop_index (p->get_distance (), &(_stops));
+                for (m; m<M-1; m++)
                 {
+                    // first and last column are zeros
+                    if (m == 0) continue;
+                    // if bus has arrived but not departed, (and GPS is at stop),
+                    // then include dwell time, otherwise continue ()
                     if (rng.runif () < gtfs->parameters ()->pr_stop)
                     {
                         dt = -1.0;
@@ -168,10 +173,11 @@ namespace Gtfs {
                                 gtfs->parameters ()->dwell_time;
                         }
                         dwell_t (i, m) = round (gtfs->parameters ()->gamma + dt);
+                        if (i > 0) dwell_t (i, m) += dwell_t (i-1, m);
                     }
                 }
             }
-            // std::cout << "\n" << seg_tt.format (intMat) << "\n";
+            std::cout << "\n" << seg_tt.format (intMat) << "\n";
 
             // Convert segment mat to link mat
             Eigen::MatrixXi link_tt = seg_tt * Hseg;
@@ -180,6 +186,7 @@ namespace Gtfs {
             std::cout << "\n" << dwell_t.format (intMat) << "\n";
 
             _eta_matrix = link_tt + dwell_t;
+            std::cout << "\n" << _eta_matrix.format (intMat) << "\n";
         }
         else
         {
@@ -202,8 +209,8 @@ namespace Gtfs {
 
             std::sort (col_m.data (), col_m.data () + col_m.size ());
             // median
-            etas.at (m).stop_id = _stops.at (m).stop->stop_id ();
-            etas.at (m).estimate = _timestamp + col_m (floor (N/2));
+            etas.at (m+1).stop_id = _stops.at (m).stop->stop_id ();
+            etas.at (m+1).estimate = _timestamp + col_m (floor (N/2));
         }
 
         return etas;
@@ -217,7 +224,7 @@ namespace Gtfs {
             << route ()->route_short_name ()
             << " ("
             << stops ().at (0).arrival_time
-            << ")\n"
+            << ") with " << stops ().size () << " stops\n"
             << "              schedule       eta  delay  (error)";
 
         // std::string
@@ -226,7 +233,7 @@ namespace Gtfs {
             if (arrival_times.at (i).estimate == 0) continue;
 
             std::cout << "\n   + stop "
-                << std::setw (2) << i << ": "
+                << std::setw (2) << (i+1) << ": "
                 << stops ().at (i).arrival_time << "  "
                 << Time (arrival_times.at (i).estimate) << "  "
                 << std::setw (5)
