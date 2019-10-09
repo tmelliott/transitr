@@ -293,6 +293,7 @@ namespace Gtfs
         // std::pair<Eigen::VectorXd, Eigen::MatrixXd> estimate_tt ();
         // std::pair<std::vector<Time>, std::vector<double> > calculate_etas ();
         etavector get_etas ();
+        etavector& get_arrival_times ();
 
         void print_etas ();
 

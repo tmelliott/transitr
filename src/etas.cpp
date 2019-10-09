@@ -202,18 +202,42 @@ namespace Gtfs {
         int N (_eta_matrix.rows ());
 
         Eigen::VectorXi col_m;
+        double wt;
+        double mean_tt;
         for (int m=_stop_index;m<M-1;m++)
         {
             col_m = _eta_matrix.col (m);
             if (col_m.isZero ()) continue;
 
-            std::sort (col_m.data (), col_m.data () + col_m.size ());
+            // std::sort (col_m.data (), col_m.data () + col_m.size ());
             // median
             etas.at (m+1).stop_id = _stops.at (m).stop->stop_id ();
-            etas.at (m+1).estimate = _timestamp + col_m (floor (N/2));
+
+            mean_tt = 0;
+            for (int i=0; i<N; ++i)
+            {
+                if (_vehicle != nullptr && _vehicle->state()->size () == N)
+                {
+                    mean_tt += _vehicle->state ()->at (i).get_weight () * col_m (i);
+                }
+                else
+                {
+                    mean_tt += col_m (i);
+                }
+            }
+            if (_vehicle == nullptr || _vehicle->state()->size () != N)
+                mean_tt /= col_m.size ();
+
+            etas.at (m+1).estimate = _timestamp + round (mean_tt);
+            // etas.at (m+1).estimate = _timestamp + col_m (floor (N/2));
         }
 
         return etas;
+    }
+
+    etavector& Trip::get_arrival_times ()
+    {
+        return arrival_times;
     }
 
     void Trip::print_etas ()

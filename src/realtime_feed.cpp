@@ -286,7 +286,7 @@ void write_trip_updates (Gtfs::trip_map* trips, std::string& file, uint64_t& cur
     for (auto t = trips->begin (); t != trips->end (); ++t)
     {
         if (!t->second.is_active (curtime)) continue;
-        Gtfs::etavector etas (t->second.get_etas ());
+        Gtfs::etavector etas (t->second.get_arrival_times ());
         if (etas.size () == 0) continue;
 
         transit_realtime::FeedEntity* entity = feed.add_entity ();
@@ -346,8 +346,8 @@ void write_trip_updates (Gtfs::trip_map* trips, std::string& file, uint64_t& cur
             if (t->second.vehicle () != nullptr)
             {
                 stu->SetExtension (transit_network::current_delay, t->second.vehicle ()->current_delay ());
-                std::cout << "\n - vehicle " << t->second.vehicle ()->vehicle_id ()
-                    << " has delay of " << t->second.vehicle ()->current_delay () << "s";
+                // std::cout << "\n - vehicle " << t->second.vehicle ()->vehicle_id ()
+                //     << " has delay of " << t->second.vehicle ()->current_delay () << "s";
             }
             transit_network::TimePrediction* tpi = stu->MutableExtension(transit_network::eta);
             tpi->set_estimate (etas.at (si).estimate);

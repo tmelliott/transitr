@@ -3,6 +3,54 @@
 # library(devtools)
 library(tidyverse)
 
+ts2dt <- function(ts) as.POSIXct(ts, origin = "1970-01-01")
+
+# Load the actual arrival times?
+tudir <- file.path("simulations", "archive")
+tufiles <- list.files(tudir, pattern = "^trip_updates.+\\.pb$", full.names = TRUE)
+system.time( transitr:::processEtas(tufiles, "arrivaldata.csv", "at_gtfs.db") )
+
+system.time(
+    arrivaldata <- readr::read_csv(
+        "arrivaldata.csv",
+        col_names = c(
+            "trip_id", "route_id", "vehicle_id", "timestamp", 
+            "stop_sequence", "current_delay", 
+            "arrival_time", "scheduled_arrival"
+        ),
+        col_types = "ccciiiii"
+    )
+)
+arrivaldata <- arrivaldata %>% 
+    mutate(
+        scheduled_arrival = ts2dt(scheduled_arrival),
+        delay = current_delay,
+        arrival_time = scheduled_arrival + delay
+    ) %>%
+    select(trip_id, route_id, vehicle_id, stop_sequence, 
+        scheduled_arrival, arrival_time, delay) %>%
+    unique()
+
+
+tids <- arrivaldata %>% group_by(trip_id) %>%
+    summarize(n_vehicle = length(unique(vehicle_id))) %>%
+    filter(n_vehicle > 1) %>%
+    pull(trip_id)
+
+## quick inspection of the raw arrival data
+egg::ggarrange(
+ggplot(arrivaldata %>% filter(!trip_id %in% tids) %>% arrange(arrival_time), 
+    aes(arrival_time, vehicle_id, group = trip_id, colour = trip_id)) +
+    xlab("time") + theme(legend.position = "none") +
+    geom_path(),
+ggplot(arrivaldata %>% filter(trip_id %in% tids) %>% arrange(arrival_time), 
+    aes(arrival_time, vehicle_id, group = trip_id, colour = trip_id)) +
+    xlab("time") + theme(legend.position = "none") +
+    geom_path(),
+ncol = 2
+)
+
+
 sim <- "sim000"
 etadir <- file.path("simulations", sim, "etas")
 etafiles <- list.files(etadir, pattern = ".pb$", full.names = TRUE)
@@ -14,13 +62,13 @@ system.time(
     etas <- readr::read_csv(
         "etas.csv",
         col_names = c(
-            "trip_id", "route_id", "timestamp", "stop_sequence", 
-            "current_delay", "arrival_time", "scheduled_arrival"
+            "trip_id", "route_id", "vehicle_id", "timestamp", 
+            "stop_sequence", "current_delay", 
+            "arrival_time", "scheduled_arrival"
         ),
-        col_types = "cciiiii"
+        col_types = "ccciiiii"
     )
 )
-ts2dt <- function(ts) as.POSIXct(ts, origin = "1970-01-01")
 etas <- etas %>% 
     mutate(
         timestamp = ts2dt(timestamp),
@@ -30,30 +78,6 @@ etas <- etas %>%
     ) %>%
     select(trip_id, route_id, timestamp, stop_sequence, eta_prediction,
         current_delay)
-
-## Load the actual arrival times?
-# tudir <- file.path("simulations", "archive")
-# tufiles <- list.files(tudir, pattern = "^trip_updates.+\\.pb$", full.names = TRUE)
-# system.time( transitr:::processEtas(tufiles, "arrivaldata.csv", "at_gtfs.db") )
-
-# system.time(
-#     arrivaldata <- readr::read_csv(
-#         "arrivaldata.csv",
-#         col_names = c(
-#             "trip_id", "route_id", "timestamp", "stop_sequence", 
-#             "current_delay", "arrival_time", "scheduled_arrival"
-#         ),
-#         col_types = "cciiiii"
-#     )
-# )
-# arrivaldata <- arrivaldata %>% 
-#     mutate(
-#         scheduled_arrival = ts2dt(scheduled_arrival),
-#         delay = current_delay,
-#         arrival_time = scheduled_arrival + delay
-#     ) %>%
-#     select(trip_id, route_id, stop_sequence, scheduled_arrival, arrival_time, delay) %>%
-#     unique()
 
 
 ## silly plot of the ETAs
@@ -148,6 +172,7 @@ RMSE <- list(
     transitr = sqrt(mean(eta_data$eta^2)),
     gtfs = sqrt(mean(eta_data$gtfs_eta^2, na.rm = TRUE))
 )
+RMSE
 
 
 for (TRIP in unique(eta_data$trip_id)) {

@@ -2377,6 +2377,13 @@ namespace Gtfs
     {
         if (_trip != nullptr)
         {
+            // is there another vehicle assigned to that trip?
+            if (_trip->vehicle () != nullptr && 
+                _trip->vehicle ()->vehicle_id () != _vehicle_id)
+            {
+                throw 50;
+            }
+            
             // std::cout << "\n -> Transfering "
             //     << _vehicle_id << " from "
             //     << _trip->route ()->route_short_name ()
@@ -2491,7 +2498,8 @@ namespace Gtfs
     {
         if (!tu.has_trip ()) return;
         if (!tu.trip ().has_trip_id ()) return;
-        if (_trip != nullptr && _trip->trip_id () != tu.trip ().trip_id ()) return;
+        // this next line is outdated since Events!!
+        // if (_trip != nullptr && _trip->trip_id () != tu.trip ().trip_id ()) return;
         if (!tu.has_timestamp ()) return;
 
         for (auto stu : tu.stop_time_update ())

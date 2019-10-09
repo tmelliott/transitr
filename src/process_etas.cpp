@@ -52,6 +52,7 @@ void processFile (std::string& f, std::fstream& o, Gtfs::Gtfs* gtfs)
             o 
                 << tu->trip ().trip_id () 
                 << "," << tu->trip ().route_id ()
+                << "," << (tu->has_vehicle () ? tu->vehicle ().id () : "")
                 << "," << t
                 << "," << stu.stop_sequence ()
                 << "," << delay

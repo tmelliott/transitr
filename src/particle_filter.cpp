@@ -169,7 +169,17 @@ namespace Gtfs {
                 if (_trip != nullptr) _trip->unload (true);
 
                 // assign trip <--> vehicle
-                set_trip (gtfs->find_trip (e.trip_id));
+                try
+                {
+                    set_trip (gtfs->find_trip (e.trip_id));
+                }
+                catch (int e)
+                {
+                    std::cout << "\n - Another vehicle is already assigned to that trip! Skipping event ...";
+                    current_event_index++;
+                    _trip = nullptr;
+                    continue;
+                }
                 _newtrip = _trip != nullptr;
 
                 _previous_state.clear ();
