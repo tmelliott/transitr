@@ -17,9 +17,9 @@ system.time(
             "trip_id", "route_id", "vehicle_id", "timestamp", 
             "stop_sequence", "current_delay", 
             "arrival_time", "scheduled_arrival",
-            "lower", "upper"
+            "lower", "upper", "type"
         ),
-        col_types = "ccciiiiiii"
+        col_types = "ccciiiiiiif"
     ) %>% 
     mutate(
         scheduled_arrival = ts2dt(scheduled_arrival),
@@ -78,9 +78,9 @@ system.time(
             "trip_id", "route_id", "vehicle_id", "timestamp", 
             "stop_sequence", "current_delay", 
             "arrival_time", "scheduled_arrival",
-            "lower", "upper"
+            "lower", "upper", "type"
         ),
-        col_types = "ccciiiiiii"
+        col_types = "ccciiiiiiif"
     )
 )
 etas <- etas %>% 

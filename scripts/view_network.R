@@ -63,7 +63,7 @@ get_segment_data <- function(routes, route_ids) {
         segments <- segments %>% 
             inner_join(nodes, by = c("node_from" = "node_id"), suffix = c("", "_start")) %>%
             inner_join(nodes, by = c("node_to" = "node_id"), suffix = c("", "_end")) %>%
-            select(road_segment_id, length, node_lat, node_lon, node_lat_end, node_lon_end)
+            select(shape_id, road_segment_id, length, node_lat, node_lon, node_lat_end, node_lon_end)
     }
     if (dbExistsTable(con, "segment_parameters")) {
         segpars <- con %>% tbl("segment_parameters") %>% collect()
@@ -74,6 +74,93 @@ get_segment_data <- function(routes, route_ids) {
     }
     segments
 }
+
+
+tdata <- get_data("simulations/sim000/segment_observations.csv")
+library(tidyverse)
+
+ts2dt <- function(ts) as.POSIXct(ts, origin = "1970-01-01")
+
+# Load the actual arrival times?
+tudir <- file.path("simulations", "archive")
+tufiles <- list.files(tudir, pattern = "^trip_updates.+\\.pb$", full.names = TRUE)
+system.time( transitr:::processEtas(tufiles, "arrivaldata.csv", "at_gtfs.db") )
+
+system.time(
+    arrivaldata <- readr::read_csv(
+        "arrivaldata.csv",
+        col_names = c(
+            "trip_id", "route_id", "vehicle_id", "timestamp", 
+            "stop_sequence", "current_delay", 
+            "arrival_time", "scheduled_arrival",
+            "lower", "upper", "type"
+        ),
+        col_types = "ccciiiiiiif"
+    ) %>% 
+    select(trip_id, route_id, vehicle_id, timestamp, stop_sequence,
+        scheduled_arrival, type) %>%
+    mutate(timestamp = ts2dt(timestamp), scheduled_arrival = ts2dt(scheduled_arrival)) %>%
+    unique() %>%
+
+a2 <- arrivaldata %>%
+    group_by(trip_id) %>%
+    group_modify(~{
+        sseq <- c(1, diff(.x$stop_sequence) < 0) %>% cumsum
+        x2 <- .x[sseq == which.max(table(sseq)), ]
+        vids <- table(x2$vehicle_id)
+        x2 %>% filter(vehicle_id == names(vids)[which.max(vids)]) %>%
+            group_by(route_id, vehicle_id, stop_sequence, scheduled_arrival, type) %>%
+            group_modify(~{
+                if (.y$type == "arrival") 
+                    summarize(.x, timestamp = max(timestamp))
+                else
+                    summarize(.x, timestamp = min(timestamp))
+            })
+    })
+
+a3 <- a2 %>%
+    spread(key = type, value = timestamp)
+
+start <- a3 %>% filter(!is.na(departure)) %>%
+    mutate(segment_index = stop_sequence) %>%
+    select(trip_id, route_id, vehicle_id, segment_index, departure)
+end <- a3 %>% filter(!is.na(arrival) & stop_sequence > 1) %>%
+    mutate(segment_index = stop_sequence - 1) %>%
+    select(trip_id, route_id, vehicle_id, segment_index, arrival)
+
+tt <- inner_join(start, end, by = c("trip_id", "route_id", "vehicle_id", "segment_index")) %>%
+    mutate(travel_time = as.integer(arrival - departure))
+
+## route segments
+segd <- get_segment_data(route_ids = unique(tt$route_id)) %>%
+    select(shape_id, road_segment_id, length)
+
+con <- dbConnect(SQLite(), "at_gtfs.db")
+tsh <- con %>% tbl("trips") %>% 
+    filter(trip_id %in% !!tt$trip_id) %>%
+    select(trip_id, shape_id) %>% 
+    collect()
+dbDisconnect(con)
+
+tt_data <- tt %>% left_join(tsh, by = "trip_id") %>%
+    left_join(segd, by = "shape_id")
+
+segids <- tdata %>% pull(segment_id) %>% table %>% sort %>% tail(6) %>% names
+
+ggplot(tdata %>% filter(segment_id %in% segids), 
+    aes(timestamp, obs_tt)) +
+    geom_point(
+        aes(as.integer(arrival), travel_time),
+        data = tt_data %>% rename(segment_id = road_segment_id) %>%
+             filter(segment_id %in% segids),
+        colour = "orangered"
+    ) +
+    geom_point() +
+    facet_wrap(~segment_id)
+
+
+
+
 
 
 view_segment_states <- function(f = "segment_states.csv", o, segment, n = 12, speed = FALSE, id) {

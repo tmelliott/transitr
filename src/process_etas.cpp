@@ -62,6 +62,7 @@ void processFile (std::string& f, std::fstream& o, Gtfs::Gtfs* gtfs)
                 << "," << trip->stops ().at (stu.stop_sequence ()-1).arrival_time.asUNIX (t)
                 << "," << (hasETA ? std::to_string (stu.GetExtension (transit_network::eta).quantiles (0).value ()) : "")
                 << "," << (hasETA ? std::to_string (stu.GetExtension (transit_network::eta).quantiles (2).value ()) : "")
+                << "," << (hasETA ? "" : (stu.has_arrival () ? "arrival" : "departure"))
                 << "\n";
         }
     }
