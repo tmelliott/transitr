@@ -177,22 +177,36 @@ model(nw)
 # ## --- examine estimation accuracy
 pf_times <- read_csv("particle_travel_times.csv",
     col_types = list(
-        col_integer(), col_factor(ordered = TRUE),
-        col_double(), col_double()
+        col_integer(), col_character(), col_integer(), col_double(), col_double()
     ),
-    col_names = c("timestamp", "segment_index", "time", "weight")) %>%
-    mutate(timestamp = as.POSIXct(timestamp, origin = "1970-01-01"))
+    col_names = c("timestamp", "vehicle_id", "segment_id", "time", "weight")) %>%
+    mutate(
+        timestamp = as.POSIXct(timestamp, origin = "1970-01-01"),
+        segment_id = factor(segment_id, ordered = TRUE)
+    )
 
 ttdat <- tibble(
     segment_index = factor(seq_along(travel_times) - 1, ordered = TRUE),
     time = travel_times
 )
+pf_times_smry <- pf_times %>%
+    group_by(segment_index) %>%
+    summarize(
+        mean_tt = mean(time),
+        # median_tt = median(time),
+        wt_mean_tt = sum(weight * time),
+        # wt_median_tt = weighted.median(time, weight)
+        var = var(time)
+    )
+
 ggplot(pf_times, aes(segment_index, time)) +
-    geom_violin(adjust = 2) +
+    geom_violin(aes(weight = weight), adjust = 2) +
+    geom_point(aes(x = as.integer(segment_index) + 0.3, y = mean_tt),
+        data = pf_times_smry, colour = "red") +
     geom_point(data = ttdat)
 
 ggplot(pf_times, aes(time)) +
-    geom_histogram(aes(y = ..density..)) +
+    geom_histogram(aes(y = ..density.., weight = weight)) +
     geom_vline(aes(xintercept = time, colour = "True travel time (sec)"), 
         data = ttdat) +
     facet_wrap(segment_index~., scales = "free") +

@@ -7,6 +7,9 @@ ignore:
   - "src/gtfs-realtime.pb.cpp"
   - "src/realtime_main.cpp"   # cannot be tested (runs indefinitely)
 
+codecov:
+  branch: develop
+  
 coverage:
   status:
     project:
