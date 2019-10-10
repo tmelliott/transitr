@@ -49,6 +49,8 @@ void processFile (std::string& f, std::fstream& o, Gtfs::Gtfs* gtfs)
             {
                 delay = 0;
             }
+            bool hasETA = stu.HasExtension (transit_network::eta);
+
             o 
                 << tu->trip ().trip_id () 
                 << "," << tu->trip ().route_id ()
@@ -56,8 +58,10 @@ void processFile (std::string& f, std::fstream& o, Gtfs::Gtfs* gtfs)
                 << "," << t
                 << "," << stu.stop_sequence ()
                 << "," << delay
-                << "," << (stu.HasExtension (transit_network::eta) ? stu.GetExtension (transit_network::eta).estimate () : 0)
+                << "," << (hasETA ? stu.GetExtension (transit_network::eta).estimate () : 0)
                 << "," << trip->stops ().at (stu.stop_sequence ()-1).arrival_time.asUNIX (t)
+                << "," << (hasETA ? std::to_string (stu.GetExtension (transit_network::eta).quantiles (0).value ()) : "")
+                << "," << (hasETA ? std::to_string (stu.GetExtension (transit_network::eta).quantiles (2).value ()) : "")
                 << "\n";
         }
     }

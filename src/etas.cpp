@@ -15,29 +15,38 @@ namespace Gtfs {
         // Update trip state
         if (!loaded) load ();
 
-        std::cout << "\n * Updating trip " << _trip_id
-            << " (" << _route->route_short_name () << ")";
+        bool log (false);
+#if VERBOSE > 1
+        log = true;
+#endif
+
+        if (log)
+            std::cout << "\n * Updating trip " << _trip_id
+                << " (" << _route->route_short_name () << ")";
 
         int eta_model (gtfs->parameters ()->eta_model);
-        std::cout
-            << "\n   - Estimating ETAs using Model " << eta_model;
 
-        std::cout << "\n   - Vehicle: "
-            << (_vehicle == nullptr ? "none" : _vehicle->vehicle_id ());
+        if (log)
+        {
+            std::cout
+                << "\n   - Estimating ETAs using Model " << eta_model;
+            std::cout << "\n   - Vehicle: "
+                << (_vehicle == nullptr ? "none" : _vehicle->vehicle_id ());
+        }
 
         if (_vehicle != nullptr)
         {
             // has vehicle been updated?
             if (_vehicle->timestamp () > _timestamp)
             {
-                std::cout << " (updated - ";
+                if (log) std::cout << " (updated - ";
 
                 Event* event = _vehicle->latest_event ();
 
                 _segment_progress = 0;
                 if (event->type == EventType::gps)
                 {
-                    std::cout << "gps";
+                    if (log) std::cout << "gps";
                     _event_type = 0;
                     double d = _vehicle->distance ();
                     _segment_index = find_segment_index (d, &(_shape->segments ()));
@@ -51,44 +60,45 @@ namespace Gtfs {
                     if (event->type == EventType::arrival)
                     {
                         _event_type = 1;
-                        std::cout << "arrival";
+                        if (log) std::cout << "arrival";
                     }
                     else
                     {
                         _event_type = 2;
-                        std::cout << "departure";
+                        if (log) std::cout << "departure";
                     }
 
                     _stop_index = event->stop_index;
                     double d = _stops.at (_stop_index).distance;
                     _segment_index = find_segment_index (d, &(_shape->segments ()));
                 }
-                std::cout << ")";
+                if (log) std::cout << ")";
                 
             }
         }
         _timestamp = t;
 
-        std::cout
-            << "\n   - Event Type: " << _event_type
-            << "\n   - Stop index: " << (_stop_index+1)
-            << " of " << _stops.size ()
-            << "\n   - Segment index: " << (_segment_index+1)
-            << " of " << _shape->segments ().size ()
-            << " (" << (_segment_progress*100) << "%)";
+        if (log)
+            std::cout
+                << "\n   - Event Type: " << _event_type
+                << "\n   - Stop index: " << (_stop_index+1)
+                << " of " << _stops.size ()
+                << "\n   - Segment index: " << (_segment_index+1)
+                << " of " << _shape->segments ().size ()
+                << " (" << (_segment_progress*100) << "%)";
 
         if (_stop_index < _shape->segments ().size ())
         {
-            std::cout << "\n\n * Forecasting ..." << std::endl;
+            if (log) std::cout << "\n\n * Forecasting ..." << std::endl;
             forecast (rng);
 
-            std::cout << "\n\n * Summarising ..." << std::endl;
+            if (log) std::cout << "\n\n * Summarising ..." << std::endl;
             arrival_times = get_etas ();
 
-            print_etas ();
+            if (log) print_etas ();
         }
 
-        std::cout << "\n\n------------------------------------------\n";
+        if (log) std::cout << "\n\n------------------------------------------\n";
 
     }
 
@@ -117,6 +127,21 @@ namespace Gtfs {
 
         if (gtfs->parameters ()->eta_model == 0 && _vehicle != nullptr)
         {
+            // current NW state
+            // std::cout << "\n   == Network state ==";
+            // int i=1;
+            // for (auto seg : segs)
+            // {
+            //     std::cout << "\n ["
+            //         << std::setw (5) << round (seg.distance) << "m into trip, "
+            //         << std::setw (5) << round (seg.segment->length ()) << "m long, "
+            //         << std::setw (3) << round (seg.segment->travel_time ()) << "s travel time ("
+            //         << std::setw (4) << round (seg.segment->uncertainty ()) << "), "
+            //         << std::setw (3) << (_stops.at (i).arrival_time - _stops.at (i-1).departure_time ) << "s scheduled]";
+            //     i++;
+            // }
+            // std::cout << "\n  ===================\n\n";
+
             // iterate over vehicle state
             int N (_vehicle->state ()->size ());
             N = std::min (N, 10);
@@ -127,7 +152,7 @@ namespace Gtfs {
             int l;
             int tt;
             double dt;
-            double v;
+            double v, xx;
             //  vehicle speed too slow?
             bool use_particle_speed (_vehicle->speed () < 2);
             for (int i=0; i<N; i++)
@@ -138,22 +163,32 @@ namespace Gtfs {
                 l = find_segment_index (p->get_distance (), &segs);
                 v = use_particle_speed ? p->get_speed () : 
                     segs.at (l).segment->sample_speed (rng);
-                tt += 
+                xx = segs.at (l).segment->sample_travel_time (rng);
+                tt += fmin(xx, 
                     round ((
                         segs.at (l).distance + 
                         segs.at (l).segment->length () - 
                         p->get_distance ()
-                    ) / p->get_speed ());
+                    ) / p->get_speed ())
+                );
 
-                seg_tt (i, l) = fmin (tt, 60*30); // no more than 30 mins!
+                seg_tt (i, l) = tt; // no slower than 0.5m/s
 
                 l++;
                 while (l < L)
                 {
                     // fetch tt from scheduled travel time ...
-                    // tt += _stops.at (l+1).arrival_time - _stops.at (l).departure_time;
-                    tt += segs.at (l).segment->sample_travel_time (rng, tt);
-                    seg_tt (i, l) = fmin (tt, 60*60*2); // no more than 2 hours!!
+                    if (segs.at (l).segment->uncertainty () == 0 ||
+                        segs.at (l).segment->uncertainty () > 2 * segs.at (l).segment->travel_time ())
+                    {
+                        tt += rng.rnorm () * pow (segs.at (l).segment->prior_travel_time_var (), 0.5) +
+                            (int) (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
+                    }
+                    else
+                    {
+                        tt += segs.at (l).segment->sample_travel_time (rng, tt);
+                    }
+                    seg_tt (i, l) = tt;
                     l++;
                 }
 
@@ -177,16 +212,16 @@ namespace Gtfs {
                     }
                 }
             }
-            std::cout << "\n" << seg_tt.format (intMat) << "\n";
+            // std::cout << "\n" << seg_tt.format (intMat) << "\n";
 
             // Convert segment mat to link mat
             Eigen::MatrixXi link_tt = seg_tt * Hseg;
 
-            std::cout << "\n" << link_tt.format (intMat) << "\n";
-            std::cout << "\n" << dwell_t.format (intMat) << "\n";
+            // std::cout << "\n" << link_tt.format (intMat) << "\n";
+            // std::cout << "\n" << dwell_t.format (intMat) << "\n";
 
             _eta_matrix = link_tt + dwell_t;
-            std::cout << "\n" << _eta_matrix.format (intMat) << "\n";
+            // std::cout << "\n" << _eta_matrix.format (intMat) << "\n";
         }
         else
         {
@@ -202,34 +237,81 @@ namespace Gtfs {
         int N (_eta_matrix.rows ());
 
         Eigen::VectorXi col_m;
-        double wt;
-        double mean_tt;
+        std::vector<std::tuple<double, double> > tt_wt (N);
+
+        double tt_mean, tt_lower, tt_upper;
+        uint64_t ts;
         for (int m=_stop_index;m<M-1;m++)
         {
             col_m = _eta_matrix.col (m);
             if (col_m.isZero ()) continue;
 
-            // std::sort (col_m.data (), col_m.data () + col_m.size ());
-            // median
             etas.at (m+1).stop_id = _stops.at (m).stop->stop_id ();
-
-            mean_tt = 0;
             for (int i=0; i<N; ++i)
             {
                 if (_vehicle != nullptr && _vehicle->state()->size () == N)
                 {
-                    mean_tt += _vehicle->state ()->at (i).get_weight () * col_m (i);
+                    tt_wt.at (i) = std::make_tuple (
+                        col_m (i),
+                        _vehicle->state ()->at (i).get_weight ()
+                    );
                 }
                 else
                 {
-                    mean_tt += col_m (i);
+                    tt_wt.at (i) = std::make_tuple (col_m (i), pow(N, -1));
                 }
             }
-            if (_vehicle == nullptr || _vehicle->state()->size () != N)
-                mean_tt /= col_m.size ();
 
-            etas.at (m+1).estimate = _timestamp + round (mean_tt);
-            // etas.at (m+1).estimate = _timestamp + col_m (floor (N/2));
+            tt_mean = std::accumulate (tt_wt.begin (), tt_wt.end (), 0.0, 
+                [](double a, std::tuple<double, double>& b)
+                {
+                    return a + std::get<0> (b) * std::get<1> (b);
+                });
+
+            ts = (_vehicle != nullptr && _vehicle->state ()->size () == N) ?
+                _vehicle->timestamp () : _timestamp;
+            etas.at (m+1).estimate = ts + round (tt_mean);
+
+            std::sort (tt_wt.begin (), tt_wt.end (), 
+                [](std::tuple<double, double>& a, std::tuple<double, double>& b)
+                {
+                    return std::get<0> (a) < std::get<0> (b);
+                });
+
+            // then the quantiles
+            int i=0;
+            double sum_wt = 0.0;
+            // 2.5% quantile
+            while (sum_wt < 0.025)
+            {
+                sum_wt += std::get<1> (tt_wt.at (i));
+                i++;
+            }
+            etas.at (m+1).quantiles.emplace_back (
+                0.025, 
+                ts + round (std::get<0> (tt_wt.at (i-1)))
+            );
+            // 50% quantile (median)
+            while (sum_wt < 0.5)
+            {
+                sum_wt += std::get<1> (tt_wt.at (i));
+                i++;
+            }
+            etas.at (m+1).quantiles.emplace_back (
+                0.5, 
+                ts + round (std::get<0> (tt_wt.at (i-1)))
+            );
+            // 97.5% quantile
+            while (sum_wt < 0.975)
+            {
+                sum_wt += std::get<1> (tt_wt.at (i));
+                i++;
+            }
+            if (i == N) i = i-1;
+            etas.at (m+1).quantiles.emplace_back (
+                0.975, 
+                ts + round (std::get<0> (tt_wt.at (i)))
+            );
         }
 
         return etas;
@@ -249,7 +331,7 @@ namespace Gtfs {
             << " ("
             << stops ().at (0).arrival_time
             << ") with " << stops ().size () << " stops\n"
-            << "              schedule       eta  delay  (error)";
+            << "              schedule       eta  delay  (prediction interval)";
 
         // std::string
         for (int i=0; i<stops ().size (); i++)
@@ -263,7 +345,9 @@ namespace Gtfs {
                 << std::setw (5)
                 << (arrival_times.at (i).estimate - stops ().at (i).arrival_time)
                 << "  ("
-                // << uncertainty.at (i)
+                << Time (arrival_times.at (i).quantiles.at (0).time)
+                << " - "
+                << Time (arrival_times.at (i).quantiles.at (2).time)
                 << ")";
         }
     }

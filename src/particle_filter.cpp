@@ -298,7 +298,7 @@ namespace Gtfs {
                     << _trip->stops ().at (_stop_index).distance << "m)";
 #endif
             }
-            std::cout << "\n - the vehicle's current delay is " << _current_delay << "s";
+            // std::cout << "\n - the vehicle's current delay is " << _current_delay << "s";
 
             if (!_skip_observation)
             {
@@ -903,8 +903,12 @@ namespace Gtfs {
             // add noise once per iteration, 
             // or when passing segment/stop
             double vel = speed + rng.rnorm () * vehicle->system_noise ();
+            int nn = 100;
             while (vel <= 0 || vel > 30) 
+            {
                 vel = speed + rng.rnorm () * vehicle->system_noise ();
+                if (nn-- == 0) vel = rng.runif () * 30.0;
+            }
             speed = vel;
 #if VERBOSE > 3
             std::cout << speed;
@@ -967,16 +971,6 @@ namespace Gtfs {
                     segment_index++;
                     next_node = &(nodes.at (segment_index + 1));
 
-                    // adjust speed
-//                     if (segments.at (segment_index).segment->travel_time () > 0 &
-//                         segments.at (segment_index).segment->uncertainty () > 0)
-//                     {
-//                         speed = segments.at (segment_index).segment->sample_speed (rng);
-// #if VERBOSE > 3
-//                         std::cout << "\n -> setting vehicle speed to " <<
-//                             speed << " based on segment state";
-// #endif
-//                     }
 
                     bool is_stop;
                     is_stop = next_node->node->node_type () == 0;
@@ -985,6 +979,32 @@ namespace Gtfs {
                         stop_index++;
                         next_stop = &(stops.at (stop_index + 1));
                     }
+
+                    // adjust speed
+                    if (segments.at (segment_index).segment->travel_time () > 0 &
+                        segments.at (segment_index).segment->uncertainty () > 0 &
+                        segments.at (segment_index).segment->uncertainty () < segments.at (segment_index).segment->length () * 2)
+                    {
+                        speed = segments.at (segment_index).segment->sample_speed (rng);
+                    }
+                    else
+                    {
+                        // set speed to scheduled speed +- some noise
+                        if (next_node->node->node_type () == 0 && 
+                            nodes.at (segment_index).node->node_type () == 0)
+                        {
+                            int sched_tt = stops.at (stop_index + 1).arrival_time - 
+                                stops.at (stop_index).departure_time;
+                            // std::cout << "\n - inter-stop time = " << sched_tt << "s";
+                            // std::cout << "\n - length = " << segments.at (segment_index).segment->length () << "m";
+                            speed = segments.at (segment_index).segment->length () / sched_tt;
+                            // std::cout << "\n - speed = " << speed;
+                        }
+                    }
+#if VERBOSE > 3
+                    std::cout << "\n -> setting vehicle speed to " <<
+                        speed << " based on segment state";
+#endif
 
 #if VERBOSE > 3
                     std::cout << "\n   -> arrival at node " << (segment_index);

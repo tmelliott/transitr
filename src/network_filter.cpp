@@ -16,7 +16,7 @@ namespace Gtfs {
 
         // also specify the "between vehicle" variabilty
         if (_state_var == 0)
-            _state_var = exp (-1.2 + 1.2 * log (min_tt));
+            _state_var = pow (exp (-2.44 + 1.4 * log (min_tt)), 2);
         
         _measurement_error = params->nw_measurement_error;
     }
@@ -144,15 +144,14 @@ namespace Gtfs {
             return _length / (rng.rnorm () * 25.0 + 5.0); // [5, 30m/s]
         }
 
-        auto x = predict (0); //delta);
+        auto x = predict (delta);
+        double var = fmin (x.second (0, 0), _prior_travel_time_var * 2);
 
         // truncated normal distribution
         double tt (-1.0);
         int tries (100);
         while ((tt < min_tt || tt > _length*5) && tries > 0) {
-            tt = rng.rnorm () * 
-                (pow (x.second (0, 0), 0.5) + _state_var) + 
-                x.first (0);
+            tt = rng.rnorm () * (pow (var, 0.5) + _state_var) + x.first (0);
             tries--;
         }
         return round (fmax (0.0, tt));

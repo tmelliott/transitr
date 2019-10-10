@@ -1590,7 +1590,7 @@ namespace Gtfs
         if (sqlite3_step (stmt) == SQLITE_ROW)
         {
             _system_noise = sqlite3_column_double (stmt, 0);
-            _state_var = sqlite3_column_double (stmt, 1);
+            _state_var = pow (sqlite3_column_double (stmt, 1), 2);
             _prior_travel_time = sqlite3_column_double (stmt, 2);
             _prior_travel_time_var = sqlite3_column_double (stmt, 3);
         }
@@ -1681,7 +1681,7 @@ namespace Gtfs
     void Segment::push_data (int time, double err, uint64_t ts)
     {
         if (!loaded) load ();
-        if (time < min_tt) return;
+        if (time < min_tt || time > _length) return;
         std::lock_guard<std::mutex> lk (data_mutex);
         _data.emplace_back ((int) round (time), fmax (min_err, err));
 
