@@ -175,6 +175,8 @@ namespace Gtfs {
                 seg_tt (i, l) = tt; // no slower than 0.5m/s
 
                 l++;
+                double rho, X, Y, x, sig1, sig2, mean, var;
+                x = tt;
                 while (l < L)
                 {
                     // fetch tt from scheduled travel time ...
@@ -186,7 +188,50 @@ namespace Gtfs {
                     }
                     else
                     {
-                        tt += segs.at (l).segment->sample_travel_time (rng, tt);
+                        /**
+                         * Add correlation of rho to the segments,
+                         * (X,Y) ~ Normal([mu1, mu2], [[sig1,rho], [rho,sig2]) ->
+                         * Y|X=x ~ Normal(mu1 + sig1/sig2 * rho * (x-mu1), (1-rho) * sig2^2)
+                         *
+                         * TODO: if previous segment state isn't ok, just use current segment state
+                         */
+                        if (segs.at (l-1).segment->uncertainty () > 0 &&
+                            segs.at (l-1).segment->uncertainty () < 2 * segs.at (l-1).segment->travel_time ())
+                        {
+                            rho = 0.1;
+                            X = segs.at (l-1).segment->travel_time ();
+                            sig1 = pow (segs.at (l-1).segment->uncertainty (), 0.5);
+                            Y = segs.at (l).segment->travel_time ();
+                            sig2 = pow (segs.at (l).segment->uncertainty (), 0.5);
+                        
+                            mean = Y + sig1 / sig2 * rho * (x - X);
+                            var = (1 - pow (rho, 2)) * pow (sig1, 2);
+                        }
+                        else
+                        {
+                            mean = Y;
+                            var = sig2;
+                        }
+                        x = -1;
+                        int n = 100;
+                        while (x < segs.at (l).segment->length () / 30 | 
+                               x > segs.at (l).segment->length() * 2)
+                        {
+                            x = rng.rnorm () * pow (var, 0.5) + mean;
+                            if (n-- == 50)
+                            {
+                                mean = segs.at (l).segment->travel_time ();
+                                var = segs.at (l).segment->uncertainty ();
+                            }
+                            if (n-- == 0)
+                            {
+                                x = segs.at (l).segment->travel_time ();
+                            }
+                        }
+                        
+                        tt += x;
+
+                        // tt += segs.at (l).segment->sample_travel_time (rng, tt);
                     }
                     seg_tt (i, l) = tt;
                     l++;

@@ -86,7 +86,7 @@ tudir <- file.path("simulations", "archive")
 tufiles <- list.files(tudir, pattern = "^trip_updates.+\\.pb$", full.names = TRUE)
 system.time( transitr:::processEtas(tufiles, "arrivaldata.csv", "at_gtfs.db") )
 
-system.time(
+# system.time(
     arrivaldata <- readr::read_csv(
         "arrivaldata.csv",
         col_names = c(
@@ -100,7 +100,7 @@ system.time(
     select(trip_id, route_id, vehicle_id, timestamp, stop_sequence,
         scheduled_arrival, type) %>%
     mutate(timestamp = ts2dt(timestamp), scheduled_arrival = ts2dt(scheduled_arrival)) %>%
-    unique() %>%
+    unique() 
 
 a2 <- arrivaldata %>%
     group_by(trip_id) %>%

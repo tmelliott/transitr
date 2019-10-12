@@ -179,8 +179,8 @@ eta_data <- etas %>% select(-current_delay) %>%
 
 ## A VERY VERY BASIC RMSE THING
 RMSE <- list(
-    transitr = sqrt(mean(eta_data$eta^2)),
-    ci_cov = mean(with(eta_data, actual_arrival > lower_prediction & actual_arrival < upper_prediction)),
+    transitr = sqrt(mean(eta_data$eta^2, na.rm = TRUE)),
+    ci_cov = mean(with(eta_data, actual_arrival > lower_prediction & actual_arrival < upper_prediction), na.rm = TRUE),
     gtfs = sqrt(mean(eta_data$gtfs_eta^2, na.rm = TRUE))
 )
 RMSE
@@ -189,7 +189,7 @@ range(eta_data$timestamp)
 
 for (TRIP in unique(eta_data$trip_id)) {
     routedata <- eta_data %>% 
-        filter(trip_id == TRIP & timestamp > as.POSIXct("2019-08-19 10:00:00"))
+        filter(trip_id == TRIP & !is.na(eta) & timestamp > as.POSIXct("2019-08-19 10:00:00"))
     if (nrow(routedata) == 0) next()
     p <- ggplot(routedata %>% filter(time_until_arrival > 0), 
         aes(timestamp)) +
