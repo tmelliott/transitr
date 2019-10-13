@@ -191,21 +191,19 @@ namespace Gtfs {
                         /**
                          * Add correlation of rho to the segments,
                          * (X,Y) ~ Normal([mu1, mu2], [[sig1,rho], [rho,sig2]) ->
-                         * Y|X=x ~ Normal(mu1 + sig1/sig2 * rho * (x-mu1), (1-rho) * sig2^2)
-                         *
-                         * TODO: if previous segment state isn't ok, just use current segment state
+                         * Y|X=x ~ Normal(mu2 + sig2/sig1 * rho * (x-mu1), (1-rho^2) * sig2^2)
                          */
                         if (segs.at (l-1).segment->uncertainty () > 0 &&
                             segs.at (l-1).segment->uncertainty () < 2 * segs.at (l-1).segment->travel_time ())
                         {
-                            rho = 0.1;
+                            rho = 0.5;
                             X = segs.at (l-1).segment->travel_time ();
                             sig1 = pow (segs.at (l-1).segment->uncertainty (), 0.5);
                             Y = segs.at (l).segment->travel_time ();
                             sig2 = pow (segs.at (l).segment->uncertainty (), 0.5);
                         
-                            mean = Y + sig1 / sig2 * rho * (x - X);
-                            var = (1 - pow (rho, 2)) * pow (sig1, 2);
+                            mean = Y + sig2 / sig1 * rho * (x - X);
+                            var = (1 - pow (rho, 2)) * pow (sig2, 2);
                         }
                         else
                         {

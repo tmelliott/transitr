@@ -189,7 +189,7 @@ range(eta_data$timestamp)
 
 for (TRIP in unique(eta_data$trip_id)) {
     routedata <- eta_data %>% 
-        filter(trip_id == TRIP & !is.na(eta) & timestamp > as.POSIXct("2019-08-19 10:00:00"))
+        filter(trip_id == TRIP & !is.na(eta))# & timestamp > as.POSIXct("2019-08-19 10:00:00"))
     if (nrow(routedata) == 0) next()
     p <- ggplot(routedata %>% filter(time_until_arrival > 0), 
         aes(timestamp)) +
