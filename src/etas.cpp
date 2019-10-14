@@ -26,6 +26,20 @@ namespace Gtfs {
 
         int eta_model (gtfs->parameters ()->eta_model);
 
+        // Initalize?
+        if (_eta_state.size () == 1)
+        {
+            Time* at;
+            // needs initialization
+            _eta_state.resize (_stops.size ());
+            for (int m=0; m<_stops.size (); ++m)
+            {
+                at = &(m == 0 ? _stops.at (m).departure_time : _stops.at (m).arrival_time);
+                // once prior variance is known, place here
+                _eta_state.at (m) = std::make_tuple (at->asUNIX (t), 30*m);
+            }
+        }
+
         if (log)
         {
             std::cout
@@ -76,6 +90,7 @@ namespace Gtfs {
                 
             }
         }
+        _delta = (_timestamp > 0 ? t - _timestamp : 0);
         _timestamp = t;
 
         if (log)
@@ -196,7 +211,7 @@ namespace Gtfs {
                         if (segs.at (l-1).segment->uncertainty () > 0 &&
                             segs.at (l-1).segment->uncertainty () < 2 * segs.at (l-1).segment->travel_time ())
                         {
-                            rho = 0.5;
+                            rho = 0.1;
                             X = segs.at (l-1).segment->travel_time ();
                             sig1 = pow (segs.at (l-1).segment->uncertainty (), 0.5);
                             Y = segs.at (l).segment->travel_time ();
@@ -207,8 +222,8 @@ namespace Gtfs {
                         }
                         else
                         {
-                            mean = Y;
-                            var = sig2;
+                            mean = segs.at (l).segment->travel_time ();
+                            var = segs.at (l).segment->uncertainty ();
                         }
                         x = -1;
                         int n = 100;
@@ -226,6 +241,9 @@ namespace Gtfs {
                                 x = segs.at (l).segment->travel_time ();
                             }
                         }
+                        
+                        // add between-vehicle noise (this is definitely segment independent)
+                        x += rng.rnorm () * segs.at (l).segment->state_var ();
                         
                         tt += x;
 
@@ -282,7 +300,8 @@ namespace Gtfs {
         Eigen::VectorXi col_m;
         std::vector<std::tuple<double, double> > tt_wt (N);
 
-        double tt_mean, tt_lower, tt_upper;
+        double tt_mean, tt_var, tt_lower, tt_upper;
+        double X, P, y, S, K;
         uint64_t ts;
         for (int m=_stop_index;m<M-1;m++)
         {
@@ -311,50 +330,121 @@ namespace Gtfs {
                     return a + std::get<0> (b) * std::get<1> (b);
                 });
 
-            ts = (_vehicle != nullptr && _vehicle->state ()->size () == N) ?
-                _vehicle->timestamp () : _timestamp;
-            etas.at (m+1).estimate = ts + round (tt_mean);
-
-            std::sort (tt_wt.begin (), tt_wt.end (), 
-                [](std::tuple<double, double>& a, std::tuple<double, double>& b)
+            tt_var = std::accumulate (tt_wt.begin (), tt_wt.end (), 0.0,
+                [&tt_mean](double a, std::tuple<double, double>& b)
                 {
-                    return std::get<0> (a) < std::get<0> (b);
+                    return a + pow (std::get<0> (b) - tt_mean, 2) * std::get<1> (b);
                 });
 
-            // then the quantiles
-            int i=0;
-            double sum_wt = 0.0;
-            // 2.5% quantile
-            while (sum_wt < 0.025)
+            ts = (_vehicle != nullptr && _vehicle->state ()->size () == N) ?
+                _vehicle->timestamp () : _timestamp;
+                
+            /**
+             * A note on indices:
+             *
+             * _eta_matrix is M-1 length, so EXCLUDES the first stop.
+             * etas/_eta_state are M length, so include first stop
+             */
+            
+            // update the estimate state
+            if (true) 
             {
-                sum_wt += std::get<1> (tt_wt.at (i));
-                i++;
+                // update the state using the mean and var ...
+                X = std::get<0> (_eta_state.at (m+1)) - _timestamp;
+                P = std::get<1> (_eta_state.at (m+1));
+                if (X > 2*60*60)
+                {
+                    // reset X because it's going stupid!
+                    X = _stops.at (m+1).departure_time.asUNIX (_timestamp) - _timestamp;
+                }
+                if (P == 0)
+                {
+                    P = abs (X);
+                }
+
+                // predict, using noise? uncertainty doesn't really 'change' over time
+                std::cout << "\n----\n stop = " << m+1 
+                    << " state is (" << X << ", " << P << ")";
+
+                X = X;
+                P = P + _delta;
+                std::cout << "\n prediction = ("
+                    << X << ", " << P << ")";
+
+                std::cout << "\n observe [" << tt_mean << ", " << tt_var << "]";
+                // KF update
+                y = tt_mean - X;
+                S = P + (tt_var == 0 ? pow (tt_mean, 0.5) : tt_var);
+                K = P / S;
+                X += K * y;
+                P = (1 - K) * P;
+
+                std::cout << "\n updated state is (" << X << ", " << P << ")";
+
+                // insert back into state
+                _eta_state.at (m+1) = std::make_tuple (_timestamp + round (X), P);
+
+                etas.at (m+1).estimate = std::get<0> (_eta_state.at (m+1));
+                etas.at (m+1).quantiles.emplace_back (
+                    0.025, 
+                    std::get<0> (_eta_state.at (m+1)) -
+                        std::ceil (1.96 * pow (std::get<1> (_eta_state.at (m+1)), 0.5))
+                );
+                etas.at (m+1).quantiles.emplace_back (
+                    0.5, 
+                    std::get<0> (_eta_state.at (m+1))
+                );
+                etas.at (m+1).quantiles.emplace_back (
+                    0.975, 
+                    std::get<0> (_eta_state.at (m+1)) +
+                        std::ceil (1.96 * pow (std::get<1> (_eta_state.at (m+1)), 0.5))
+                );
             }
-            etas.at (m+1).quantiles.emplace_back (
-                0.025, 
-                ts + round (std::get<0> (tt_wt.at (i-1)))
-            );
-            // 50% quantile (median)
-            while (sum_wt < 0.5)
+            else
             {
-                sum_wt += std::get<1> (tt_wt.at (i));
-                i++;
+                etas.at (m+1).estimate = ts + round (tt_mean);
+
+                std::sort (tt_wt.begin (), tt_wt.end (), 
+                    [](std::tuple<double, double>& a, std::tuple<double, double>& b)
+                    {
+                        return std::get<0> (a) < std::get<0> (b);
+                    });
+
+                // then the quantiles
+                int i=0;
+                double sum_wt = 0.0;
+                // 2.5% quantile
+                while (sum_wt < 0.025)
+                {
+                    sum_wt += std::get<1> (tt_wt.at (i));
+                    i++;
+                }
+                etas.at (m+1).quantiles.emplace_back (
+                    0.025, 
+                    ts + round (std::get<0> (tt_wt.at (i-1)))
+                );
+                // 50% quantile (median)
+                while (sum_wt < 0.5)
+                {
+                    sum_wt += std::get<1> (tt_wt.at (i));
+                    i++;
+                }
+                etas.at (m+1).quantiles.emplace_back (
+                    0.5, 
+                    ts + round (std::get<0> (tt_wt.at (i-1)))
+                );
+                // 97.5% quantile
+                while (sum_wt < 0.975)
+                {
+                    sum_wt += std::get<1> (tt_wt.at (i));
+                    i++;
+                }
+                if (i == N) i = i-1;
+                etas.at (m+1).quantiles.emplace_back (
+                    0.975, 
+                    ts + round (std::get<0> (tt_wt.at (i)))
+                );
             }
-            etas.at (m+1).quantiles.emplace_back (
-                0.5, 
-                ts + round (std::get<0> (tt_wt.at (i-1)))
-            );
-            // 97.5% quantile
-            while (sum_wt < 0.975)
-            {
-                sum_wt += std::get<1> (tt_wt.at (i));
-                i++;
-            }
-            if (i == N) i = i-1;
-            etas.at (m+1).quantiles.emplace_back (
-                0.975, 
-                ts + round (std::get<0> (tt_wt.at (i)))
-            );
         }
 
         return etas;

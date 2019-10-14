@@ -925,6 +925,10 @@ namespace Gtfs
         _arrival_times.resize (_stops.size (), 0);
         _departure_times.resize (_stops.size (), 0);
 
+        // initialize from schedule
+        _eta_state.resize (1, std::make_tuple (0, 0.0));
+
+
         _timestamp = 0;
         _stop_index = 0;
         _segment_index = 0;

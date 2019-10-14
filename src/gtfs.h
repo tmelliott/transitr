@@ -233,6 +233,7 @@ namespace Gtfs
         Time _start_time;
         Eigen::MatrixXi _eta_matrix;
         etavector arrival_times;
+        std::vector<std::tuple<uint64_t, double> > _eta_state;
         // std::vector<int> _link_times;
         // std::vector<int> _dwell_times;
 
@@ -241,6 +242,7 @@ namespace Gtfs
         // Eigen::MatrixXd Hseg;   // transform segment travel times to stop tts
         
         uint64_t _timestamp;
+        int _delta;
         int _stop_index;
         int _segment_index;
         double _segment_progress;

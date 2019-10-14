@@ -187,6 +187,7 @@ RMSE
 
 range(eta_data$timestamp)
 
+q("no")
 for (TRIP in unique(eta_data$trip_id)) {
     routedata <- eta_data %>% 
         filter(trip_id == TRIP & !is.na(eta))# & timestamp > as.POSIXct("2019-08-19 10:00:00"))
