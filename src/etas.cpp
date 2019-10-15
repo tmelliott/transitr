@@ -383,15 +383,16 @@ namespace Gtfs {
 #endif
 
                 // KF update
-                if (tt_var == 0)
-                {
-                    tt_var = tt_mean;
-                }
-                else
-                {
-                    tt_var += tt_mean;
-                    // tt_var += pow (X - tt_mean, 2);
-                }
+                // if (tt_var == 0)
+                // {
+                //     tt_var = tt_mean;
+                // }
+                // else
+                // {
+                //     tt_var += tt_mean;
+                //     // tt_var += pow (X - tt_mean, 2);
+                // }
+                tt_var += pow (tt_mean, 2);
                 y = tt_mean - X;
                 S = P + tt_var;
                 K = P / S;
