@@ -399,7 +399,7 @@ namespace Gtfs {
                 X += K * y;
                 P = (1 - K) * P;
 
-                P += pow (y, 2);
+                // P += pow (y, 2);
 
 #if SIMULATION
                 fout << "," << X << "," << P << "\n";
