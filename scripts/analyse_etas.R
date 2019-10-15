@@ -8,7 +8,7 @@ ts2dt <- function(ts) as.POSIXct(ts, origin = "1970-01-01")
 # Load the actual arrival times?
 tudir <- file.path("simulations", "archive")
 tufiles <- list.files(tudir, pattern = "^trip_updates.+\\.pb$", full.names = TRUE)
-system.time( transitr:::processEtas(tufiles, "arrivaldata.csv", "at_gtfs.db") )
+# system.time( transitr:::processEtas(tufiles, "arrivaldata.csv", "at_gtfs.db") )
 
 system.time(
     arrivaldata <- readr::read_csv(
@@ -187,8 +187,9 @@ RMSE
 
 range(eta_data$timestamp)
 
-q("no")
+# q("no")
 for (TRIP in unique(eta_data$trip_id)) {
+    print(TRIP)
     routedata <- eta_data %>% 
         filter(trip_id == TRIP & !is.na(eta))# & timestamp > as.POSIXct("2019-08-19 10:00:00"))
     if (nrow(routedata) == 0) next()
@@ -203,6 +204,83 @@ for (TRIP in unique(eta_data$trip_id)) {
     print(p)
     grid::grid.locator()
 }
+
+
+## RAW eta state data
+raw <- readr::read_csv(
+        "simulations/sim000/eta_state.csv",
+        col_names = c(
+            "trip_id", "stop_sequence", "timestamp",
+            "X", "P", "Xhat", "Phat", "Z", "E", "Xnew", "Pnew"
+        ),
+        col_types = "ciinnnnnnnn"
+    ) %>% filter(X < 2*60*60) %>%
+    mutate(
+        timestamp = ts2dt(timestamp),
+        stop_sequence = stop_sequence + 1
+    )
+max(raw$timestamp)
+
+## pick a trip
+tid <- "1141155994-20190806160740_v82.21"
+tid <- "1141156213-20190806160740_v82.21"
+tid <- "1141156521-20190806160740_v82.21"
+trip_data <- raw %>% filter(trip_id == tid)
+arr_data <- arrivaldata %>% filter(trip_id == tid)
+
+get_ci <- function(x, p, which = c("lower", "upper"), q = 0.95, ts) {
+    which <- match.arg(which)
+    q <- (1 - q) / 2
+    if (which == "upper") q <- 1 - q
+    z <- qnorm(q, x, sqrt(p))
+    if (missing(ts)) return(z)
+    t <- as.POSIXct(ts + z, origin = "1970-01-01")
+    if (which == "upper") t <- t + 60
+    as.POSIXct(
+        paste(
+            format(t, "%Y-%m-%d %H:"),
+            as.integer(format(t, "%M")),
+            ":00"
+        )
+    )
+}
+
+ggplot(trip_data, aes(timestamp)) +
+    geom_hline(aes(x = NULL, y = NULL, yintercept = arrival_time),
+        data = arr_data) +
+    geom_vline(aes(x = NULL, y = NULL, xintercept = arrival_time),
+        data = arr_data) +
+    geom_hline(aes(x = NULL, y = NULL, yintercept = scheduled_arrival),
+        data = arr_data, lty = 3) +
+    geom_linerange(
+        aes(
+            x = timestamp,
+            # y = timestamp + Z,
+            ymin = timestamp + get_ci(Z, E, "lower"),
+            ymax = timestamp + get_ci(Z, E, "upper")
+        ), 
+        colour = "red"
+    ) +
+    geom_linerange(
+        aes(
+            x = timestamp+5,
+            # y = timestamp + Xhat,
+            ymin = timestamp + get_ci(Xhat, Phat, "lower"),
+            ymax = timestamp + get_ci(Xhat, Phat, "upper")
+        ), 
+        colour = "blue"
+    ) +
+    geom_linerange(
+        aes(
+            x = timestamp+10,
+            # y = NULL,#timestamp + Xnew,
+            ymin = get_ci(Xnew, Pnew, "lower", ts = timestamp),
+            ymax = get_ci(Xnew, Pnew, "upper", ts = timestamp)
+        )
+    ) +
+    facet_wrap(~stop_sequence, scale = "free_y")
+
+
 
     # p <- ggplot(routedata, aes(time_until_arrival/60, 
     #     as.integer(arrival_time - actual_arrival)/60)) +

@@ -36,7 +36,7 @@ namespace Gtfs {
             {
                 at = &(m == 0 ? _stops.at (m).departure_time : _stops.at (m).arrival_time);
                 // once prior variance is known, place here
-                _eta_state.at (m) = std::make_tuple (at->asUNIX (t), 30*m);
+                _eta_state.at (m) = std::make_tuple (at->asUNIX (t), 30);
             }
         }
 
@@ -211,7 +211,7 @@ namespace Gtfs {
                         if (segs.at (l-1).segment->uncertainty () > 0 &&
                             segs.at (l-1).segment->uncertainty () < 2 * segs.at (l-1).segment->travel_time ())
                         {
-                            rho = 0.1;
+                            rho = 0.8;
                             X = segs.at (l-1).segment->travel_time ();
                             sig1 = pow (segs.at (l-1).segment->uncertainty (), 0.5);
                             Y = segs.at (l).segment->travel_time ();
@@ -375,18 +375,30 @@ namespace Gtfs {
 #endif
 
                 X = X;
-                P = P + _delta;
+                // 'volatility', how far to go?
+                P = P + _delta;// + pow (X - tt_mean, 2);
 
 #if SIMULATION
                 fout << "," << X << "," << P << "," << tt_mean << "," << tt_var;
 #endif
 
                 // KF update
+                if (tt_var == 0)
+                {
+                    tt_var = tt_mean;
+                }
+                else
+                {
+                    tt_var += tt_mean;
+                    // tt_var += pow (X - tt_mean, 2);
+                }
                 y = tt_mean - X;
-                S = P + (tt_var == 0 ? pow (tt_mean, 0.5) : tt_var);
+                S = P + tt_var;
                 K = P / S;
                 X += K * y;
                 P = (1 - K) * P;
+
+                P += pow (y, 2);
 
 #if SIMULATION
                 fout << "," << X << "," << P << "\n";
