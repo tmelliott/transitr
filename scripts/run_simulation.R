@@ -29,6 +29,7 @@ dir.create("modeleval")
 if (file.exists("segment_states.csv")) unlink("segment_states.csv")
 if (file.exists("segment_observations.csv")) unlink("segment_observations.csv")
 if (file.exists("particle_travel_times.csv")) unlink("particle_travel_times.csv")
+if (file.exists("eta_state.csv")) unlink("eta_state.csv")
 
 nw <- load_gtfs("../../at_gtfs.db", output = "etas.pb") %>%
     realtime_feed(c(sprintf("http://localhost:3000/%s/vehicle_positions", ca[1]), 

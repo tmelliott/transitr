@@ -300,6 +300,13 @@ namespace Gtfs {
         Eigen::VectorXi col_m;
         std::vector<std::tuple<double, double> > tt_wt (N);
 
+#if SIMULATION
+        // Want to write them to a file (for research)
+        std::ofstream fout;
+        fout.open ("eta_state.csv", std::ofstream::app);
+        // trip_id, stop_id, timestamp, state, var, pred_state, pred_var, obs, obs_err, final_state, final_var
+#endif
+
         double tt_mean, tt_var, tt_lower, tt_upper;
         double X, P, y, S, K;
         uint64_t ts;
@@ -362,16 +369,18 @@ namespace Gtfs {
                     P = abs (X);
                 }
 
-                // predict, using noise? uncertainty doesn't really 'change' over time
-                std::cout << "\n----\n stop = " << m+1 
-                    << " state is (" << X << ", " << P << ")";
+#if SIMULATION
+                fout << _trip_id << "," << (m+1) << "," << _timestamp
+                    << "," << X << "," << P;
+#endif
 
                 X = X;
                 P = P + _delta;
-                std::cout << "\n prediction = ("
-                    << X << ", " << P << ")";
 
-                std::cout << "\n observe [" << tt_mean << ", " << tt_var << "]";
+#if SIMULATION
+                fout << "," << X << "," << P << "," << tt_mean << "," << tt_var;
+#endif
+
                 // KF update
                 y = tt_mean - X;
                 S = P + (tt_var == 0 ? pow (tt_mean, 0.5) : tt_var);
@@ -379,7 +388,9 @@ namespace Gtfs {
                 X += K * y;
                 P = (1 - K) * P;
 
-                std::cout << "\n updated state is (" << X << ", " << P << ")";
+#if SIMULATION
+                fout << "," << X << "," << P << "\n";
+#endif
 
                 // insert back into state
                 _eta_state.at (m+1) = std::make_tuple (_timestamp + round (X), P);
@@ -446,6 +457,12 @@ namespace Gtfs {
                 );
             }
         }
+
+#if SIMULATION
+        {
+            fout.close ();
+        }
+#endif
 
         return etas;
     }
