@@ -221,17 +221,12 @@ raw <- readr::read_csv(
     )
 max(raw$timestamp)
 
-## pick a trip
-tid <- "1141155994-20190806160740_v82.21"
-tid <- "1141156213-20190806160740_v82.21"
-tid <- "1141156521-20190806160740_v82.21"
-trip_data <- raw %>% filter(trip_id == tid)
-arr_data <- arrivaldata %>% filter(trip_id == tid)
 
 get_ci <- function(x, p, which = c("lower", "upper"), q = 0.95, ts) {
     which <- match.arg(which)
     q <- (1 - q) / 2
     if (which == "upper") q <- 1 - q
+    p <- ifelse(p > 1e6, 0, p)
     z <- qnorm(q, x, sqrt(p))
     if (missing(ts)) return(z)
     t <- as.POSIXct(ts + z, origin = "1970-01-01")
@@ -245,41 +240,51 @@ get_ci <- function(x, p, which = c("lower", "upper"), q = 0.95, ts) {
     )
 }
 
-ggplot(trip_data, aes(timestamp)) +
-    geom_hline(aes(x = NULL, y = NULL, yintercept = arrival_time),
-        data = arr_data) +
-    geom_vline(aes(x = NULL, y = NULL, xintercept = arrival_time),
-        data = arr_data) +
-    geom_hline(aes(x = NULL, y = NULL, yintercept = scheduled_arrival),
-        data = arr_data, lty = 3) +
-    geom_linerange(
-        aes(
-            x = timestamp,
-            # y = timestamp + Z,
-            ymin = timestamp + get_ci(Z, E, "lower"),
-            ymax = timestamp + get_ci(Z, E, "upper")
-        ), 
-        colour = "red"
-    ) +
-    geom_linerange(
-        aes(
-            x = timestamp+5,
-            # y = timestamp + Xhat,
-            ymin = timestamp + get_ci(Xhat, Phat, "lower"),
-            ymax = timestamp + get_ci(Xhat, Phat, "upper")
-        ), 
-        colour = "blue"
-    ) +
-    geom_linerange(
-        aes(
-            x = timestamp+10,
-            # y = NULL,#timestamp + Xnew,
-            ymin = get_ci(Xnew, Pnew, "lower", ts = timestamp),
-            ymax = get_ci(Xnew, Pnew, "upper", ts = timestamp)
-        )
-    ) +
-    facet_wrap(~stop_sequence, scale = "free_y")
+## pick a trip
+# tid <- "1141155994-20190806160740_v82.21"
+# tid <- "1141156213-20190806160740_v82.21"
+# tid <- "1141156521-20190806160740_v82.21"
 
+for (tid in unique(raw$trip_id)) {
+    trip_data <- raw %>% filter(trip_id == tid)
+    arr_data <- arrivaldata %>% filter(trip_id == tid)
+
+    p <- ggplot(trip_data, aes(timestamp)) +
+        geom_hline(aes(x = NULL, y = NULL, yintercept = arrival_time),
+            data = arr_data) +
+        geom_vline(aes(x = NULL, y = NULL, xintercept = arrival_time),
+            data = arr_data) +
+        geom_hline(aes(x = NULL, y = NULL, yintercept = scheduled_arrival),
+            data = arr_data, lty = 3) +
+        geom_linerange(
+            aes(
+                x = timestamp,
+                # y = timestamp + Z,
+                ymin = timestamp + get_ci(Z, E, "lower"),
+                ymax = timestamp + get_ci(Z, E, "upper")
+            ), 
+            colour = "red"
+        ) +
+        geom_linerange(
+            aes(
+                x = timestamp+5,
+                ymin = timestamp + get_ci(Xhat, Phat, "lower"),
+                ymax = timestamp + get_ci(Xhat, Phat, "upper")
+            ), 
+            colour = "blue"
+        ) +
+        geom_linerange(
+            aes(
+                x = timestamp+10,
+                # y = NULL,#timestamp + Xnew,
+                ymin = get_ci(Xnew, Pnew, "lower", ts = timestamp),
+                ymax = get_ci(Xnew, Pnew, "upper", ts = timestamp)
+            )
+        ) +
+        facet_wrap(~stop_sequence, scale = "free_y")
+    plot(p)
+    grid::grid.locator()
+}
 
 
     # p <- ggplot(routedata, aes(time_until_arrival/60, 
