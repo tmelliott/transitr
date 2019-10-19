@@ -139,6 +139,10 @@ namespace Gtfs
         int dropoff_type;
         double distance;
 
+        /* information learnt from historical data */
+        double average_delay = 0.0;
+        double sd_delay = 0.0;
+
         StopTime ();
         StopTime (std::string& stop_id, std::string& trip_id,
                   std::string& at, std::string& dt, 
@@ -270,6 +274,8 @@ namespace Gtfs
         void complete ();
         bool is_active (uint64_t& t);
         bool is_active ();
+
+        void get_db_delays ();
 
         std::string& trip_id ();
         Route* route ();

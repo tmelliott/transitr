@@ -29,14 +29,28 @@ namespace Gtfs {
         // Initalize?
         if (_eta_state.size () == 1)
         {
+
+            /** Check if `stop_delays` table exists, and if so for each stop fetch the 
+             * relevant delay information.
+             */
+            
+            get_db_delays ();
+
             Time* at;
             // needs initialization
             _eta_state.resize (_stops.size ());
+            double d = 0, e = 30;
             for (int m=0; m<_stops.size (); ++m)
             {
                 at = &(m == 0 ? _stops.at (m).departure_time : _stops.at (m).arrival_time);
+
+                d = _stops.at (m).average_delay;
+                e = _stops.at (m).sd_delay;
+
+                if (e == 0) e = 600;
+
                 // once prior variance is known, place here
-                _eta_state.at (m) = std::make_tuple (at->asUNIX (t), 30);
+                _eta_state.at (m) = std::make_tuple (at->asUNIX (t) + d, pow (e, 2));
             }
         }
 
@@ -169,14 +183,14 @@ namespace Gtfs {
             double dt;
             double v, xx;
             //  vehicle speed too slow?
-            bool use_particle_speed (_vehicle->speed () < 2);
+            // bool use_particle_speed (true);//_vehicle->speed () < 2);
             for (int i=0; i<N; i++)
             {
                 tt = 0;
                 p = &(_vehicle->state ()->at (i));
                 // time to end of current segment
                 l = find_segment_index (p->get_distance (), &segs);
-                v = use_particle_speed ? p->get_speed () : 
+                v = (rng.runif () < 0.5) ? p->get_speed () : 
                     segs.at (l).segment->sample_speed (rng);
                 xx = segs.at (l).segment->sample_travel_time (rng);
                 tt += fmin(xx, 
@@ -194,12 +208,43 @@ namespace Gtfs {
                 x = tt;
                 while (l < L)
                 {
+                    // Q: is the next stop a layover?
+                    if (_stops.at (l).departure_time > _stops.at (l).arrival_time)
+                    {
+                        // time until scheduled departure
+                        tt = fmax (_stops.at (l).departure_time - Time (_timestamp), tt);
+                    }
+
                     // fetch tt from scheduled travel time ...
                     if (segs.at (l).segment->uncertainty () == 0 ||
                         segs.at (l).segment->uncertainty () > 2 * segs.at (l).segment->travel_time ())
                     {
-                        tt += rng.rnorm () * pow (segs.at (l).segment->prior_travel_time_var (), 0.5) +
-                            (int) (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
+                        if (segs.at (l).segment->prior_travel_time_var () == 0)
+                        {
+                            // travel time is just going to be somewhere between 5m/s and 30m/s
+                            double len = segs.at (l).segment->length ();
+                            double sched_speed = len / 
+                                ((int) (_stops.at (l+1).arrival_time - _stops.at (l).departure_time));
+                            double v = 0;
+                            int n = 100;
+                            while (v < 2 || v > 30)
+                            {
+                                v = rng.rnorm () * 5.0 + sched_speed;
+
+                                // give up after 100 tries
+                                if (n-- == 0)
+                                    v = rng.runif () * 28.0 + 2.0;
+                            }
+                            tt += len / v;
+                        }
+                        else
+                        {
+                            // prior uncertainty + vehicle variation
+                            double var = segs.at (l).segment->prior_travel_time_var ();
+                            // var += pow (segs.at (l).segment->state_var (), 2);
+                            tt += rng.rnorm () * pow (var, 0.5) +
+                                (int) (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
+                        }
                     }
                     else
                     {
@@ -378,6 +423,12 @@ namespace Gtfs {
                 // 'volatility', how far to go?
                 P = P + _delta;// + pow (X - tt_mean, 2);
 
+                // tt_var = fmax (pow (tt_mean, 2), tt_var);
+                // tt_var += tt_mean * 2;
+                
+                // multiple by how far it is from state estimate
+                tt_var *= fmax (1.0, (tt_mean - X) / pow (P, 0.5));
+
 #if SIMULATION
                 fout << "," << X << "," << P << "," << tt_mean << "," << tt_var;
 #endif
@@ -392,7 +443,6 @@ namespace Gtfs {
                 //     tt_var += tt_mean;
                 //     // tt_var += pow (X - tt_mean, 2);
                 // }
-                tt_var += pow (tt_mean, 2);
                 y = tt_mean - X;
                 S = P + tt_var;
                 K = P / S;

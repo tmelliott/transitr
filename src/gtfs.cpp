@@ -892,8 +892,6 @@ namespace Gtfs
             sqlite3_finalize (stmt);
         }
 
-        gtfs->close_connection ();
-
         // now load stop distances ...
         std::vector<ShapeNode> nodes = _shape->nodes ();
         // for (int i=0; i<nodes.size (); i++)
@@ -928,12 +926,93 @@ namespace Gtfs
         // initialize from schedule
         _eta_state.resize (1, std::make_tuple (0, 0.0));
 
-
         _timestamp = 0;
         _stop_index = 0;
         _segment_index = 0;
         
         loaded = true;
+
+        /**
+         * Check if `stop_delays` table exists, and if so for each stop fetch the 
+         * relevant delay information.
+         */
+        
+    }
+
+    void Trip::get_db_delays ()
+    {
+        if (!loaded) load ();
+
+        sqlite3* db = gtfs->get_connection ();
+        if (db == nullptr)
+        {
+            gtfs->close_connection ();
+            return;
+        }
+
+        sqlite3_stmt* stmt;
+        std::string qry = 
+            "SELECT COUNT(type) FROM sqlite_master WHERE type='table' AND name='stop_delays'";
+        const char* tblcheck = qry.c_str ();
+        if (sqlite3_prepare_v2 (db, tblcheck, -1, &stmt, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+        if (sqlite3_step (stmt) != SQLITE_ROW)
+        {
+            Rcpp::Rcerr << " x Couldn't get segment from db\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+        if (sqlite3_column_int (stmt, 0) == 0)
+        {
+            // segment parameters table doesn't exist
+            // Rcpp::Rcout << " x No parameter table found. \n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+
+        std::cout << " - found stop delays!\n";
+
+        // table exists, grab!
+        qry = "SELECT stop_sequence, avg_delay, sd_delay FROM stop_delays WHERE trip_id=?";
+        const char* delayq = qry.c_str ();
+        if (sqlite3_prepare_v2(db, delayq, -1, &stmt, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+
+        const char* tidstr = _trip_id.c_str ();
+
+        if (sqlite3_bind_text (stmt, 1, tidstr, -1, SQLITE_STATIC) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Cant bind TRIP_ID to query\n   "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_reset (stmt);
+            return;
+        }
+
+        int si;
+        while (sqlite3_step (stmt) == SQLITE_ROW)
+        {
+            si = sqlite3_column_int (stmt, 0);
+            _stops.at (si-1).average_delay = sqlite3_column_double (stmt, 1);
+            _stops.at (si-1).sd_delay = sqlite3_column_double (stmt, 2);
+        }
+
+        sqlite3_finalize (stmt);
+        gtfs->close_connection ();
     }
 
     void Trip::unload () { unload (false); }

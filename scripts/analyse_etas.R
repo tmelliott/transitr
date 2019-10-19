@@ -185,13 +185,15 @@ RMSE <- list(
 )
 RMSE
 
+if (!interactive()) q("no")
+
 range(eta_data$timestamp)
 
 # q("no")
 for (TRIP in unique(eta_data$trip_id)) {
     print(TRIP)
     routedata <- eta_data %>% 
-        filter(trip_id == TRIP & !is.na(eta))# & timestamp > as.POSIXct("2019-08-19 10:00:00"))
+        filter(trip_id == TRIP & !is.na(eta) & timestamp > as.POSIXct("2019-08-19 10:00:00"))
     if (nrow(routedata) == 0) next()
     p <- ggplot(routedata %>% filter(time_until_arrival > 0), 
         aes(timestamp)) +
@@ -285,6 +287,10 @@ for (tid in unique(raw$trip_id)) {
     plot(p)
     grid::grid.locator()
 }
+
+
+## Calculate reliablity of PF estimates over time
+
 
 
     # p <- ggplot(routedata, aes(time_until_arrival/60, 
