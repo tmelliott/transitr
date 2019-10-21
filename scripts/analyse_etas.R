@@ -185,9 +185,9 @@ RMSE <- list(
 )
 RMSE
 
-if (!interactive()) q("no")
-
 range(eta_data$timestamp)
+
+if (!interactive()) q("no")
 
 # q("no")
 for (TRIP in unique(eta_data$trip_id)) {

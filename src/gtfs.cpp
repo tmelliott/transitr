@@ -773,7 +773,8 @@ namespace Gtfs
         if (sqlite3_prepare_v2(db, qrystr, -1, &stmt, 0) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
-                << sqlite3_errmsg (db) << "\n";
+                << sqlite3_errmsg (db) << "\n"
+                << "TRIP ID = " << _trip_id << "\n";
             sqlite3_finalize (stmt);
             gtfs->close_connection ();
             return;
@@ -951,7 +952,7 @@ namespace Gtfs
         }
 
         sqlite3_stmt* stmt;
-        std::string qry = 
+        std::string qry =
             "SELECT COUNT(type) FROM sqlite_master WHERE type='table' AND name='stop_delays'";
         const char* tblcheck = qry.c_str ();
         if (sqlite3_prepare_v2 (db, tblcheck, -1, &stmt, 0) != SQLITE_OK)
@@ -979,7 +980,8 @@ namespace Gtfs
             return;
         }
 
-        std::cout << " - found stop delays!\n";
+        // std::cout << " - found stop delays!\n";
+        sqlite3_finalize (stmt);
 
         // table exists, grab!
         qry = "SELECT stop_sequence, avg_delay, sd_delay FROM stop_delays WHERE trip_id=?";
@@ -994,12 +996,12 @@ namespace Gtfs
         }
 
         const char* tidstr = _trip_id.c_str ();
-
         if (sqlite3_bind_text (stmt, 1, tidstr, -1, SQLITE_STATIC) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Cant bind TRIP_ID to query\n   "
                 << sqlite3_errmsg (db) << "\n";
-            sqlite3_reset (stmt);
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
             return;
         }
 
