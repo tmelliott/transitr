@@ -209,6 +209,8 @@ for (TRIP in unique(eta_data$trip_id)) {
 
 
 ## RAW eta state data
+library(tidyverse)
+
 raw <- readr::read_csv(
         "simulations/sim000/eta_state.csv",
         col_names = c(
@@ -247,6 +249,9 @@ get_ci <- function(x, p, which = c("lower", "upper"), q = 0.95, ts) {
 # tid <- "1141156213-20190806160740_v82.21"
 # tid <- "1141156521-20190806160740_v82.21"
 
+raw %>% arrange(desc(Z)) %>% pull(trip_id) %>% head(100)
+
+tid <- "8301169919-20190806160740_v82.21"
 for (tid in unique(raw$trip_id)) {
     trip_data <- raw %>% filter(trip_id == tid)
     arr_data <- arrivaldata %>% filter(trip_id == tid)
@@ -258,14 +263,14 @@ for (tid in unique(raw$trip_id)) {
             data = arr_data) +
         geom_hline(aes(x = NULL, y = NULL, yintercept = scheduled_arrival),
             data = arr_data, lty = 3) +
-        geom_linerange(
+        geom_pointrange(
             aes(
                 x = timestamp,
-                # y = timestamp + Z,
+                y = timestamp + Z,
                 ymin = timestamp + get_ci(Z, E, "lower"),
                 ymax = timestamp + get_ci(Z, E, "upper")
             ), 
-            colour = "red"
+            colour = "red", size = 0.1
         ) +
         geom_linerange(
             aes(
@@ -290,7 +295,33 @@ for (tid in unique(raw$trip_id)) {
 
 
 ## Calculate reliablity of PF estimates over time
+delay_data <- raw %>% 
+    left_join(arrivaldata,
+        by = c("trip_id", "stop_sequence")
+    ) %>%
+    unique() %>%
+    filter(timestamp <= arrival_time) %>%
+    filter(between(delay, -30*60, 60*60*2) & between(Z, 0, 2*60*60)) %>%
+    mutate(
+        particle_eta = timestamp + Z,
+        particle_error = as.integer(particle_eta - arrival_time),
+        actual_eta = as.integer(arrival_time - timestamp),
+        bin = factor(floor(actual_eta / 60), ordered = TRUE)
+    ) %>%
+    filter(E < 2*actual_eta)
 
+ggplot(delay_data, aes(actual_eta/60, particle_error/60)) +
+    geom_hex()
+
+delay_data %>%
+    group_by(bin) %>%
+    summarize(RMSE = sqrt(sum(particle_error^2))) %>%
+    filter(bin < 11) %>%
+    ggplot(aes(as.integer(as.character(bin))^0.5, sqrt(RMSE))) + geom_point() +
+        geom_abline(slope = 20, intercept = 30)
+
+
+    
 
 
     # p <- ggplot(routedata, aes(time_until_arrival/60, 

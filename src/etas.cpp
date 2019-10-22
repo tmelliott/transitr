@@ -181,7 +181,7 @@ namespace Gtfs {
             int l;
             int tt;
             double dt;
-            double v, xx;
+            double v, xx, seg_prog;
             //  vehicle speed too slow?
             // bool use_particle_speed (true);//_vehicle->speed () < 2);
             for (int i=0; i<N; i++)
@@ -190,8 +190,24 @@ namespace Gtfs {
                 p = &(_vehicle->state ()->at (i));
                 // time to end of current segment
                 l = find_segment_index (p->get_distance (), &segs);
-                v = (rng.runif () < 0.5) ? p->get_speed () : 
-                    segs.at (l).segment->sample_speed (rng);
+
+                /** if less than 20% of the way through the segment, 
+                  * or particle speed is less than 1,
+                  * sample speed from segment state
+                  **/
+                seg_prog = (p->get_distance () - segs.at (l).distance) / segs.at (l).segment->length ();
+                if (_vehicle->speed () > 2.0 &&
+                    seg_prog > 0.2 && 
+                    p->get_speed () > 1.0 && 
+                    rng.runif () < 0.5)
+                {
+                    v = fmin (30.0, fmax (1.0, rng.rnorm () * 3.0 + p->get_speed ()));
+                }
+                else
+                {
+                    v = segs.at (l).segment->sample_speed (rng);
+                }
+                
                 xx = segs.at (l).segment->sample_travel_time (rng);
                 tt += fmin(xx, 
                     round ((
@@ -242,8 +258,19 @@ namespace Gtfs {
                             // prior uncertainty + vehicle variation
                             double var = segs.at (l).segment->prior_travel_time_var ();
                             // var += pow (segs.at (l).segment->state_var (), 2);
-                            tt += rng.rnorm () * pow (var, 0.5) +
-                                (int) (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
+                            double tx = 0;
+                            double len = segs.at (l).segment->length ();
+                            int nn = 100;
+                            while (tx < len / 30 || tx > len)
+                            {
+                                tx = rng.rnorm () * pow (var, 0.5) +
+                                    (int) (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
+                                if (nn-- == 0)
+                                {
+                                    var = pow (len, 0.5);
+                                }
+                            }
+                            tt += tx;
                         }
                     }
                     else
@@ -288,9 +315,13 @@ namespace Gtfs {
                         }
                         
                         // add between-vehicle noise (this is definitely segment independent)
-                        x += rng.rnorm () * segs.at (l).segment->state_var ();
-                        
-                        tt += x;
+                        double newx;
+                        while (x < segs.at (l).segment->length () / 30 | 
+                               x > segs.at (l).segment->length() * 2)
+                        {
+                            newx = x + rng.rnorm () * segs.at (l).segment->state_var ();
+                        }                        
+                        tt += newx;
 
                         // tt += segs.at (l).segment->sample_travel_time (rng, tt);
                     }
@@ -427,7 +458,17 @@ namespace Gtfs {
                 // tt_var += tt_mean * 2;
                 
                 // multiple by how far it is from state estimate
-                tt_var *= fmax (1.0, (tt_mean - X) / pow (P, 0.5));
+                // tt_var *= fmax (1.0, (tt_mean - X) / pow (P, 0.5));
+
+                if (tt_var < 2 * X)
+                {
+                    tt_var = pow (20 * sqrt (fmin (10, tt_mean / 60)) + 30, 2);
+                }
+                else
+                {
+                    tt_var = 1e10; // very, very unreliable!
+                }
+                
 
 #if SIMULATION
                 fout << "," << X << "," << P << "," << tt_mean << "," << tt_var;
