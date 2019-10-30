@@ -6,9 +6,10 @@ namespace Gtfs {
     {
         if (!loaded) load ();
         // set up the initial state of the segment
-        _travel_time (0) = _prior_travel_time > 0 ? _prior_travel_time : _length / 10.0;
-        _travel_time (1) = _prior_travel_time_var > 0 ? _prior_travel_time_var : 0.0;
+        _travel_time (0) = _prior_travel_time > 0 ? _prior_travel_time : _length / 8.0;
+        _travel_time (1) = 0.0;
         _uncertainty = Eigen::Matrix2d::Zero ();
+        _uncertainty (0, 0) = _prior_travel_time_var > 0 ? _prior_travel_time_var : 0.0;
         min_tt = _length / max_speed;
 
         if (_system_noise == 0)
@@ -17,7 +18,7 @@ namespace Gtfs {
         // also specify the "between vehicle" variabilty
         if (_state_var == 0)
             _state_var = pow (exp (-2.44 + 1.4 * log (min_tt)), 2);
-        
+
         _measurement_error = params->nw_measurement_error;
     }
 
@@ -35,7 +36,7 @@ namespace Gtfs {
         else
         {
             Phat = Eigen::Matrix2d::Zero ();
-            switch (_model_type) 
+            switch (_model_type)
             {
                 case 0:
                     Phat (0, 0) = 1000.0;
@@ -66,21 +67,29 @@ namespace Gtfs {
         {
             _timestamp = now;
         }
-        
+
+        bool log (false);
 #if VERBOSE > 0
-        std::cout << "\n\n + Segment " << _segment_id 
-            << "\n  => X = "<< _travel_time.format (tColVec) 
-            << " and P = " << _uncertainty.format(inlineMat);
+        log = true;
+        std::cout << "\n\n + Segment " << std::setw (6) << _segment_id
+            << ", delta = " << std::setw (4) << (now - _timestamp)
+            << " -> X = " << std::setw (5) << round (_travel_time (0))
+            << ", P = " << std::setw (6) << round (_uncertainty (0, 0));
 #endif
 
         Eigen::Vector2d xhat = _travel_time;
         Eigen::Matrix2d Phat = _uncertainty;
-        if (Phat (0, 0) == 0) Phat (0, 0) = 1000;
+        if (Phat (0, 0) == 0) Phat (0, 0) = 1e10;
         int delta = now - _timestamp;
-        if (delta > 0) 
+        if (delta > 0)
         {
             Phat (0, 0) += pow(delta * _system_noise, 2);
         }
+
+        if (log)
+            std::cout
+                << " => X = " << std::setw (5) << round (_travel_time (0))
+                << ", P = " << std::setw (6) << round (_uncertainty (0, 0));
 
         double B, b, U, u, Z, z;
         B = Phat (0, 0);
@@ -91,18 +100,29 @@ namespace Gtfs {
         z = 0;
         double err;
         std::pair<int, double>* dj;
+        if (log) std::cout << "; Z: [";
         for (int j=0; j<_data.size (); j++)
         {
             dj = &(_data.at (j));
             err = fmax (_measurement_error, dj->second) + pow (_state_var, 2);
+            if (log)
+                std::cout << "{"
+                    << round (dj->first) << ", " << round (err)
+                    << "}";
             Z += 1 / err;
             z += dj->first / err;
         }
+        if (log) std::cout << "]";
         U += Z;
         u += z;
 
         B = 1 / U;
         b = u / U;
+
+        if (log)
+            std::cout
+                << " => X = " << std::setw (5) << round (b)
+                << ", P = " << std::setw (6) << round (B);
 
         Phat (0, 0) = B;
         xhat (0) = b;
@@ -139,7 +159,7 @@ namespace Gtfs {
     int Segment::sample_travel_time (RNG& rng, int delta)
     {
         if (!loaded) load ();
-        if ( _travel_time (0) == 0) 
+        if ( _travel_time (0) == 0)
         {
             return _length / (rng.rnorm () * 25.0 + 5.0); // [5, 30m/s]
         }
@@ -166,4 +186,4 @@ namespace Gtfs {
         return fmin (30.0, fmax (0.5, _length / x));
     }
 
-} // end Gtfs 
+} // end Gtfs

@@ -53,10 +53,10 @@ Time::Time (std::string& t)
 // #ifdef __linux__
 //     struct tm tm;
 //     strptime (t.c_str (), "%H:%M:%S", &tm);
-//     int sec = tm.tm_hour * SECONDS_IN_HOUR + 
+//     int sec = tm.tm_hour * SECONDS_IN_HOUR +
 //         tm.tm_min * SECONDS_IN_MIN + tm.tm_sec;
 // #else
-    // necessary to manually pull apart the string 
+    // necessary to manually pull apart the string
     std::string delim = ":";
     size_t pos = 0;
     std::string token;
@@ -82,9 +82,14 @@ Time::Time (std::string& t)
 Time::Time (uint64_t& t)
 {
     // convert UNIX timestamp to a time object
+    if (t < 0)
+    {
+        _seconds = 0;
+        return;
+    }
     std::time_t tx (t);
     struct tm *t0 = localtime(&tx);
-    _seconds = t0->tm_hour * SECONDS_IN_HOUR + 
+    _seconds = t0->tm_hour * SECONDS_IN_HOUR +
         t0->tm_min * SECONDS_IN_MIN + t0->tm_sec;
 }
 

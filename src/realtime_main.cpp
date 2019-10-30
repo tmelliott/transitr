@@ -173,6 +173,7 @@ void run_realtime_model (List nw)
 #endif
 #if SIMULATION
         std::vector<std::string> routes_to_keep ({
+            // "70"
             "24B", "931", "NX1", "NX2", "866", "802", "82", "83", "25B", 
             "27H", "030", "047", "003", "SKY", "321", "221X", "243X", "223X", 
             "248X", "22A", "70", "028", "101", "966", "22N", "22R", "24R", 

@@ -36,7 +36,7 @@ namespace Gtfs {
             dist = _trip->stops ().at (_stop_index).distance;
             // _current_delay = e.delay;
         }
-        
+
         double d, u;
         Particle* p;
         for (int i=0; i<_N; ++i)
@@ -63,7 +63,7 @@ namespace Gtfs {
                     p->set_arrival_time (e.stop_index, p->get_arrival_time (e.stop_index) - dwell);
                     p->set_departure_time (e.stop_index, p->get_departure_time (e.stop_index) - dwell);
                 }
-                
+
                 // and set the travel time for the segment to zero
                 auto segments = _trip->shape ()->segments ();
                 int segindex = find_segment_index (dist, &segments);
@@ -119,7 +119,7 @@ namespace Gtfs {
     {
         int nnew = time_events.size () - current_event_index;
 #if VERBOSE > 0
-        std::cout << "\n\n+ vehicle " << _vehicle_id << ": "       
+        std::cout << "\n\n+ vehicle " << _vehicle_id << ": "
             << nnew << " new events";
 #endif
         if (nnew == 0) return;
@@ -135,16 +135,16 @@ namespace Gtfs {
             {
                 for (int i=0; i<(current_event_index-1); ++i)
                 {
-                    std::cout << "\n    [" << time_events.at (i).timestamp << "] ";
+                    std::cout << "\n    [" << Time (time_events.at (i).timestamp) << "] ";
                     time_events.at (i).print ();
                 }
             }
-            std::cout << "\n    [" << _timestamp << "] ";
+            std::cout << "\n    [" << Time (_timestamp) << "] ";
             if (_trip == nullptr)
             {
                 std::cout << "the trip is null ... ";
             }
-            else 
+            else
             {
                 std::cout
                     << _trip->route ()->route_short_name ()
@@ -158,7 +158,7 @@ namespace Gtfs {
         // repeat until there are no more events
         while (current_event_index < time_events.size ())
         {
-            // std::cout << std::endl << " ++++ there are " << time_events.size () 
+            // std::cout << std::endl << " ++++ there are " << time_events.size ()
             //     << " events; requesting index " << current_event_index << std::endl;
             auto e = time_events.at (current_event_index);
             _latest_event = &(time_events.at (current_event_index));
@@ -214,8 +214,8 @@ namespace Gtfs {
             }
             else
             {
-                std::cout 
-                    << " (" << _trip->stops ().at (0).departure_time 
+                std::cout
+                    << " (" << _trip->stops ().at (0).departure_time
                     << ", " << _trip->stops ().size () << " stops"
                     << "): ";
             }
@@ -241,14 +241,14 @@ namespace Gtfs {
                             return;
                         }
 
-                        // if the estimated distance is less than the previous 
-                        // estimated distance, do something about that 
+                        // if the estimated distance is less than the previous
+                        // estimated distance, do something about that
                         auto pos = latlng (e.position.latitude, e.position.longitude);
                         auto est_dist = _trip->shape ()->distance_of (pos);
                         // std::cout << "\n-> from " << estimated_dist << " to " << est_dist;
                         if (est_dist - estimated_dist < -5.0)
                         {
-                            // looks like we've gone backwards ... 
+                            // looks like we've gone backwards ...
                             // ... uh oh
                             // 1. skip this observation
                             // 2. undo the entire state, and repredict state using newest obs
@@ -293,8 +293,8 @@ namespace Gtfs {
                 _current_delay = e.delay;
                 // ----------------------------------- CHECK STOP INDEX
 #if VERBOSE > 0
-                std::cout << " - there are " << _trip->stops ().size () 
-                    << " stops " << " (d = " 
+                std::cout << " - there are " << _trip->stops ().size ()
+                    << " stops " << " (d = "
                     << _trip->stops ().at (_stop_index).distance << "m)";
 #endif
             }
@@ -355,24 +355,24 @@ namespace Gtfs {
                     }
 
 #if VERBOSE > 0
-                    std::cout << "\n  - segment " 
+                    std::cout << "\n  - segment "
                         << (_current_segment + 1)
                         << " of " << _segment_travel_times.size ();
 #endif
 
                     err = std::accumulate (
-                        _state.begin (), 
-                        _state.end (), 
+                        _state.begin (),
+                        _state.end (),
                         0.0,
                         [=](double a, Particle& p) {
-                            return a + p.get_weight () * 
+                            return a + p.get_weight () *
                                 pow (p.get_travel_time (_current_segment) - tt, 2);
                         }
                     );
 
                     // if the error is effectively 0 ...
                     // ...  handled by Segment::update ()
-                    // if (err < 1) 
+                    // if (err < 1)
                     //     err = 3; //segs.at (_current_segment).segment->length () / 30;
 
                     _segment_travel_times.at (_current_segment) = (tt);
@@ -392,11 +392,11 @@ namespace Gtfs {
                     }
 #endif
                 }
-            
+
                 // NOTE: need to ignore segment if previous segment travel time is 0
                 // (i.e., can't be sure that the current segment travel time is complete)
-                
-                
+
+
 #if SIMULATION
                 fout.close ();
 #endif
@@ -447,9 +447,9 @@ namespace Gtfs {
         }
 
         // move the particles
-        if (_complete || !valid () || _delta == 0) 
+        if (_complete || !valid () || _delta == 0)
         {
-            if (log) 
+            if (log)
             {
                 std::cout << "\n ... uh oh ... ";
                 if (_complete) std::cout << "complete!";
@@ -463,7 +463,7 @@ namespace Gtfs {
 #endif
 
         bool all_complete = true;
-        double dbar = 0.0, vbar = 0.0, 
+        double dbar = 0.0, vbar = 0.0,
             dbar2 = 0.0, vbar2 = 0.0, ddbar = 0.0,
             dtbar = 0;
         int firstN = 20;
@@ -473,10 +473,11 @@ namespace Gtfs {
             pi++;
 #if VERBOSE > 0
             if (firstN > 0)
-                std::cout << "\n      [" << p.get_distance () 
-                    << ", " << p.get_speed ()
-                    << ", " << (p.get_stop_index () + 1)
-                    << ", " << (p.get_segment_index () + 1)
+                std::cout << "\n      ["
+                    << std::setw (5) << round (p.get_distance ())
+                    << ", " << std::setw (4) << (round (p.get_speed () * 10) / 10)
+                    << ", " << std::setw (2) << (p.get_stop_index () + 1)
+                    << ", " << std::setw (2) << (p.get_segment_index () + 1)
                     << "]";
             // else
             //     std::cout << "\r                                                                               "
@@ -490,16 +491,17 @@ namespace Gtfs {
             // if (firstN == 0)
             //     std::cout << " complete ...";
 #endif
-  
+
 
             // if any aren't complete, prevent vehicle from finishing trip
             all_complete = false;
 #if VERBOSE > 0
             if (firstN > 0) {
-                std::cout << " -> [" << p.get_distance () 
-                    << ", " << p.get_speed () 
-                    << ", " << (p.get_stop_index () + 1)
-                    << ", " << (p.get_segment_index () + 1)
+                std::cout << " -> ["
+                    << std::setw (5) << round (p.get_distance ())
+                    << ", " << std::setw (4) << (round (p.get_speed () * 10) / 10)
+                    << ", " << std::setw (2) << (p.get_stop_index () + 1)
+                    << ", " << std::setw (2) << (p.get_segment_index () + 1)
                     << "]";
             }
 #endif
@@ -507,7 +509,7 @@ namespace Gtfs {
             dbar2 += p.get_distance () * p.get_weight ();
             vbar2 += p.get_speed () * p.get_weight ();
 
-            if (p.is_complete ()) 
+            if (p.is_complete ())
             {
 #if VERBOSE > 0
                 if (firstN > 0) {
@@ -523,20 +525,44 @@ namespace Gtfs {
             {
                 case EventType::gps :
                     {
-                        double err = _gpserror; // fmax (_gpserror, dist_to_route);
+                        double err = fmax (_gpserror, dist_to_route);
                         p.calculate_likelihood (e.position, _trip->shape ()->path (), err);
                         double d = p.get_distance ();
                         auto pos = _trip->shape ()->coordinates_of (d);
                         ddbar += distanceEarth (e.position, pos) * p.get_weight ();
+#if VERBOSE > 0
+                        if (firstN > 0) {
+                            std::cout << " -> d(Y,Xi) = "
+                                << std::setw (5) << round (distanceEarth (e.position, pos));
+                        }
+#endif
                         break;
                     }
                 case EventType::arrival :
                     p.calculate_likelihood (e, _arrival_error);
                     dtbar += (int)(p.get_arrival_time (e.stop_index) - e.timestamp) * p.get_weight ();
+#if VERBOSE > 0
+                        if (firstN > 0) {
+                            int art = p.get_arrival_time (e.stop_index);
+                            std::cout << ", arr = "
+                                << Time (art)
+                                << " -> d(A,Ai) = "
+                                << std::setw (3) << (int)(p.get_arrival_time (e.stop_index) - e.timestamp);
+                        }
+#endif
                     break;
                 case EventType::departure :
                     p.calculate_likelihood (e, _departure_error);
                     dtbar += (int)(p.get_departure_time (e.stop_index) - e.timestamp) * p.get_weight ();
+#if VERBOSE > 0
+                        if (firstN > 0) {
+                            int art = p.get_arrival_time (e.stop_index);
+                            std::cout << ", dep = "
+                                << Time (art)
+                                << " -> d(D,Di) = "
+                                << std::setw (3) << (int)(p.get_departure_time (e.stop_index) - e.timestamp);
+                        }
+#endif
                     break;
             }
 
@@ -552,7 +578,7 @@ namespace Gtfs {
 
         latlng px = latlng ();
 #if VERBOSE > 0
-        std::cout << 
+        std::cout <<
             "\n    ========================================================================="
             << std::endl
             << "      [" << dbar << ", " << vbar << "] -> "
@@ -563,7 +589,7 @@ namespace Gtfs {
             case EventType::gps :
                 {
                     px = _trip->shape ()->coordinates_of (dbar2);
-                    std::cout << "d(h(X), y) = " << ddbar 
+                    std::cout << "d(h(X), y) = " << ddbar
                         << " [" << px.latitude << ", " << px.longitude << "]";
                     break;
                 }
@@ -651,7 +677,7 @@ namespace Gtfs {
                     std::cout << "(getpx_len="
                         << _trip->shape ()->path ().size () << ")";
                     px = _trip->shape ()->coordinates_of (dbar);
-                    std::cout << "d(h(X), y) = " << ddbar 
+                    std::cout << "d(h(X), y) = " << ddbar
                         << " [" << px.latitude << ", " << px.longitude << "]";
                     break;
                 }
@@ -734,7 +760,7 @@ namespace Gtfs {
     double Vehicle::distance ()
     {
         double distance = 0.0;
-        for (auto p = _state.begin (); p != _state.end (); ++p) 
+        for (auto p = _state.begin (); p != _state.end (); ++p)
             distance += p->get_weight () * p->get_distance ();
         return distance;
     }
@@ -742,7 +768,7 @@ namespace Gtfs {
     double Vehicle::speed ()
     {
         double speed = 0.0;
-        for (auto p = _state.begin (); p != _state.end (); ++p) 
+        for (auto p = _state.begin (); p != _state.end (); ++p)
             speed += p->get_weight () * p->get_speed ();
         return speed;
     }
@@ -760,8 +786,8 @@ namespace Gtfs {
     {
 #if VERBOSE > 3
         std::cout << "\n ===> Transition particle\n"
-            << " * Initial state: [d=" << distance 
-            << ", s=" << speed 
+            << " * Initial state: [d=" << distance
+            << ", s=" << speed
             << ", j=" << stop_index
             << ",l=" << segment_index
             << "]";
@@ -793,13 +819,13 @@ namespace Gtfs {
             << " with " << L << " nodes and " << M << " stops";
 #endif
 
-        if (stop_index == M - 1 || segment_index == L - 1) 
+        if (stop_index == M - 1 || segment_index == L - 1)
         {
             complete = true;
         }
 
-        if (delta == 0 || complete || !vehicle || !vehicle->trip () || 
-            !vehicle->trip ()->shape ()) 
+        if (delta == 0 || complete || !vehicle || !vehicle->trip () ||
+            !vehicle->trip ()->shape ())
         {
 #if VERBOSE > 3
             std::cout << "\n ** nothing to mutate, skipping particle\n";
@@ -871,9 +897,37 @@ namespace Gtfs {
 #if VERBOSE > 3
                 std::cout << " which is a bus stop";
 #endif
-                wait = vehicle->gamma () +
-                    vehicle->dwell_time () +
-                    vehicle->dwell_time_var () * rng.rnorm ();
+                if (segment_index == 0)
+                {
+                    Time& sched = stops.at (0).departure_time;
+                    double avgdelay = stops.at (0).average_delay;
+                    double sddelay = stops.at (0).sd_delay;
+
+                    int depi;
+                    if (sddelay == 0)
+                    {
+                        depi = rng.runif () * 90 - 30; // [-30, 60] second delay
+                    }
+                    else
+                    {
+                        depi = round (rng.rnorm () * sddelay + avgdelay);
+                    }
+
+                    if (Time (e.timestamp) > sched + depi)
+                    {
+                        wait = 0;
+                    }
+                    else
+                    {
+                        wait = (sched + depi) - Time (e.timestamp);
+                    }
+                }
+                else
+                {
+                    wait = vehicle->gamma () +
+                        vehicle->dwell_time () +
+                        vehicle->dwell_time_var () * rng.rnorm ();
+                }
             }
             else
             {
@@ -889,22 +943,22 @@ namespace Gtfs {
         }
 
         // if it's the last stop, gotta go to the end
-        bool complete_route 
+        bool complete_route
             (e.type != EventType::gps && e.stop_index == stops.size () - 1);
 
         if (delta < 0 && !complete_route) return;
-        
+
         if (vehicle->params ()->noise_model == 0)
         {
 #if VERBOSE > 3
             std::cout << "\n\n * Using noise model 0, adjusting speed:"
                 << "\n   " << speed << " -> ";
 #endif
-            // add noise once per iteration, 
+            // add noise once per iteration,
             // or when passing segment/stop
             double vel = speed + rng.rnorm () * vehicle->system_noise ();
             int nn = 100;
-            while (vel <= 0 || vel > 30) 
+            while (vel <= 0 || vel > 30)
             {
                 vel = speed + rng.rnorm () * vehicle->system_noise ();
                 if (nn-- == 0) vel = rng.runif () * 30.0;
@@ -926,7 +980,7 @@ namespace Gtfs {
                 node_dist = next_node->distance - distance;
                 node_eta = node_dist / speed;
 #if VERBOSE > 3
-                std::cout << "\n\n * Next node is " 
+                std::cout << "\n\n * Next node is "
                     << "(" << next_node->distance << " - " << distance << ") = "
                     << node_dist << "m away"
                     << "\n   -> ETA of " << node_eta << "s, delta = "
@@ -981,26 +1035,26 @@ namespace Gtfs {
                     }
 
                     // adjust speed
-                    if (segments.at (segment_index).segment->travel_time () > 0 &
-                        segments.at (segment_index).segment->uncertainty () > 0 &
-                        segments.at (segment_index).segment->uncertainty () < segments.at (segment_index).segment->length () * 2)
-                    {
-                        speed = segments.at (segment_index).segment->sample_speed (rng);
-                    }
-                    else
-                    {
-                        // set speed to scheduled speed +- some noise
-                        if (next_node->node->node_type () == 0 && 
-                            nodes.at (segment_index).node->node_type () == 0)
-                        {
-                            int sched_tt = stops.at (stop_index + 1).arrival_time - 
-                                stops.at (stop_index).departure_time;
-                            // std::cout << "\n - inter-stop time = " << sched_tt << "s";
-                            // std::cout << "\n - length = " << segments.at (segment_index).segment->length () << "m";
-                            speed = segments.at (segment_index).segment->length () / sched_tt;
-                            // std::cout << "\n - speed = " << speed;
-                        }
-                    }
+                    // if (segments.at (segment_index).segment->travel_time () > 0 &
+                    //     segments.at (segment_index).segment->uncertainty () > 0 &
+                    //     segments.at (segment_index).segment->uncertainty () < segments.at (segment_index).segment->length () * 2)
+                    // {
+                    //     speed = segments.at (segment_index).segment->sample_speed (rng);
+                    // }
+                    // else
+                    // {
+                    //     // set speed to scheduled speed +- some noise
+                    //     if (next_node->node->node_type () == 0 &&
+                    //         nodes.at (segment_index).node->node_type () == 0)
+                    //     {
+                    //         int sched_tt = stops.at (stop_index + 1).arrival_time -
+                    //             stops.at (stop_index).departure_time;
+                    //         // std::cout << "\n - inter-stop time = " << sched_tt << "s";
+                    //         // std::cout << "\n - length = " << segments.at (segment_index).segment->length () << "m";
+                    //         speed = segments.at (segment_index).segment->length () / sched_tt;
+                    //         // std::cout << "\n - speed = " << speed;
+                    //     }
+                    // }
 #if VERBOSE > 3
                     std::cout << "\n -> setting vehicle speed to " <<
                         speed << " based on segment state";
@@ -1020,7 +1074,7 @@ namespace Gtfs {
                     if (is_stop)
                     {
                         // if (rng.runif() < vehicle->pr_stop ())
-                        
+
                         // Pr(stop) inverse proportional to speed
                         // [0m/s -> 1, 35m/s -> 0]
                         if (rng.runif () > (35 - speed) / 35)
@@ -1028,7 +1082,7 @@ namespace Gtfs {
 #if VERBOSE > 3
                             std::cout << "\n   -> dwell time at stop: ";
 #endif
-                            dwell = vehicle->gamma () + 
+                            dwell = vehicle->gamma () +
                                 vehicle->dwell_time () +
                                 vehicle->dwell_time_var () * rng.rnorm ();
 #if VERBOSE > 3
@@ -1043,7 +1097,7 @@ namespace Gtfs {
                         }
                         dt.at (stop_index) = at.at (stop_index) + round (dwell);
 #if VERBOSE > 3
-                        std::cout << " -> departure time = " 
+                        std::cout << " -> departure time = "
                             << dt.at (stop_index);
 #endif
                     }
@@ -1074,8 +1128,8 @@ namespace Gtfs {
         }
 
 #if VERBOSE > 3
-        std::cout << "\n\n * Final state: [d=" << distance 
-            << ", s=" << speed 
+        std::cout << "\n\n * Final state: [d=" << distance
+            << ", s=" << speed
             << ", j=" << stop_index
             << ", l=" << segment_index
             << "]";
@@ -1094,7 +1148,7 @@ namespace Gtfs {
                 stop_eta = stop_dist / speed;
                 at.at (stop_index + 1) = vehicle->timestamp () + stop_eta;
 #if VERBOSE > 3
-                std::cout << "\n   -> arrival: " 
+                std::cout << "\n   -> arrival: "
                     << at.at (stop_index + 1);
 #endif
             }
@@ -1105,12 +1159,12 @@ namespace Gtfs {
                 if (rng.runif () < vehicle->pr_stop ())
                 {
                     dwell += vehicle->gamma () +
-                        vehicle->dwell_time () + 
+                        vehicle->dwell_time () +
                         vehicle->dwell_time_var () * rng.rnorm ();
                 }
                 dt.at (stop_index + 1) = at.at (stop_index + 1) + dwell;
 #if VERBOSE > 3
-                std::cout << "\n   -> departure: " 
+                std::cout << "\n   -> departure: "
                     << dt.at (stop_index + 1);
 #endif
             }
@@ -1124,25 +1178,25 @@ namespace Gtfs {
 
     // void Particle::old_travel (int delta, Event& e, RNG& rng)
     // {
-            // if (complete || !vehicle || !vehicle->trip () || 
+            // if (complete || !vehicle || !vehicle->trip () ||
             // !vehicle->trip ()->shape ()) return;
 
     //     // do the particle physics
     //     double Dmax = vehicle->trip ()->shape ()->path ().back ().distance;
-    //     if (distance >= Dmax) 
+    //     if (distance >= Dmax)
     //     {
     //         distance = Dmax;
     //         complete = true;
     //         return;
     //     }
-        
+
     //     // get STOPS
     //     std::vector<StopTime>* stops;
     //     stops = &(vehicle->trip ()->stops ());
     //     int M (stops->size ());
     //     stop_index = find_stop_index (distance, stops);
     //     // std::cout << " [M=" << M << ",m=" << stop_index << "], ";
-    //     if (stop_index == M-1) 
+    //     if (stop_index == M-1)
     //     {
     //         distance = Dmax;
     //         complete = true;
@@ -1150,7 +1204,7 @@ namespace Gtfs {
     //     }
 
     //     double next_stop_d = stops->at (stop_index + 1).distance;
-        
+
     //     // get SEGMENTS
     //     std::vector<ShapeSegment>* segments;
     //     segments = &(vehicle->trip ()->shape ()->segments ());
@@ -1160,7 +1214,7 @@ namespace Gtfs {
     //     // std::cout << ",l=" << l << " --> " << segment_index << "], ";
     //     double next_segment_d;
     //     next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
-        
+
     //     // allow vehicle to remain stationary if at a stop:
     //     // if (distance == stops->at (stop_index).distance)
     //     // {
@@ -1180,7 +1234,7 @@ namespace Gtfs {
     //     //         tt.at (l) = tt.at (l) + 1;
     //     // }
 
-         
+
     //     // adjust "delta" if arrival/departure already set
     //     uint64_t tx = vehicle->timestamp () - delta;
     //     if (dt.at (stop_index) > tx)
@@ -1200,7 +1254,7 @@ namespace Gtfs {
     //         // particle has not yet ARRIVED at the stop
     //         if (e.type == EventType::departure && stop_index == e.stop_index)
     //         {
-    //             // let's fudge 
+    //             // let's fudge
     //             uint64_t newtime = rng.rnorm () * vehicle->departure_error () + e.timestamp + 0.5;
     //             dt.at (stop_index) = fmax (newtime, at.at (stop_index));
     //             delta = (int)(vehicle->timestamp () - dt.at (stop_index));
@@ -1238,7 +1292,7 @@ namespace Gtfs {
     //     double speed_mean = 10.0;
     //     double speed_sd = 100.0;
     //     // if (segments->at (l).segment->travel_time () > 0 &&
-    //     //     segments->at (l).segment->uncertainty () > 0) 
+    //     //     segments->at (l).segment->uncertainty () > 0)
     //     // {
     //     //     speed_mean = segments->at (l).segment->get_speed ();
     //     //     speed_sd = - segments->at (l).segment->length () / pow (speed_mean, 2) *
@@ -1246,10 +1300,10 @@ namespace Gtfs {
     //     //     speed_sd = pow(speed_sd, 0.5);
     //     // }
     //     double vmax = 30; //rng.runif () < 0.5 ? 30.0 : 15.0;
-        
+
     //     if (vehicle->params ()->noise_model == 0)
     //     {
-    //         // add noise once per iteration, 
+    //         // add noise once per iteration,
     //         // or when passing segment/stop
     //         double vel = speed + rng.rnorm () * vehicle->system_noise ();
     //         while (vel <= 0 || vel > 30) vel = speed + rng.rnorm () * vehicle->system_noise ();
@@ -1268,7 +1322,7 @@ namespace Gtfs {
     //         // }
     //         // while (speed + accel_prop < 0.0 || speed + accel_prop > vmax && n < 1000)
     //         // {
-    //         //     accel_prop = rng.rnorm () * vehicle->system_noise () * 
+    //         //     accel_prop = rng.rnorm () * vehicle->system_noise () *
     //         //         (1.0 + (double)n / 100.0);
     //         //     n++;
     //         //     // if (accelerating > 0.0)
@@ -1305,17 +1359,17 @@ namespace Gtfs {
 
     //         if (tt.at (l) >= 0)
     //             tt.at (l) = tt.at (l) + 1;
-            
+
     //         if (l < L-1 && distance >= next_segment_d)
     //         {
-    //             // reaching intersection ... 
+    //             // reaching intersection ...
     //             l++;
     //             segment_index++;
     //             tt.at (l) = 0;
     //             next_segment_d = (l+1 >= L-1) ? Dmax : segments->at (l+1).distance;
     //             // vmax = rng.runif () < 0.5 ? 30.0 : 15.0;
     //             // if (segments->at (l).segment->travel_time () > 0 &&
-    //             //     segments->at (l).segment->uncertainty () > 0) 
+    //             //     segments->at (l).segment->uncertainty () > 0)
     //             // {
     //             //     speed_mean = segments->at (l).segment->get_speed ();
     //             //     speed_sd = - segments->at (l).segment->length () / pow (speed_mean, 2) *
@@ -1339,7 +1393,7 @@ namespace Gtfs {
     //         {
     //             stop_index++;
     //             // bus arrives at stop - either stops at stop, of drives past
-    //             if (bus_stop (vehicle->timestamp () - delta, rng)) 
+    //             if (bus_stop (vehicle->timestamp () - delta, rng))
     //                 distance = next_stop_d;
     //             // end of route? end.
     //             if (stop_index >= M-1)
@@ -1367,7 +1421,7 @@ namespace Gtfs {
     //         stop_index++;
     //         bus_stop (vehicle->timestamp () - delta, rng);
     //         distance = next_stop_d;
-    //         if (stop_index < M - 1) 
+    //         if (stop_index < M - 1)
     //             next_stop_d = stops->at (stop_index + 1).distance;
     //     }
     // }
@@ -1387,7 +1441,7 @@ namespace Gtfs {
 
         double u (rng.runif ());
         // if (u < vehicle->pr_stop ())
-        
+
         /**
          * let's try Thomas' idea of stopping probability being
          * inversely proportional to speed
@@ -1438,8 +1492,8 @@ namespace Gtfs {
     }
 
     void
-    Particle::calculate_likelihood (latlng& y, 
-                                    std::vector<ShapePt>& path, 
+    Particle::calculate_likelihood (latlng& y,
+                                    std::vector<ShapePt>& path,
                                     double sigma)
     {
         latlng ppos = vehicle->trip ()->shape ()->coordinates_of (distance);
@@ -1453,11 +1507,11 @@ namespace Gtfs {
 
     void Particle::calculate_likelihood (Event& e, double error)
     {
-        uint64_t t = (e.type == EventType::arrival) ? 
+        uint64_t t = (e.type == EventType::arrival) ?
             get_arrival_time (e.stop_index) :
             get_departure_time (e.stop_index);
 
-        if (t == 0) 
+        if (t == 0)
         {
 #if VERBOSE > 0
             if (vehicle->get_n () < 20)
@@ -1477,9 +1531,9 @@ namespace Gtfs {
                 << " (diff: " << (tdiff) << "s)";
 #endif
 
-        log_likelihood = - 0.5 * log (2 * M_PI) - log (error) - 
+        log_likelihood = - 0.5 * log (2 * M_PI) - log (error) -
             pow (tdiff, 2) / 2.0 / pow (error, 2);
-        
+
     }
 
     void Particle::calculate_arrival_likelihood (int index, uint64_t time, double error)

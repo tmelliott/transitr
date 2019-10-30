@@ -65,7 +65,7 @@ namespace Gtfs
     struct eta
     {
         std::string stop_id;
-        uint64_t estimate;
+        uint64_t estimate = 0;
         std::vector<etaQ> quantiles;
     };
 

@@ -12,6 +12,11 @@ context("Arrival time estimation") {
     par.nw_measurement_error = 5;
     RNG rng (10);
 
+    test_that("ETA struct is initialized with estimate of 0") {
+        Gtfs::eta e;
+        expect_true (e.estimate == 0);
+    }
+
     test_that("Trip states initialized correctly") {
         // create a trip and initialize it .. 
         std::string t ("1141160875-20190613111133_v80.31");
