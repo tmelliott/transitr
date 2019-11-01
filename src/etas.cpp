@@ -179,7 +179,7 @@ namespace Gtfs {
 
             // iterate over vehicle state
             int N (_vehicle->state ()->size ());
-            N = std::min (N, 500);
+            N = std::min (N, 200);
             Eigen::MatrixXi seg_tt (Eigen::MatrixXi::Zero (N, L));
             Eigen::MatrixXi dwell_t (Eigen::MatrixXi::Zero (N, M-1));
 
@@ -187,6 +187,8 @@ namespace Gtfs {
             int l;
             int tt;
             int pi;
+            double u;
+            double wti;
             double dt;
             double v, xx, seg_prog;
             //  vehicle speed too slow?
@@ -195,7 +197,17 @@ namespace Gtfs {
             {
                 tt = 0;
                 // fetch a random particle
-                pi = floor (rng.runif () * (_vehicle->state ()->size ()));
+                u = rng.runif ();
+                wti = 0;
+                pi = 0;
+                while (wti < u) {
+                    wti += _vehicle->state ()->at (pi++).get_weight ();
+                    if (pi == _vehicle->state ()->size ()-1)
+                    {
+                        break;
+                    }
+                }
+                // pi = floor (rng.runif () * (_vehicle->state ()->size ()));
                 p = &(_vehicle->state ()->at (pi));
                 // time to end of current segment
                 l = find_segment_index (p->get_distance (), &segs);
@@ -214,7 +226,7 @@ namespace Gtfs {
                 }
                 else
                 {
-                    v = segs.at (l).segment->sample_speed (rng);
+                    v = segs.at (l).segment->sample_speed (rng) * (1 - seg_prog);
                 }
 
                 xx = segs.at (l).segment->sample_travel_time (rng);
@@ -238,10 +250,10 @@ namespace Gtfs {
                 while (l < L)
                 {
                     // Q: is the next stop a layover?
-                    if (_stops.at (l).departure_time > _stops.at (l).arrival_time)
+                    if (_stops.at (l+1).departure_time > _stops.at (l+1).arrival_time)
                     {
                         // time until scheduled departure
-                        tt = fmax (_stops.at (l).departure_time - Time (_timestamp), tt);
+                        tt = fmax (_stops.at (l+1).departure_time - Time (_timestamp), tt);
                     }
 
                     // fetch tt from scheduled travel time ...
@@ -345,7 +357,7 @@ namespace Gtfs {
                         Y = segs.at (l).segment->travel_time ();
                         sig2 = pow (segs.at (l).segment->uncertainty (), 0.5);
 
-                        rho = 0.8;
+                        rho = 0.0;
 
                         if (sig2 == 0 || sig2 > 2 * Y)
                         {
