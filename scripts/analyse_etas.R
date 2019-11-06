@@ -253,7 +253,7 @@ raw <- readr::read_csv(
 # TRIP <- "470158176-20190806160740_v82.21"
 # TRIP <- "442135482-20190806160740_v82.21"
 
-# TRIP <- unique(eta_data$trip_id)[1]
+# TRIP <- unique(eta_data$trip_id)[2]
 tripdata <- eta_data %>%
     filter(trip_id == TRIP & !is.na(eta)) %>%
     filter(stop_sequence < max(.data$stop_sequence)) %>%
@@ -324,10 +324,10 @@ ggplot(trip_etas, aes(timestamp)) +
     ## 1. raw estimate (particle filter + network)
     geom_ribbon(
         aes(
-            ymin = get_ci(raw_estimate, raw_uncertainty, "lower",
-                ts = timestamp) - actual_arrival,
-            ymax = get_ci(raw_estimate, raw_uncertainty, "upper",
-                ts = timestamp) - actual_arrival
+            ymin = as.integer(get_ci(raw_estimate, raw_uncertainty, "lower",
+                ts = timestamp) - actual_arrival),
+            ymax = as.integer(get_ci(raw_estimate, raw_uncertainty, "upper",
+                ts = timestamp) - actual_arrival)
         ),
         fill = "orangered",
         alpha = 0.3
