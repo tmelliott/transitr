@@ -932,12 +932,6 @@ namespace Gtfs
         _segment_index = 0;
 
         loaded = true;
-
-        /**
-         * Check if `stop_delays` table exists, and if so for each stop fetch the
-         * relevant delay information.
-         */
-
     }
 
     void Trip::get_db_delays ()
@@ -984,7 +978,7 @@ namespace Gtfs
         sqlite3_finalize (stmt);
 
         // table exists, grab!
-        qry = "SELECT stop_sequence, avg_delay, sd_delay FROM stop_delays WHERE trip_id=?";
+        qry = "SELECT stop_sequence, avg, sd, q50 FROM stop_delays WHERE route_id=?";
         const char* delayq = qry.c_str ();
         if (sqlite3_prepare_v2(db, delayq, -1, &stmt, 0) != SQLITE_OK)
         {
@@ -995,7 +989,7 @@ namespace Gtfs
             return;
         }
 
-        const char* tidstr = _trip_id.c_str ();
+        const char* tidstr = truncate_id (_trip_id).c_str ();
         if (sqlite3_bind_text (stmt, 1, tidstr, -1, SQLITE_STATIC) != SQLITE_OK)
         {
             Rcpp::Rcerr << " x Cant bind TRIP_ID to query\n   "
@@ -1011,6 +1005,7 @@ namespace Gtfs
             si = sqlite3_column_int (stmt, 0);
             _stops.at (si-1).average_delay = sqlite3_column_double (stmt, 1);
             _stops.at (si-1).sd_delay = sqlite3_column_double (stmt, 2);
+            _stops.at (si-1).median_delay = sqlite3_column_double (stmt, 3);
         }
 
         sqlite3_finalize (stmt);
@@ -1930,6 +1925,64 @@ namespace Gtfs
         int nodeid = sqlite3_column_int (stmt, 8);
         _node = gtfs->find_node (nodeid);
         _version = (float)sqlite3_column_double (stmt, 9);
+
+        sqlite3_finalize (stmt);
+
+        qry =
+            "SELECT COUNT(type) FROM sqlite_master WHERE type='table' AND name='dwell_times'";
+        const char* tblcheck = qry.c_str ();
+        if (sqlite3_prepare_v2 (db, tblcheck, -1, &stmt, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+        if (sqlite3_step (stmt) != SQLITE_ROW)
+        {
+            Rcpp::Rcerr << " x Couldn't get result from db\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+        if (sqlite3_column_int (stmt, 0) == 0)
+        {
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+
+        sqlite3_finalize (stmt);
+
+        qry = "SELECT avg, sd, q50 FROM dwell_times WHERE stop_id=?";
+        const char* delayq = qry.c_str ();
+        if (sqlite3_prepare_v2(db, delayq, -1, &stmt, 0) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Can't prepare query `" << qry << "`\n  "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+
+        const char* sidstr = truncate_id (_stop_id).c_str ();
+        if (sqlite3_bind_text (stmt, 1, sidstr, -1, SQLITE_STATIC) != SQLITE_OK)
+        {
+            Rcpp::Rcerr << " x Cant bind STOP_ID to query\n   "
+                << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+
+        if (sqlite3_step (stmt) == SQLITE_ROW)
+        {
+            _dwell_time = sqlite3_column_double (stmt, 0);
+            _dwell_time_sd = sqlite3_column_double (stmt, 1);
+            _dwell_time_median = sqlite3_column_double (stmt, 2);
+        }
 
         sqlite3_finalize (stmt);
         gtfs->close_connection ();
@@ -3029,6 +3082,18 @@ namespace Gtfs
         return j;
     }
 
+    std::string truncate_id (std::string& s)
+    {
+        const std::string c = s;
+        std::regex id_reg ("^([0-9]+)[-]");
+        std::smatch match;
+        if (std::regex_search (c.begin (), c.end (), match, id_reg))
+        {
+            // std::cout << "\nID: " << s << " -> " << match[1];
+            return match[1];
+        }
+        return s;
+    }
 
 
 }; // namespace Gtfs

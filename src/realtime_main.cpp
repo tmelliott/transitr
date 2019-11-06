@@ -44,7 +44,7 @@ void run_realtime_model (List nw)
     String outputname_raw = nw["output"];
     std::string dbname (dbname_raw);
     std::string outputname (outputname_raw);
-    
+
     // Construct the realtime feed object
     List apis = nw["apis"];
     List rt = apis["realtime"];
@@ -52,7 +52,7 @@ void run_realtime_model (List nw)
     int Nurl = url_raw.size ();
     std::vector<std::string> urls;
     for (int i=0; i<Nurl; i++)
-    {   
+    {
         String url (url_raw[i]);
         urls.push_back (url);
     }
@@ -104,12 +104,12 @@ void run_realtime_model (List nw)
         Rcout << "\n --- Commence iteration ---\n";
 
         timer.reset ();
-        
+
         // call the feed once and check the result is reasonable
         int ures = rtfeed.update ();
         // 5 => "simulations completed"
         if (ures == 5) break;
-        
+
         if (ures != 0 && tries < 10)
         {
             Rcout << "\n x Unable to fetch URL. Trying again ...\n";
@@ -118,19 +118,19 @@ void run_realtime_model (List nw)
             continue;
         }
         tries = 0;
-        Rcout << "\n + loaded " 
+        Rcout << "\n + loaded "
             << rtfeed.n_vehicles () << " vehicle positions and "
             << rtfeed.n_trip_updates () << " trip updates\n";
 
         {
             std::ostringstream tinfo;
             tinfo << iteration << ",";
-            if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ()) 
+            if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ())
             {
                 tinfo << rtfeed.feed()->header ().timestamp ();
             }
             tinfo << "," << rtfeed.feed ()->entity_size ();
-            
+
             timer.set_info (tinfo.str ());
         }
         timer.report ("loading vehicle positions");
@@ -144,7 +144,7 @@ void run_realtime_model (List nw)
         Rcout << vehicles.size () << " vehicles\n";
 #endif
         // for (auto v = vehicles.begin (); v != vehicles.end (); ++v)
-        // {       
+        // {
         //     Rcout << "+ vehicle " << v->second.vehicle_id () << "\n";
         //         // << "  - trip id: " << v->second.trip ()->trip_id () << "\n";
 
@@ -173,11 +173,11 @@ void run_realtime_model (List nw)
 #endif
 #if SIMULATION
         std::vector<std::string> routes_to_keep ({
-            // "70"
-            "24B", "931", "NX1", "NX2", "866", "802", "82", "83", "25B", 
-            "27H", "030", "047", "003", "SKY", "321", "221X", "243X", "223X", 
-            "248X", "22A", "70", "028", "101", "966", "22N", "22R", "24R", 
-            "24W", "25L", "27T", "27W", "75", "INN", "OUT", "923", "924"
+            "NX1"
+            // "24B", "931", "NX1", "NX2", "866", "802", "82", "83", "25B",
+            // "27H", "030", "047", "003", "SKY", "321", "221X", "243X", "223X",
+            // "248X", "22A", "70", "028", "101", "966", "22N", "22R", "24R",
+            // "24W", "25L", "27T", "27W", "75", "INN", "OUT", "923", "924"
         });
 #endif
         #pragma omp parallel for num_threads(params.n_core)
@@ -217,7 +217,7 @@ void run_realtime_model (List nw)
                 {
                     fout << sl->second.segment_id () << ","
                         << rtfeed.feed()->header ().timestamp () << ","
-                        << ds.first << "," 
+                        << ds.first << ","
                         << ds.second << "\n";
                 }
             }
@@ -246,7 +246,7 @@ void run_realtime_model (List nw)
                 // if (sl->second.get_data ().size () == 0) continue;
                 fout << sl->second.segment_id () << ","
                     << sl->second.timestamp () << ","
-                    << sl->second.travel_time () << "," 
+                    << sl->second.travel_time () << ","
                     << sl->second.uncertainty () << "\n";
             }
             fout.close ();
@@ -256,7 +256,7 @@ void run_realtime_model (List nw)
 #if VERBOSE > 0
         Rcout << "\n\n >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ETA Predictions\n";
 #endif
-        
+
         // Predict ETAs
         uint64_t curtime (rtfeed.feed()->header ().timestamp ());
         #pragma omp parallel for num_threads(params.n_core)
@@ -290,7 +290,7 @@ void run_realtime_model (List nw)
 #if SIMULATION
         std::ostringstream outputname_t;
         outputname_t << "etas/etas";
-        if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ()) 
+        if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ())
         {
             outputname_t << "_" << curtime;
         }
@@ -317,7 +317,7 @@ void run_realtime_model (List nw)
 // #if SIMULATION
 //         std::ostringstream outputname_t;
 //         outputname_t << "etas/etas";
-//         if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ()) 
+//         if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ())
 //         {
 //             outputname_t << "_" << rtfeed.feed ()->header ().timestamp ();
 //         }

@@ -179,7 +179,7 @@ namespace Gtfs {
 
             // iterate over vehicle state
             int N (_vehicle->state ()->size ());
-            N = std::min (N, 200);
+            N = std::min (N, 20);
             Eigen::MatrixXi seg_tt (Eigen::MatrixXi::Zero (N, L));
             Eigen::MatrixXi dwell_t (Eigen::MatrixXi::Zero (N, M-1));
 
@@ -211,23 +211,35 @@ namespace Gtfs {
                 p = &(_vehicle->state ()->at (pi));
                 // time to end of current segment
                 l = find_segment_index (p->get_distance (), &segs);
+                // std::cout << "\n --- [p], l = " << l;
 
                 /** if less than 20% of the way through the segment,
                   * or particle speed is less than 1,
                   * sample speed from segment state
                   **/
-                seg_prog = (p->get_distance () - segs.at (l).distance) / segs.at (l).segment->length ();
-                if (_vehicle->speed () > 2.0 &&
-                    seg_prog > 0.2 &&
-                    p->get_speed () > 1.0 &&
-                    rng.runif () < 0.5)
+                seg_prog = (p->get_distance () - segs.at (l).distance);// / segs.at (l).segment->length ();
+                // std::cout << ", prog = " << seg_prog;
+                double vel = 0.0;
+                while (vel < 2.0 || vel > 30.0)
                 {
-                    v = fmin (30.0, fmax (1.0, rng.rnorm () * 3.0 + p->get_speed ()));
+                    vel = rng.rnorm () * 2.0 + p->get_speed ();
+                }
+                // std::cout << ", vel = " << vel << ", v = " << v;
+                double speed = vel;
+                if (speed > 2.0 &&
+                    (seg_prog / segs.at (l).segment->length () < 0.1 || seg_prog > 100))
+                {
+                    v = speed;
                 }
                 else
                 {
-                    v = segs.at (l).segment->sample_speed (rng) * (1 - seg_prog);
+                    // use the scheduled time
+                    v = segs.at (l).segment->length () /
+                        (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
                 }
+                // std::cout
+                //     << " -> d = " << (segs.at (l).segment->length () - seg_prog)
+                //     << " -> t = " << ((segs.at (l).segment->length () - seg_prog) / v);
 
                 xx = segs.at (l).segment->sample_travel_time (rng);
                 tt += fmin(xx,
@@ -235,7 +247,7 @@ namespace Gtfs {
                         segs.at (l).distance +
                         segs.at (l).segment->length () -
                         p->get_distance ()
-                    ) / p->get_speed ())
+                    ) / v)
                 );
 
                 seg_tt (i, l) = tt; // no slower than 0.5m/s
@@ -414,16 +426,31 @@ namespace Gtfs {
                     // then include dwell time, otherwise continue ()
                     if (rng.runif () < gtfs->parameters ()->pr_stop)
                     {
-                        dt = -1.0;
-                        while (dt <= 0 || dt > 5*60)
+                        if (_stops.at (m).sd_delay > 0)
                         {
-                            dt = rng.rnorm () * gtfs->parameters ()->dwell_time_var +
-                                gtfs->parameters ()->dwell_time;
+                            dt = 0.0;
+                            while (dt <= 0.0)
+                            {
+                                dt = rng.rnorm () * _stops.at (m).sd_delay +
+                                    _stops.at (m).average_delay;
+                            }
+                            dt = fmax (gtfs->parameters ()->gamma, dt);
                         }
-                        dwell_t (i, m) = round (gtfs->parameters ()->gamma + dt);
+                        else
+                        {
+                            dt = -1.0;
+                            while (dt <= 0 || dt > 5*60)
+                            {
+                                dt = rng.rnorm () * gtfs->parameters ()->dwell_time_var +
+                                    gtfs->parameters ()->dwell_time;
+                            }
+                            dt += gtfs->parameters ()->gamma;
+                        }
+                        dwell_t (i, m) = round (dt);
                         if (i > 0) dwell_t (i, m) += dwell_t (i-1, m);
                     }
                 }
+                // std::cout << "---\n";
             }
             // std::cout << "\n" << seg_tt.format (intMat) << "\n";
 

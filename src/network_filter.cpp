@@ -170,11 +170,11 @@ namespace Gtfs {
         // truncated normal distribution
         double tt (-1.0);
         int tries (100);
-        while ((tt < min_tt || tt > _length*5) && tries > 0) {
+        while ((tt < min_tt || tt > _length*3) && tries > 0) {
             tt = rng.rnorm () * (pow (var, 0.5) + _state_var) + x.first (0);
             tries--;
         }
-        return round (fmax (0.0, tt));
+        return round (fmin(_length, fmax (min_tt, tt)));
     }
     double Segment::sample_speed (RNG& rng)
     {
@@ -182,8 +182,20 @@ namespace Gtfs {
     }
     double Segment::sample_speed (RNG& rng, int delta)
     {
-        int x = sample_travel_time (rng, delta);
-        return fmin (30.0, fmax (0.5, _length / x));
+        int x = 0;
+        int nmax = 100;
+        double s = 0.0;
+        while (s < 0.5 || s > 30)
+        {
+            x = sample_travel_time (rng, delta);
+            s = _length / x;
+            if (nmax == 0)
+            {
+                return rng.runif () * 29.0 + 1.0;
+            }
+        }
+
+        return s;
     }
 
 } // end Gtfs

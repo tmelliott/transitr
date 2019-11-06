@@ -922,11 +922,15 @@ namespace Gtfs {
                         wait = (sched + depi) - Time (e.timestamp);
                     }
                 }
-                else
+                else if (rng.runif () < vehicle->params ()->pr_stop)
                 {
                     wait = vehicle->gamma () +
                         vehicle->dwell_time () +
                         vehicle->dwell_time_var () * rng.rnorm ();
+                }
+                else
+                {
+                    wait = 0.0;
                 }
             }
             else
@@ -934,7 +938,16 @@ namespace Gtfs {
 #if VERBOSE > 3
                 std::cout << " which is a generic intersection";
 #endif
-                wait = - vehicle->dwell_time () * log (rng.runif ());
+                if (rng.runif () < vehicle->params ()->pr_stop)
+                {
+                    // wait = - vehicle->dwell_time () * log (rng.runif ());
+                    // ignore segment intersection times for now ...
+                    wait = 0.0;
+                }
+                else
+                {
+                    wait = 0.0;
+                }
             }
 #if VERBOSE > 3
             std::cout << " -> waiting " << round (wait) << "s";
@@ -1077,14 +1090,27 @@ namespace Gtfs {
 
                         // Pr(stop) inverse proportional to speed
                         // [0m/s -> 1, 35m/s -> 0]
-                        if (rng.runif () > (35 - speed) / 35)
+                        if (rng.runif () > vehicle->params ()->pr_stop)
                         {
 #if VERBOSE > 3
                             std::cout << "\n   -> dwell time at stop: ";
 #endif
-                            dwell = vehicle->gamma () +
-                                vehicle->dwell_time () +
-                                vehicle->dwell_time_var () * rng.rnorm ();
+                            if (stops.at (stop_index).sd_delay > 0)
+                            {
+                                dwell = 0.0;
+                                while (dwell <= 0.0)
+                                {
+                                    dwell = rng.rnorm () * stops.at (stop_index).sd_delay +
+                                        stops.at (stop_index).average_delay;
+                                }
+                                dwell = fmax (vehicle->gamma (), dwell);
+                            }
+                            else
+                            {
+                                dwell = vehicle->gamma () +
+                                    vehicle->dwell_time () +
+                                    vehicle->dwell_time_var () * rng.rnorm ();
+                            }
 #if VERBOSE > 3
                             std::cout << round (dwell);
 #endif
