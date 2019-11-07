@@ -922,6 +922,17 @@ namespace Gtfs {
                         wait = (sched + depi) - Time (e.timestamp);
                     }
                 }
+                else if (stops.at (stop_index).departure_time > stops.at (stop_index).arrival_time)
+                {
+                    // iteration start time = e.timestamp - delta
+                    // scheduled departure = stops.at.dep time
+                    wait = fmax (
+                        0.0,
+                        stops.at (stop_index).departure_time - 
+                            (Time (e.timestamp - delta)) + 
+                            rng.rnorm () * 5.0
+                    );
+                }
                 else if (rng.runif () < vehicle->params ()->pr_stop)
                 {
                     wait = vehicle->gamma () +

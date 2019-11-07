@@ -173,7 +173,7 @@ void run_realtime_model (List nw)
 #endif
 #if SIMULATION
         std::vector<std::string> routes_to_keep ({
-            // "NX1"
+            // "70"
             "24B", "931", "NX1", "NX2", "866", "802", "82", "83", "25B",
             "27H", "030", "047", "003", "SKY", "321", "221X", "243X", "223X",
             "248X", "22A", "70", "028", "101", "966", "22N", "22R", "24R",
@@ -264,17 +264,18 @@ void run_realtime_model (List nw)
         {
             for (auto trip = trips->begin (i); trip != trips->end (i); ++trip)
             {
+#if SIMULATION
+                auto rsn = trip->second.route ()->route_short_name ();
+                bool skip = true;
+                // if (trip->second.trip_id () != "1141156213-20190806160740_v82.21") continue;
+                for (auto rtk = routes_to_keep.begin (); rtk != routes_to_keep.end (); ++rtk)
+                {
+                    if (rsn == *rtk) skip = false;
+                }
+                if (skip) continue;
+#endif
                 if (trip->second.is_active (curtime))
                 {
-#if SIMULATION
-                    auto rsn = trip->second.route ()->route_short_name ();
-                    bool skip = true;
-                    for (auto rtk = routes_to_keep.begin (); rtk != routes_to_keep.end (); ++rtk)
-                    {
-                        if (rsn == *rtk) skip = false;
-                    }
-                    if (skip) continue;
-#endif
                     trip->second.update (curtime, rngs.at (omp_get_thread_num ()));
                     // trip->second.update_etas (curtime, rngs.at (omp_get_thread_num ()));
 #if VERBOSE > 1
