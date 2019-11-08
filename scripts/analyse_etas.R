@@ -187,25 +187,25 @@ RMSE
 
 range(eta_data$timestamp)
 
-if (!interactive()) q("no")
+# if (!interactive()) q("no")
 
 # q("no")
-for (TRIP in sample(unique(eta_data$trip_id))) {
-    print(TRIP)
-    routedata <- eta_data %>%
-        filter(trip_id == TRIP & !is.na(eta) & timestamp > as.POSIXct("2019-08-19 6:00:00"))
-    if (nrow(routedata) == 0) next()
-    p <- ggplot(routedata %>% filter(time_until_arrival > 0),
-        aes(timestamp)) +
-        geom_pointrange(aes(y = eta_prediction, ymin = lower_prediction, ymax = upper_prediction)) +
-        geom_point(aes(y = gtfs_arrival_time), colour = "red") +
-        geom_hline(aes(yintercept = actual_arrival), colour = "blue") +
-        geom_hline(aes(yintercept = scheduled_arrival), colour = "black", lty = 2) +
-        facet_wrap(~stop_sequence,scales="free_y") +
-        theme(legend.position = "none")
-    print(p)
-    grid::grid.locator()
-}
+# for (TRIP in sample(unique(eta_data$trip_id))) {
+#     print(TRIP)
+#     routedata <- eta_data %>%
+#         filter(trip_id == TRIP & !is.na(eta) & timestamp > as.POSIXct("2019-08-19 6:00:00"))
+#     if (nrow(routedata) == 0) next()
+#     p <- ggplot(routedata %>% filter(time_until_arrival > 0),
+#         aes(timestamp)) +
+#         geom_pointrange(aes(y = eta_prediction, ymin = lower_prediction, ymax = upper_prediction)) +
+#         geom_point(aes(y = gtfs_arrival_time), colour = "red") +
+#         geom_hline(aes(yintercept = actual_arrival), colour = "blue") +
+#         geom_hline(aes(yintercept = scheduled_arrival), colour = "black", lty = 2) +
+#         facet_wrap(~stop_sequence,scales="free_y") +
+#         theme(legend.position = "none")
+#     print(p)
+#     grid::grid.locator()
+# }
 
 
 
@@ -254,7 +254,7 @@ raw <- readr::read_csv(
 # TRIP <- "442135482-20190806160740_v82.21"
 TRIP <- "51446171530-20190806160740_v82.21"
 
-# TRIP <- unique(eta_data$trip_id)[2]
+for (TRIP in unique(eta_data$trip_id)) {
 tripdata <- eta_data %>%
     filter(trip_id == TRIP & !is.na(eta)) %>%
     filter(stop_sequence < max(.data$stop_sequence)) %>%
@@ -306,6 +306,7 @@ trip_etas <- tripdata %>%
             w_historical * historical_estimate
     )
 
+graph <- 
 ggplot(trip_etas, aes(timestamp)) +
     ## info about scheduled, actual arrival time
     geom_point(
@@ -338,31 +339,31 @@ ggplot(trip_etas, aes(timestamp)) +
         colour = "orangered"
     ) +
     ## 2. historical delay
-    geom_ribbon(
-        aes(
-            ymin = get_ci(historical_estimate, historical_uncertainty, "lower") +
-                as.integer(timestamp - actual_arrival),
-            ymax = get_ci(historical_estimate, historical_uncertainty, "upper") +
-                as.integer(timestamp - actual_arrival)
-        ),
-        fill = "magenta",
-        alpha = 0.3
-    ) +
+    # geom_ribbon(
+    #     aes(
+    #         ymin = get_ci(historical_estimate, historical_uncertainty, "lower") +
+    #             as.integer(timestamp - actual_arrival),
+    #         ymax = get_ci(historical_estimate, historical_uncertainty, "upper") +
+    #             as.integer(timestamp - actual_arrival)
+    #     ),
+    #     fill = "magenta",
+    #     alpha = 0.3
+    # ) +
     geom_path(
         aes(y = timestamp + historical_estimate - actual_arrival),
         colour = "magenta"
     ) +
     ## 3. schedule + delay
-    geom_ribbon(
-        aes(
-            ymin = get_ci(schedule_delay_estimate, schedule_delay_uncertainty, "lower") +
-                as.integer(timestamp - actual_arrival),
-            ymax = get_ci(schedule_delay_estimate, schedule_delay_uncertainty, "upper") +
-                as.integer(timestamp - actual_arrival)
-        ),
-        fill = "forestgreen",
-        alpha = 0.3
-    ) +
+    # geom_ribbon(
+    #     aes(
+    #         ymin = get_ci(schedule_delay_estimate, schedule_delay_uncertainty, "lower") +
+    #             as.integer(timestamp - actual_arrival),
+    #         ymax = get_ci(schedule_delay_estimate, schedule_delay_uncertainty, "upper") +
+    #             as.integer(timestamp - actual_arrival)
+    #     ),
+    #     fill = "forestgreen",
+    #     alpha = 0.3
+    # ) +
     geom_path(
         aes(y = timestamp + schedule_delay_estimate - actual_arrival),
         colour = "forestgreen"
@@ -380,6 +381,10 @@ ggplot(trip_etas, aes(timestamp)) +
         labels = function(x) x / 60
     ) +
     labs(x = "Time", y = "ETA error (min)")
+ggsave(sprintf("~/Dropbox/graphs/graph_%s.jpg", TRIP), graph, width = 18, height = 10)
+}
+
+if (!interactive()) q("no")
 
 ## How reliable are the various ETAs over time?
 trip_etas %>%

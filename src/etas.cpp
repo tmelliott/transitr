@@ -183,7 +183,7 @@ namespace Gtfs {
 
             // iterate over vehicle state
             int N (_vehicle->state ()->size ());
-            N = std::min (N, 20);
+            N = std::min (N, 100);
             _eta_matrix = Eigen::MatrixXi::Zero (N, M);
             // Eigen::MatrixXi seg_tt (Eigen::MatrixXi::Zero (N, L));
             // Eigen::MatrixXi dwell_t (Eigen::MatrixXi::Zero (N, M-1));
@@ -302,7 +302,7 @@ namespace Gtfs {
                 //     << " -> d = " << (segs.at (l).segment->length () - seg_prog)
                 //     << " -> t = " << ((segs.at (l).segment->length () - seg_prog) / v);
 
-                xx = segs.at (l).segment->sample_travel_time (rng);
+                xx = segs.at (l).segment->sample_travel_time (rng, tt);
                 tt += fmin(xx,
                     round ((
                         segs.at (l).distance +
@@ -355,6 +355,9 @@ namespace Gtfs {
                         // sig1 = sig2;
                         Y = segs.at (l).segment->travel_time ();
                         sig2 = pow (segs.at (l).segment->uncertainty (), 0.5);
+                        // additional variance for forecast dispersion
+                        sig2 += pow (segs.at (l).segment->system_noise (), 2) * tt;
+                        sig2 = fmax (sig2, segs.at (l).segment->prior_travel_time_var () * 2);
 
                         rho = 0.0;
 
@@ -594,7 +597,7 @@ namespace Gtfs {
                 // P += pow (y, 2);
 
 #if SIMULATION
-                fout << "," << X << "," << P << "\n";
+                fout << "," << X << "," << P;
 #endif
 
                 // insert back into state
@@ -615,6 +618,53 @@ namespace Gtfs {
                     std::get<0> (_eta_state.at (m)) +
                         std::ceil (1.96 * pow (std::get<1> (_eta_state.at (m)), 0.5))
                 );
+#if SIMULATION
+                std::sort (
+                    tt_wt.begin (), 
+                    tt_wt.end (),
+                    [](std::tuple<double, double>& a, std::tuple<double, double>& b)
+                    {
+                        return std::get<0> (a) < std::get<0> (b);
+                    }
+                );
+                int i=0;
+                double sum_wt = 0.0;
+                // 2.5% quantile
+                while (sum_wt < 0.025)
+                {
+                    sum_wt += std::get<1> (tt_wt.at (i));
+                    i++;
+                }
+                fout << "," << round (std::get<0> (tt_wt.at (i-1)));
+                // etas.at (m).quantiles.emplace_back (
+                //     0.025,
+                //     ts + round (std::get<0> (tt_wt.at (i-1)))
+                // );
+                // 50% quantile (median)
+                while (sum_wt < 0.5)
+                {
+                    sum_wt += std::get<1> (tt_wt.at (i));
+                    i++;
+                }
+                fout << "," << round (std::get<0> (tt_wt.at (i-1)));
+                // etas.at (m).quantiles.emplace_back (
+                //     0.5,
+                //     ts + round (std::get<0> (tt_wt.at (i-1)))
+                // );
+                // 97.5% quantile
+                while (sum_wt < 0.975)
+                {
+                    sum_wt += std::get<1> (tt_wt.at (i));
+                    i++;
+                }
+                if (i == N) i = i-1;
+                fout << "," << round (std::get<0> (tt_wt.at (i)));
+                // etas.at (m).quantiles.emplace_back (
+                //     0.975,
+                //     ts + round (std::get<0> (tt_wt.at (i)))
+                // );
+                fout << "\n";
+#endif
             }
             else
             {

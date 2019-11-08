@@ -395,6 +395,7 @@ namespace Gtfs
         double length ();
         double min_travel_time ();
         double state_var ();
+        double system_noise ();
 
         double prior_travel_time ();
         double prior_travel_time_var ();

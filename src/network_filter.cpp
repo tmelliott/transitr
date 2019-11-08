@@ -31,7 +31,12 @@ namespace Gtfs {
 
         if (_uncertainty (0, 0) > 0)
         {
-            Phat (0, 0) += pow (_system_noise * delta, 2);
+            // Check this ... (chapters 4/5):
+            Phat (0, 0) += pow (_system_noise, 2) * delta;
+
+            if (delta > 30 && _prior_travel_time_var > 0 && 
+                Phat (0, 0) > 2 * _prior_travel_time_var)
+                Phat (0, 0) = 2 * _prior_travel_time_var;
         }
         else
         {
