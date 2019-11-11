@@ -7,6 +7,11 @@
 #include "timing.h"
 #endif
 
+template <typename T>
+T pnorm (T x, T m, T s)
+{
+    return 0.5 * (1.0 + erf ((x - m) * M_SQRT1_2 / s));
+}
 
 namespace Gtfs {
 
@@ -217,7 +222,7 @@ namespace Gtfs {
                 // time to end of current segment
                 l = find_segment_index (p->get_distance (), &segs);
                 // std::cout << "\n --- [p], l = " << l;
-                
+
                 /**
                  * START: % of the way through segment l
                  * 0---- ... ----(l-1)-----(l)------(l+1)---- ... ----(L-1)---(L)
@@ -230,10 +235,10 @@ namespace Gtfs {
                  *   - if > zero, use particle's speed + noise OR NW state speed (if particle going slow)
                  *     or scheduled speed if NW state isn't available/useful
                  * - THEN, while l < L
-                 *   - add MAX(dwell time, layover departure) 
+                 *   - add MAX(dwell time, layover departure)
                  *   - add travel time [l, l+1) (again, NW or schedule, depending)
                  *   -> save arrival time at l+1
-                 * 
+                 *
                  */
 
                 /** if less than 20% of the way through the segment,
@@ -273,7 +278,7 @@ namespace Gtfs {
                     if (is_layover)
                     {
                         tt = fmax (
-                            tt, 
+                            tt,
                             _stops.at (l).departure_time - Time (_timestamp) + rng.rnorm () * 5.0
                         );
                     }
@@ -343,7 +348,7 @@ namespace Gtfs {
                         }
                     }
                     tt += fmax (0.0, dt);
-                    
+
                     // layover ?
                     if (_stops.at (l).departure_time > _stops.at (l).arrival_time)
                     {
@@ -446,8 +451,168 @@ namespace Gtfs {
         // trip_id, stop_id, timestamp, state, var, pred_state, pred_var, obs, obs_err, final_state, final_var
 #endif
 
-        double tt_mean, tt_var, tt_lower, tt_upper;
+        double tt_mean, tt_var, tt_lower, tt_median, tt_upper;
         double X, P, y, S, K;
+
+        bool normal_is_converged (false);
+        int normal_n;
+        std::vector<double> normal_pi, normal_mu, normal_sigma2;
+        std::vector<double> normal_mean, normal_var, normal_lower, normal_median, normal_upper;
+        // normal approx:
+        // need to calculate pi, mu, sigma for each mode:
+        normal_pi.clear ();
+        normal_mu.clear ();
+        normal_sigma2.clear ();
+        normal_mean.resize (M, 0.0);
+        normal_var.resize (M, 0.0);
+        normal_lower.resize (M, 0.0);
+        normal_median.resize (M, 0.0);
+        normal_upper.resize (M, 0.0);
+
+        if (_vehicle != nullptr)
+        {
+            if (_stops.at (_stop_index).distance + 20.0 >= _vehicle->distance ())
+            {
+                // vehicle has not yet departed current stop index
+                normal_pi.push_back (0.5);
+                normal_pi.push_back (0.5);
+                normal_mu.push_back (20.0);
+                normal_mu.push_back (0.0);
+                normal_sigma2.push_back (15.0);
+                normal_sigma2.push_back (0.0);
+            }
+        }
+        else
+        {
+            return etas;
+        }
+
+        // for optimisation
+        const int double_bits = std::numeric_limits<double>::digits;
+        std::pair<double, double> r;
+
+        double normal_tt = 0.0, normal_tt_var = 0.0;
+        auto segs = _shape->segments ();
+        std::cout << "\n ++ starting from stop " << _stop_index;
+        for (int m=_stop_index+1; m<M; m++)
+        {
+            std::cout << "\n Estimating for stop " << m << ": ";
+            // travel time to get there:
+            normal_tt_var =
+                fmin (
+                    segs.at (m-1).segment->prior_travel_time_var (),
+                    normal_tt_var + segs.at (m-1).segment->uncertainty () + normal_tt * 0.05
+                );
+            normal_tt += segs.at (m-1).segment->travel_time ();
+            std::cout << " tt = " << normal_tt << " (" << normal_tt_var << ")";
+
+            int curlen = normal_pi.size ();
+            if (curlen == 0)
+            {
+                // initialize it
+                for (int k=0;k<2;k++)
+                {
+                    normal_pi.push_back (0.5);
+                    normal_mu.push_back (20.0 * (k == 1));
+                    normal_sigma2.push_back (15.0 * (k == 1));
+                }
+            }
+            else if (m - _stop_index < 5)
+            {
+                // it doesn't stop
+                for (int j=0;j<curlen;j++)
+                {
+                    normal_pi.push_back (normal_pi.at (j) * 0.8);
+                    normal_mu.push_back (normal_mu.at (j));
+                    normal_sigma2.push_back (normal_sigma2.at (j));
+                }
+
+                // it stops
+                for (int j=0;j<curlen;j++)
+                {
+                    normal_pi.at (j) *= 0.2;
+                    normal_mu.at (j) += 20.0;
+                    normal_sigma2.at (j) += 10.0;
+                }
+            }
+            else
+            {
+                std::cout << "\nDone.\n";
+                break;
+            }
+
+
+            for (int i=0; i<normal_pi.size (); i++)
+            {
+                std::cout << "\n " << i << ": "
+                    << normal_pi.at (i) << ", "
+                    << normal_mu.at (i) << ", "
+                    << normal_sigma2.at (i);
+            }
+
+            normal_mean.at (m) = 0.0;
+            double EVX = 0.0, VEX1 = 0.0, VEX2 = 0.0;
+            for (int i=0; i<normal_pi.size (); i++)
+            {
+                normal_mean.at (m) += normal_pi.at (i) * normal_mu.at (i);
+                EVX += normal_pi.at (i) * pow (normal_sigma2.at (i), 2);
+                VEX1 += normal_pi.at (i) * pow (normal_mu.at (i), 2);
+                VEX2 += normal_pi.at (i) * normal_mu.at (i);
+            }
+            normal_var.at (m) = EVX + VEX1 - pow (VEX2, 2);
+
+            std::cout << "\n arrival time -> "
+                << (normal_mean.at (m))
+                << " (" << (normal_var.at (m)) << ")";
+
+            // find quantiles:
+
+            r = boost::math::tools::brent_find_minima (
+                [&, normal_pi, normal_mu, normal_sigma2](double const& x)
+                {
+                    double r = 0.0;
+                    for (int i=0;i<normal_pi.size ();i++)
+                    {
+                        r += normal_pi.at (i) *
+                            pnorm (x, normal_mu.at (i), pow (normal_sigma2.at (i), 0.5));
+                    }
+                    return pow (r - 0.05, 2);
+                },
+                0.,
+                normal_mean.at (m) + 5 * (normal_var.at (m)),
+                double_bits
+            );
+            normal_lower.at (m) = r.first;
+
+            r = boost::math::tools::brent_find_minima (
+                [&, normal_pi, normal_mu, normal_sigma2](double const& x)
+                {
+                    double r = 0.0;
+                    for (int i=0;i<normal_pi.size ();i++)
+                    {
+                        r += normal_pi.at (i) *
+                            pnorm (x, normal_mu.at (i), pow (normal_sigma2.at (i), 0.5));
+                    }
+                    return pow (r - 0.95, 2);
+                },
+                0.,
+                normal_mean.at (m) + 5 * (normal_var.at (m)),
+                double_bits
+            );
+            normal_upper.at (m) = r.first;
+
+            std::cout << " -> ["
+                << normal_lower.at (m) << ", " << normal_upper.at (m) << "]";
+
+            // if (!normal_is_converged)
+            // {
+
+            // }
+        }
+
+        std::cout << "We are done!\n\n";
+
+
         uint64_t ts;
         if (log) std::cout << " - get state starts at stop " << (_stop_index+1) << "\n";
         for (int m=_stop_index;m<M;m++)
@@ -489,12 +654,57 @@ namespace Gtfs {
             ts = (_vehicle != nullptr && _vehicle->state ()->size () == N) ?
                 _vehicle->timestamp () : _timestamp;
 
+#if SIMULATION
+            std::sort (
+                tt_wt.begin (),
+                tt_wt.end (),
+                [](std::tuple<double, double>& a, std::tuple<double, double>& b)
+                {
+                    return std::get<0> (a) < std::get<0> (b);
+                }
+            );
+            int i=0;
+            double sum_wt = 0.0;
+            // 2.5% quantile
+            while (sum_wt < 0.025)
+            {
+                sum_wt += std::get<1> (tt_wt.at (i));
+                i++;
+            }
+            tt_lower = round (std::get<0> (tt_wt.at (i-1)));
+            // 50% quantile (median)
+            while (sum_wt < 0.5)
+            {
+                sum_wt += std::get<1> (tt_wt.at (i));
+                i++;
+            }
+            tt_median = round (std::get<0> (tt_wt.at (i-1)));
+            // 97.5% quantile
+            while (sum_wt < 0.975)
+            {
+                sum_wt += std::get<1> (tt_wt.at (i));
+                i++;
+            }
+            if (i == N) i = i-1;
+            tt_upper = round (std::get<0> (tt_wt.at (i)));
+
+#endif
+
             /**
              * A note on indices:
              *
              * _eta_matrix is M length, INCLUDES the first stop.
              * etas/_eta_state are M length, so include first stop
              */
+
+            // Write estimates to the file:
+            // trip_id, stop_sequence, timestamp, pf_obs, pf_var, pf_lower, pf_upper, normal_mean, normal_var, normal_lower, normal_upper
+#if SIMULATION
+            fout << _trip_id << "," << (m) << "," << _timestamp
+                // particle predictions:
+                << "," << tt_mean << "," << tt_var << "," << tt_lower << "," << tt_upper;
+
+#endif
 
             // update the estimate state
             if (true)
@@ -521,10 +731,10 @@ namespace Gtfs {
                         << ", P = " << std::setw (8) << (round (P * 100) / 100);
 
 
-#if SIMULATION
-                fout << _trip_id << "," << (m) << "," << _timestamp
-                    << "," << X << "," << P;
-#endif
+// #if SIMULATION
+//                 fout << _trip_id << "," << (m) << "," << _timestamp
+//                     << "," << X << "," << P;
+// #endif
 
                 int avg_arr = _stops.at (m).departure_time.asUNIX (_timestamp) + _stops.at (m).average_delay;
                 double avg_eta = avg_arr - _timestamp;
@@ -564,9 +774,9 @@ namespace Gtfs {
                         << " => Z = " << std::setw (8) << (round (tt_mean * 100) / 100)
                         << ", R = " << std::setw (8) << (round (tt_var * 100) / 100);
 
-#if SIMULATION
-                fout << "," << X << "," << P << "," << tt_mean << "," << tt_var;
-#endif
+// #if SIMULATION
+//                 fout << "," << X << "," << P << "," << tt_mean << "," << tt_var;
+// #endif
 
                 // KF update
                 // if (tt_var == 0)
@@ -596,9 +806,9 @@ namespace Gtfs {
 
                 // P += pow (y, 2);
 
-#if SIMULATION
-                fout << "," << X << "," << P;
-#endif
+// #if SIMULATION
+//                 fout << "," << X << "," << P;
+// #endif
 
                 // insert back into state
                 _eta_state.at (m) = std::make_tuple (_timestamp + round (X), P);
@@ -619,51 +829,7 @@ namespace Gtfs {
                         std::ceil (1.96 * pow (std::get<1> (_eta_state.at (m)), 0.5))
                 );
 #if SIMULATION
-                std::sort (
-                    tt_wt.begin (), 
-                    tt_wt.end (),
-                    [](std::tuple<double, double>& a, std::tuple<double, double>& b)
-                    {
-                        return std::get<0> (a) < std::get<0> (b);
-                    }
-                );
-                int i=0;
-                double sum_wt = 0.0;
-                // 2.5% quantile
-                while (sum_wt < 0.025)
-                {
-                    sum_wt += std::get<1> (tt_wt.at (i));
-                    i++;
-                }
-                fout << "," << round (std::get<0> (tt_wt.at (i-1)));
-                // etas.at (m).quantiles.emplace_back (
-                //     0.025,
-                //     ts + round (std::get<0> (tt_wt.at (i-1)))
-                // );
-                // 50% quantile (median)
-                while (sum_wt < 0.5)
-                {
-                    sum_wt += std::get<1> (tt_wt.at (i));
-                    i++;
-                }
-                fout << "," << round (std::get<0> (tt_wt.at (i-1)));
-                // etas.at (m).quantiles.emplace_back (
-                //     0.5,
-                //     ts + round (std::get<0> (tt_wt.at (i-1)))
-                // );
-                // 97.5% quantile
-                while (sum_wt < 0.975)
-                {
-                    sum_wt += std::get<1> (tt_wt.at (i));
-                    i++;
-                }
-                if (i == N) i = i-1;
-                fout << "," << round (std::get<0> (tt_wt.at (i)));
-                // etas.at (m).quantiles.emplace_back (
-                //     0.975,
-                //     ts + round (std::get<0> (tt_wt.at (i)))
-                // );
-                fout << "\n";
+
 #endif
             }
             else

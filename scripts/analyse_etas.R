@@ -306,7 +306,7 @@ trip_etas <- tripdata %>%
             w_historical * historical_estimate
     )
 
-graph <- 
+graph <-
 ggplot(trip_etas, aes(timestamp)) +
     ## info about scheduled, actual arrival time
     geom_point(
