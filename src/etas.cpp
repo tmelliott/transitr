@@ -7,11 +7,11 @@
 #include "timing.h"
 #endif
 
-template <typename T>
-T pnorm (T x, T m, T s)
-{
-    return 0.5 * (1.0 + erf ((x - m) * M_SQRT1_2 / s));
-}
+// template <typename T>
+// T pnorm (T x, T m, T s)
+// {
+//     return 0.5 * (1.0 + erf ((x - m) * M_SQRT1_2 / s));
+// }
 
 namespace Gtfs {
 
@@ -454,10 +454,10 @@ namespace Gtfs {
         double tt_mean, tt_var, tt_lower, tt_median, tt_upper;
         double X, P, y, S, K;
 
-        bool normal_is_converged (false);
         int normal_n;
         std::vector<double> normal_pi, normal_mu, normal_sigma2;
         std::vector<double> normal_mean, normal_var, normal_lower, normal_median, normal_upper;
+        double segr; // segment proportion remaining
         // normal approx:
         // need to calculate pi, mu, sigma for each mode:
         normal_pi.clear ();
@@ -469,17 +469,23 @@ namespace Gtfs {
         normal_median.resize (M, 0.0);
         normal_upper.resize (M, 0.0);
 
-        if (_vehicle != nullptr)
+        if (_vehicle != nullptr && _stop_index < M - 1)
         {
             if (_stops.at (_stop_index).distance + 20.0 >= _vehicle->distance ())
             {
                 // vehicle has not yet departed current stop index
-                normal_pi.push_back (0.5);
-                normal_pi.push_back (0.5);
-                normal_mu.push_back (20.0);
+                normal_pi.push_back (_vehicle->pr_stop ());
+                normal_pi.push_back (_vehicle->pr_stop ());
+                normal_mu.push_back (_stops.at (_stop_index).average_delay);
                 normal_mu.push_back (0.0);
-                normal_sigma2.push_back (15.0);
+                normal_sigma2.push_back (pow (_stops.at (_stop_index).sd_delay, 2));
                 normal_sigma2.push_back (0.0);
+            }
+            else
+            {
+                segr = _stops.at (_stop_index+1).distance - _vehicle->distance ();
+                segr /= _stops.at (_stop_index+1).distance - _stops.at (_stop_index).distance;
+
             }
         }
         else
@@ -493,18 +499,33 @@ namespace Gtfs {
 
         double normal_tt = 0.0, normal_tt_var = 0.0;
         auto segs = _shape->segments ();
-        std::cout << "\n ++ starting from stop " << _stop_index;
+        // std::cout << "\n ++ starting from stop " << _stop_index;
         for (int m=_stop_index+1; m<M; m++)
         {
-            std::cout << "\n Estimating for stop " << m << ": ";
+            // std::cout << "\n\n Estimating for stop " << m << ": ";
             // travel time to get there:
-            normal_tt_var =
-                fmin (
-                    segs.at (m-1).segment->prior_travel_time_var (),
-                    normal_tt_var + segs.at (m-1).segment->uncertainty () + normal_tt * 0.05
-                );
-            normal_tt += segs.at (m-1).segment->travel_time ();
-            std::cout << " tt = " << normal_tt << " (" << normal_tt_var << ")";
+            if (segs.at (m-1).segment->uncertainty () > 0)
+            {
+                normal_tt_var =
+                    fmin (
+                        segs.at (m-1).segment->prior_travel_time_var (),
+                        segs.at (m-1).segment->uncertainty () +
+                            normal_tt * pow(segs.at (m-1).segment->system_noise (), 2)
+                    );
+                normal_tt = segs.at (m-1).segment->travel_time ();
+            }
+            else
+            {
+                normal_tt = segs.at (m-1).segment->prior_travel_time ();
+                normal_tt_var = segs.at (m-1).segment->prior_travel_time_var ();
+            }
+            normal_tt_var += segs.at (m-1).segment->state_var ();
+            if (m == _stop_index)
+            {
+                normal_tt *= segr;
+                normal_tt_var *= pow (segr, 2);
+            }
+            // std::cout << " tt = " << normal_tt << " (" << normal_tt_var << ")";
 
             int curlen = normal_pi.size ();
             if (curlen == 0)
@@ -512,17 +533,21 @@ namespace Gtfs {
                 // initialize it
                 for (int k=0;k<2;k++)
                 {
-                    normal_pi.push_back (0.5);
-                    normal_mu.push_back (20.0 * (k == 1));
-                    normal_sigma2.push_back (15.0 * (k == 1));
+                    normal_pi.push_back (_vehicle->pr_stop ());
+                    normal_mu.push_back (_stops.at (m).average_delay * (k == 1));
+                    normal_sigma2.push_back (pow (_stops.at (m).sd_delay, 2) * (k == 1));
                 }
+                normal_tt = 0.0;
+                normal_tt_var = 0.0;
+                continue;
             }
-            else if (m - _stop_index < 5)
+            else
             {
                 // it doesn't stop
                 for (int j=0;j<curlen;j++)
                 {
-                    normal_pi.push_back (normal_pi.at (j) * 0.8);
+
+                    normal_pi.push_back (normal_pi.at (j) * _vehicle->pr_stop ());
                     normal_mu.push_back (normal_mu.at (j));
                     normal_sigma2.push_back (normal_sigma2.at (j));
                 }
@@ -530,43 +555,40 @@ namespace Gtfs {
                 // it stops
                 for (int j=0;j<curlen;j++)
                 {
-                    normal_pi.at (j) *= 0.2;
-                    normal_mu.at (j) += 20.0;
-                    normal_sigma2.at (j) += 10.0;
+                    normal_pi.at (j) *= _vehicle->pr_stop ();
+                    normal_mu.at (j) += _stops.at (m).average_delay;
+                    normal_sigma2.at (j) += pow (_stops.at (m).sd_delay, 2);
+                }
+
+                for (int j=0;j<normal_pi.size ();j++)
+                {
+                    normal_mu.at (j) += normal_tt;
+                    normal_sigma2.at (j) += normal_tt_var;
                 }
             }
-            else
-            {
-                std::cout << "\nDone.\n";
-                break;
-            }
 
-
-            for (int i=0; i<normal_pi.size (); i++)
-            {
-                std::cout << "\n " << i << ": "
-                    << normal_pi.at (i) << ", "
-                    << normal_mu.at (i) << ", "
-                    << normal_sigma2.at (i);
-            }
+            // for (int i=0; i<std::min (20, (int)normal_pi.size ()); i++)
+            // {
+            //     std::cout << "\n " << i << ": "
+            //         << normal_pi.at (i) << ", "
+            //         << normal_mu.at (i) << ", "
+            //         << normal_sigma2.at (i);
+            // }
 
             normal_mean.at (m) = 0.0;
             double EVX = 0.0, VEX1 = 0.0, VEX2 = 0.0;
             for (int i=0; i<normal_pi.size (); i++)
             {
                 normal_mean.at (m) += normal_pi.at (i) * normal_mu.at (i);
-                EVX += normal_pi.at (i) * pow (normal_sigma2.at (i), 2);
+                EVX += normal_pi.at (i) * normal_sigma2.at (i);
                 VEX1 += normal_pi.at (i) * pow (normal_mu.at (i), 2);
                 VEX2 += normal_pi.at (i) * normal_mu.at (i);
             }
             normal_var.at (m) = EVX + VEX1 - pow (VEX2, 2);
 
-            std::cout << "\n arrival time -> "
-                << (normal_mean.at (m))
-                << " (" << (normal_var.at (m)) << ")";
+            // std::cout << "\n arrival time -> ";
 
             // find quantiles:
-
             r = boost::math::tools::brent_find_minima (
                 [&, normal_pi, normal_mu, normal_sigma2](double const& x)
                 {
@@ -574,12 +596,12 @@ namespace Gtfs {
                     for (int i=0;i<normal_pi.size ();i++)
                     {
                         r += normal_pi.at (i) *
-                            pnorm (x, normal_mu.at (i), pow (normal_sigma2.at (i), 0.5));
+                            R::pnorm (x, normal_mu.at (i), pow (normal_sigma2.at (i), 0.5), 1, 0);
                     }
                     return pow (r - 0.05, 2);
                 },
-                0.,
-                normal_mean.at (m) + 5 * (normal_var.at (m)),
+                normal_mean.at (m) - 5 * pow (normal_var.at (m), 0.5),
+                normal_mean.at (m) + 5 * pow (normal_var.at (m), 0.5),
                 double_bits
             );
             normal_lower.at (m) = r.first;
@@ -591,27 +613,43 @@ namespace Gtfs {
                     for (int i=0;i<normal_pi.size ();i++)
                     {
                         r += normal_pi.at (i) *
-                            pnorm (x, normal_mu.at (i), pow (normal_sigma2.at (i), 0.5));
+                            R::pnorm (x, normal_mu.at (i), pow (normal_sigma2.at (i), 0.5), 1, 0);
                     }
                     return pow (r - 0.95, 2);
                 },
-                0.,
-                normal_mean.at (m) + 5 * (normal_var.at (m)),
+                normal_mean.at (m) - 5 * pow (normal_var.at (m), 0.5),
+                normal_mean.at (m) + 5 * pow (normal_var.at (m), 0.5),
                 double_bits
             );
             normal_upper.at (m) = r.first;
 
-            std::cout << " -> ["
-                << normal_lower.at (m) << ", " << normal_upper.at (m) << "]";
+            // std::cout << " -> ["
+                // << normal_lower.at (m) << ", " << normal_upper.at (m) << "]";
 
-            // if (!normal_is_converged)
-            // {
+            double q1, q2, qerr;
+            q1 = R::qnorm (0.05, normal_mean.at (m), pow (normal_var.at (m), 0.5), 1, 0);
+            q2 = R::qnorm (0.95, normal_mean.at (m), pow (normal_var.at (m), 0.5), 1, 0);
+            qerr =
+                pow (
+                    pow (q1 - normal_lower.at (m), 2) + pow (q2 - normal_upper.at (m), 2),
+                    0.5
+                );
+            // std::cout << "\n Quantiles of N(" << normal_mean.at (m) << ", "
+            //     << normal_var.at (m) << "): [" << q1 << ", " << q2 << "] -> sqrt(sum(diff^2)) = "
+            //     << qerr;
 
-            // }
+
+            if (qerr < 5.0 || normal_pi.size () > pow (2, 8))
+            {
+                // std::cout << "\n -> combining into single mode as difference is minimal!";
+                normal_pi.resize (1);
+                normal_pi.at (0) = 1.0;
+                normal_mu.resize (1);
+                normal_mu.at (0) = normal_mean.at (m);
+                normal_sigma2.resize (1);
+                normal_sigma2.at (0) = normal_var.at (m);
+            }
         }
-
-        std::cout << "We are done!\n\n";
-
 
         uint64_t ts;
         if (log) std::cout << " - get state starts at stop " << (_stop_index+1) << "\n";
@@ -702,8 +740,10 @@ namespace Gtfs {
 #if SIMULATION
             fout << _trip_id << "," << (m) << "," << _timestamp
                 // particle predictions:
-                << "," << tt_mean << "," << tt_var << "," << tt_lower << "," << tt_upper;
-
+                << "," << tt_mean << "," << tt_var << "," << tt_lower << "," << tt_upper
+                // normal approx pred:
+                << "," << normal_mean.at (m) << "," << normal_var.at (m) << ","
+                << normal_lower.at (m) << "," << normal_upper.at (m) << "\n";
 #endif
 
             // update the estimate state

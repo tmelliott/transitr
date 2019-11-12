@@ -10,7 +10,9 @@ tudir <- file.path("simulations", "archive")
 tufiles <- list.files(tudir, pattern = "^trip_updates.+\\.pb$", full.names = TRUE)
 # system.time( transitr:::processEtas(tufiles, "arrivaldata.csv", "at_gtfs.db") )
 
-system.time(
+if (file.exists("simulations/arrivaldata_etas.rda")) {
+    load("simulations/arrivaldata_etas.rda")
+} else {
     arrivaldata <- readr::read_csv(
         "arrivaldata.csv",
         col_names = c(
@@ -42,7 +44,8 @@ system.time(
         vids <- table(x$vehicle_id)
         x %>% filter(vehicle_id == names(vids)[which.max(vids)])
     })
-)
+    save(arrivaldata, file = "simulations/arrivaldata_etas.rda")
+}
 
 
 tids <- arrivaldata %>% group_by(trip_id) %>%
@@ -658,3 +661,40 @@ ggplot(dat, aes(timestamp, travel_time)) +
 ggplot(bad_trip, aes(timestamp, arrival_time)) +
     geom_point()+
     facet_wrap(~stop_sequence)
+
+
+
+
+
+############# NEWEST
+library(tidyverse)
+load("simulations/arrivaldata_etas.rda")
+
+etas <- read_csv("simulations/sim000/eta_state.csv",
+    col_names = c("trip_id", "stop_sequence", "timestamp",
+        "pf_mean", "pf_var", "pf_lower", "pf_upper",
+        "normal_mean", "normal_var", "normal_lower", "normal_upper"),
+    col_types = "ciinnnnnnnn"
+) %>%
+    left_join(arrivaldata, by = c("trip_id", "stop_sequence")) %>%
+    mutate(actual_eta = as.integer(arrival_time) - as.integer(timestamp))
+
+t <- etas$trip_id[1]
+for (t in unique(etas$trip_id)) {
+    p <- ggplot(etas %>% filter(trip_id == t), aes(timestamp)) +
+        geom_hline(yintercept = 0) +
+        geom_ribbon(aes(ymin = pf_lower - actual_eta, ymax = pf_upper - actual_eta),
+            fill = "orangered", alpha = 0.5) +
+        geom_ribbon(aes(ymin = normal_lower - actual_eta, ymax = normal_upper - actual_eta),
+            fill = "blue", alpha = 0.5) +
+        geom_path(aes(y = pf_mean - actual_eta), colour = "orangered") +
+        geom_path(aes(y = normal_mean - actual_eta), colour = "blue") +
+        facet_wrap(~stop_sequence, scale = "free_y") +
+        theme(legend.position = "none") +
+        scale_y_continuous(
+            breaks = function(x) pretty(x/60) * 60,
+            labels = function(x) x / 60
+        )
+    print(p)
+    grid::grid.locator()
+}
