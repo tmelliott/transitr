@@ -1612,12 +1612,6 @@ namespace Gtfs
 
         loaded = true;
 
-        // set up the initial state of the segment
-        _travel_time (0) = _length / 10.0;
-        _travel_time (1) = 0.0;
-        _uncertainty = Eigen::Matrix2d::Zero ();
-        min_tt = _length / max_speed;
-
         // attempt to fetch parameters from `segment_parameters` table
         qry = "SELECT COUNT(type) FROM sqlite_master WHERE type='table' AND name='segment_parameters'";
         const char* tblcheck = qry.c_str ();
@@ -1649,7 +1643,7 @@ namespace Gtfs
         sqlite3_finalize (stmt);
 
         // it exists - go grab them values!
-        qry = "SELECT q, phi, tt, tt_var FROM segment_parameters WHERE segment_id=?";
+        qry = "SELECT q, phi, speed, speed_var, max_speed FROM segment_parameters WHERE segment_id=?";
         const char* segpars = qry.c_str ();
         if (sqlite3_prepare_v2(db, segpars, -1, &stmt, 0) != SQLITE_OK)
         {
@@ -1671,8 +1665,9 @@ namespace Gtfs
         {
             _system_noise = sqlite3_column_double (stmt, 0);
             _state_var = pow (sqlite3_column_double (stmt, 1), 2);
-            _prior_travel_time = sqlite3_column_double (stmt, 2);
-            _prior_travel_time_var = fmax (20.0, sqlite3_column_double (stmt, 3));
+            _prior_speed = sqlite3_column_double (stmt, 2);
+            _prior_speed_var = fmax (20.0, sqlite3_column_double (stmt, 3));
+            _max_speed = sqlite3_column_double (stmt, 4);
         }
 
         sqlite3_finalize (stmt);
@@ -1711,10 +1706,15 @@ namespace Gtfs
         if (!loaded) load ();
         return _length;
     }
-    double Segment::min_travel_time ()
+    double Segment::max_speed ()
     {
         if (!loaded) load ();
-        return min_tt;
+        return _max_speed;
+    }
+    double Segment::min_err ()
+    {
+        if (!loaded) load ();
+        return _min_err;
     }
     double Segment::state_var ()
     {
@@ -1727,38 +1727,46 @@ namespace Gtfs
         return _system_noise;
     }
 
-    double Segment::prior_travel_time ()
+    /**                                          Segment state functions */
+    double Segment::prior_speed ()
     {
         if (!loaded) load ();
-        return _prior_travel_time;
+        return _prior_speed;
     };
-    double Segment::prior_travel_time_var ()
+    double Segment::prior_speed_var ()
     {
         if (!loaded) load ();
-        return _prior_travel_time_var;
+        return _prior_speed_var;
     };
 
-    std::vector<std::pair<int, double> >& Segment::data ()
-    {
-        if (!loaded) load ();
-        return _data;
-    }
     uint64_t Segment::timestamp ()
     {
         return _timestamp;
     }
-    double Segment::travel_time ()
+    double Segment::speed ()
     {
         if (!loaded) load ();
-        return _travel_time (0);
+        return _speed;
     }
+    int Segment::travel_time ()
+    {
+        if (!loaded) load ();
+        return round (_length / _speed);
+    }
+    double Segment::tt_uncertainty ()
+    {
+        if (!loaded) load ();
+        // delta method, Var(g(x)) = g'(xhat)^2 * Var(x)
+        return pow (_length / _speed, 2.) * _uncertainty;
+    }
+
     double Segment::uncertainty ()
     {
         if (!loaded) load ();
-        return _uncertainty (0, 0);
+        return _uncertainty;
     }
 
-    std::vector<std::pair<int, double> >& Segment::get_data ()
+    std::vector<std::pair<double, double> >& Segment::get_data ()
     {
         return _data;
     }
@@ -1766,9 +1774,10 @@ namespace Gtfs
     void Segment::push_data (int time, double err, uint64_t ts)
     {
         if (!loaded) load ();
-        if (time < min_tt || time > _length) return;
+        double speed = _length / (double)time;
+        if (speed <= 0 || speed > _max_speed) return;
         std::lock_guard<std::mutex> lk (data_mutex);
-        _data.emplace_back ((int) round (time), fmax (min_err, err));
+        _data.emplace_back (speed, fmax (_min_err, err));
 
 #if SIMULATION
         // write observation to file
@@ -1776,7 +1785,7 @@ namespace Gtfs
         fname << "history/segment_" << _segment_id << ".csv";
         std::ofstream fout;
         fout.open (fname.str ().c_str (), std::ofstream::app);
-        fout << _segment_id << "," << ts << "," << time << "," << err << "\n";
+        fout << _segment_id << "," << ts << "," << speed << "," << err << "\n";
         fout.close ();
 #endif
     }

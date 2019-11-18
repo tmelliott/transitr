@@ -332,11 +332,13 @@ namespace Gtfs {
                 fout.open ("particle_travel_times.csv", std::ofstream::app);
 #endif
 
+                double L;
                 for (_current_segment=0; _current_segment<M; _current_segment++)
                 {
                     if (_segment_travel_times.at (_current_segment) > 0) continue;
-                    segmin = segs.at (_current_segment).segment->min_travel_time ();
-                    segmax = segs.at (_current_segment).segment->length ();
+                    L = segs.at (_current_segment).segment->length ();
+                    segmin = L / segs.at (_current_segment).segment->max_speed ();
+                    segmax = L / 0.2;
 
                     // get the average travel time for particles along that segment
                     tt = 0.0;
@@ -928,8 +930,8 @@ namespace Gtfs {
                     // scheduled departure = stops.at.dep time
                     wait = fmax (
                         0.0,
-                        stops.at (stop_index).departure_time - 
-                            (Time (e.timestamp - delta)) + 
+                        stops.at (stop_index).departure_time -
+                            (Time (e.timestamp - delta)) +
                             rng.rnorm () * 5.0
                     );
                 }

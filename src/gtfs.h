@@ -355,18 +355,20 @@ namespace Gtfs
         double _length;
 
         /* values extracted either from the schedule or historical models */
-        double _prior_travel_time = 0.0;
-        double _prior_travel_time_var = 0.0;
+        // double _prior_travel_time = 0.0;
+        // double _prior_travel_time_var = 0.0;
+        double _prior_speed = 30. / 3.6;
+        double _prior_speed_var = 20.0 / pow (3.6, 2);
 
         std::mutex load_mutex;
 
         bool loaded = false;
 
-        double max_speed = 100.0 * 1000 / 60 / 60; // 100kmh is the max speed of a bus (presumably)
-        double min_tt = 0.0;    // assuming vehicle traveling at max speed, this is the min time
-        double min_err = 2.0;   // minimum travel time measurement error
-        float _system_noise = 0.0;  // rate of change of (mean) travel time
-        float _state_var = 0.0;     // variance between vehicles (baseline)
+        double _max_speed = 110.0 / 3.6; // 100kmh is the max speed of a bus (presumably)
+        // double min_tt = 0.0;         // assuming vehicle traveling at max speed, this is the min time
+        double _min_err = 0.5 / pow (3.6, 2); // minimum speed measurement error
+        float _system_noise = 0.0;      // rate of change of (mean) travel time
+        float _state_var = 0.0;         // variance between vehicles (baseline)
         float _measurement_error;
 
         /**
@@ -376,11 +378,12 @@ namespace Gtfs
         int _model_type = 0; // fixed, for now ...
 
         // network state
-        std::vector<std::pair<int, double> > _data; // new observations as vehicles traverse network
+        std::vector<std::pair<double, double> > _data; // new observations as vehicles traverse network
         std::mutex data_mutex;
         uint64_t _timestamp = 0;
-        Eigen::Vector2d _travel_time;
-        Eigen::Matrix2d _uncertainty;
+
+        double _speed;
+        double _uncertainty;
 
     public:
         Segment (int id, Gtfs* gtfs);
@@ -393,29 +396,35 @@ namespace Gtfs
         Node* from ();
         Node* to ();
         double length ();
-        double min_travel_time ();
+        double max_speed ();
+        double min_err ();
         double state_var ();
         double system_noise ();
 
-        double prior_travel_time ();
-        double prior_travel_time_var ();
+        /* State functions */
+        double prior_speed ();
+        double prior_speed_var ();
 
-        std::vector<std::pair<int, double> >& data ();
         uint64_t timestamp ();
-        double travel_time ();
+        double speed ();
         double uncertainty ();
 
-        double get_speed ();
-        double get_speed (int delta);
-        int sample_travel_time (RNG& rng);
-        int sample_travel_time (RNG& rng, int delta);
+        /* Network model functions */
+        std::vector<std::pair<double, double> >& get_data ();
+        void push_data (int time, double err, uint64_t ts);
+
+        double speed (int delta);
         double sample_speed (RNG& rng);
         double sample_speed (RNG& rng, int delta);
 
-        std::vector<std::pair<int, double> >& get_data ();
-        void push_data (int time, double err, uint64_t ts);
-        std::pair<Eigen::Vector2d, Eigen::Matrix2d> predict (int delta);
-        std::pair<Eigen::Vector2d, Eigen::Matrix2d> predict (uint64_t t);
+        int travel_time ();
+        double tt_uncertainty ();
+        int sample_travel_time (RNG& rng);
+        int sample_travel_time (RNG& rng, int delta);
+
+        std::pair<double, double> predict (int delta);
+        std::pair<double, double> predict (uint64_t t);
+
         void update (par* params, Gtfs* gtfs);
         void update (uint64_t now);
     };

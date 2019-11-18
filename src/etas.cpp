@@ -175,11 +175,13 @@ namespace Gtfs {
                 std::cout << "\n ["
                     << std::setw (5) << round (seg.distance) << "m into trip, "
                     << std::setw (5) << round (seg.segment->length ()) << "m long, "
-                    << std::setw (4) << round (seg.segment->travel_time ()) << "s travel time ("
+                    << std::setw (4) << round (seg.segment->speed ()) << "m/s speed ("
                     << std::setw (5) << round (seg.segment->uncertainty ()) << "), "
-                    << std::setw (4) << (_stops.at (i).arrival_time - _stops.at (i-1).departure_time ) << "s scheduled, "
-                    << std::setw (4) << round (seg.segment->prior_travel_time ()) << " ("
-                    << std::setw (5) << round (seg.segment->prior_travel_time_var ()) << "]";
+                    << std::setw (4)
+                    << (seg.segment->length () /
+                        (_stops.at (i).arrival_time - _stops.at (i-1).departure_time)) << "m/s scheduled, "
+                    << std::setw (4) << round (seg.segment->prior_speed ()) << " ("
+                    << std::setw (5) << round (seg.segment->prior_speed_var ()) << "]";
 
                 i++;
             }
@@ -190,8 +192,6 @@ namespace Gtfs {
             int N (_vehicle->state ()->size ());
             N = std::min (N, 100);
             _eta_matrix = Eigen::MatrixXi::Zero (N, M);
-            // Eigen::MatrixXi seg_tt (Eigen::MatrixXi::Zero (N, L));
-            // Eigen::MatrixXi dwell_t (Eigen::MatrixXi::Zero (N, M-1));
 
             Particle* p;
             int l;
@@ -358,22 +358,23 @@ namespace Gtfs {
                     {
                         // X = Y;
                         // sig1 = sig2;
-                        Y = segs.at (l).segment->travel_time ();
+                        Y = segs.at (l).segment->speed ();
                         sig2 = pow (segs.at (l).segment->uncertainty (), 0.5);
                         // additional variance for forecast dispersion
                         sig2 += pow (segs.at (l).segment->system_noise (), 2) * tt;
-                        sig2 = fmax (sig2, segs.at (l).segment->prior_travel_time_var () * 2);
+                        sig2 = fmax (sig2, segs.at (l).segment->prior_speed_var () * 2);
 
                         rho = 0.0;
 
                         if (sig2 == 0 || sig2 > 2 * Y)
                         {
-                            Y = segs.at (l).segment->prior_travel_time ();
-                            sig2 = pow (segs.at (l).segment->prior_travel_time_var (), 0.5);
+                            Y = segs.at (l).segment->prior_speed ();
+                            sig2 = pow (segs.at (l).segment->prior_speed_var (), 0.5);
                             if (Y == 0 || sig2 == 0)
                             {
-                                Y = _stops.at (l+1).arrival_time - _stops.at (l).departure_time;
-                                sig2 = pow (3.0 + 0.3 * Y, 0.5);
+                                Y = segs.at (l).segment->length () /
+                                    (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
+                                sig2 = 10. / pow (3.6, 2.);
                             }
                         }
 
@@ -388,21 +389,18 @@ namespace Gtfs {
                             var = pow (sig2, 2);
                         }
 
-
-                        min_tt = segs.at (l).segment->length () / 30.0;
-                        max_tt = segs.at (l).segment->length () * 2.0;
-
                         // between vehicle variance
                         var += segs.at (l).segment->state_var ();
 
                         x = 0;
                         int n=100;
-                        while (x < min_tt || x > max_tt)
+                        while (x < 0.5 || x > segs.at (l).segment->max_speed ())
                         {
                             x = rng.rnorm () * pow (var, 0.5) + mean;
+                            x = segs.at (l).segment->length () / x;
                             if (n-- == 0)
                             {
-                                x = rng.runif () * (max_tt/2 - min_tt) + min_tt;
+                                x = rng.runif () * (segs.at (l).segment->max_speed () - 10.) + 5.;
                             }
                         }
 
@@ -497,34 +495,43 @@ namespace Gtfs {
         const int double_bits = std::numeric_limits<double>::digits;
         std::pair<double, double> r;
 
-        double normal_tt = 0.0, normal_tt_var = 0.0;
+        double normal_speed = 0., normal_speed_var = 0.,
+            normal_tt = 0., normal_tt_var = 0.;
         auto segs = _shape->segments ();
         // std::cout << "\n ++ starting from stop " << _stop_index;
         for (int m=_stop_index+1; m<M; m++)
         {
             // std::cout << "\n\n Estimating for stop " << m << ": ";
             // travel time to get there:
-            if (segs.at (m-1).segment->uncertainty () > 0)
+            if (segs.at (m-1).segment->uncertainty () > 0.)
             {
-                normal_tt_var =
+                normal_speed_var =
                     fmin (
-                        segs.at (m-1).segment->prior_travel_time_var (),
+                        segs.at (m-1).segment->prior_speed_var (),
                         segs.at (m-1).segment->uncertainty () +
-                            normal_tt * pow(segs.at (m-1).segment->system_noise (), 2)
+                            normal_tt * pow(segs.at (m-1).segment->system_noise (), 2.)
                     );
-                normal_tt = segs.at (m-1).segment->travel_time ();
+                normal_speed = segs.at (m-1).segment->speed ();
             }
             else
             {
-                normal_tt = segs.at (m-1).segment->prior_travel_time ();
-                normal_tt_var = segs.at (m-1).segment->prior_travel_time_var ();
+                normal_speed = segs.at (m-1).segment->prior_speed ();
+                normal_speed_var = segs.at (m-1).segment->prior_speed_var ();
             }
-            normal_tt_var += segs.at (m-1).segment->state_var ();
+            normal_speed_var += segs.at (m-1).segment->state_var ();
+
+            double L = segs.at (m-1).segment->length ();
             if (m == _stop_index)
             {
-                normal_tt *= segr;
-                normal_tt_var *= pow (segr, 2);
+                L *= segr;
             }
+            normal_tt = segs.at (m-1).segment->length () / normal_speed;
+
+            /* delta method:
+             * Var(g(X)) = g'(Xhat)^2 * Var(X)
+             */
+            normal_tt_var = pow (segs.at (m-1).segment->length () / normal_speed, 2.);
+            normal_tt_var *= normal_speed_var;
             // std::cout << " tt = " << normal_tt << " (" << normal_tt_var << ")";
 
             int curlen = normal_pi.size ();
