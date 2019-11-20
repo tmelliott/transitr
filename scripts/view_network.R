@@ -3,7 +3,7 @@ library(RSQLite)
 library(dbplyr)
 
 get_segments <- function(f = "segment_states.csv") {
-    read_csv(f, col_names = c("segment_id", "timestamp", "travel_time", "uncertainty"),
+    read_csv(f, col_names = c("segment_id", "timestamp", "speed", "uncertainty"),
         col_types = "iinn")
 }
 

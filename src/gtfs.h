@@ -367,8 +367,8 @@ namespace Gtfs
         double _max_speed = 110.0 / 3.6; // 100kmh is the max speed of a bus (presumably)
         // double min_tt = 0.0;         // assuming vehicle traveling at max speed, this is the min time
         double _min_err = 0.5 / pow (3.6, 2); // minimum speed measurement error
-        float _system_noise = 0.0;      // rate of change of (mean) travel time
-        float _state_var = 0.0;         // variance between vehicles (baseline)
+        float _system_noise;            // rate of change of (mean) travel time
+        float _state_var = 0.0;         /* variance between vehicles (baseline) */
         float _measurement_error;
 
         /**
@@ -411,7 +411,7 @@ namespace Gtfs
 
         /* Network model functions */
         std::vector<std::pair<double, double> >& get_data ();
-        void push_data (int time, double err, uint64_t ts);
+        void push_data (double speed, double err, uint64_t ts);
 
         double speed (int delta);
         double sample_speed (RNG& rng);
@@ -419,7 +419,16 @@ namespace Gtfs
 
         int travel_time ();
         double tt_uncertainty ();
+        /** sample travel time from current road state
+         * @param rng an RNG
+         * @return an integer travel time
+         */
         int sample_travel_time (RNG& rng);
+        /** sample travel time for road state in delta seconds
+         * @param rng an RNG
+         * @param delta time, in seconds, for forecast
+         * @return an integer travel time
+         */
         int sample_travel_time (RNG& rng, int delta);
 
         std::pair<double, double> predict (int delta);
@@ -716,15 +725,15 @@ namespace Gtfs
             int resample_count = 0;
             std::string action = "";
 
-            std::vector<unsigned int> _segment_travel_times; // segment travel times
+            std::vector<double> _segment_speed_avgs; // segment travel times
             std::vector<uint64_t> _stop_arrival_times;       // stop arrival times
             std::vector<uint64_t> _stop_departure_times;     // stop departure times
             int _current_segment;
             int _current_stop;
 
-            std::vector<double> _tt_state; // travel time state vector
-            std::vector<std::vector<double> > _tt_cov; // covariance matrix for travel time
-            uint64_t _tt_time; // time travel times were last updated
+            // std::vector<double> _tt_state; // travel time state vector
+            // std::vector<std::vector<double> > _tt_cov; // covariance matrix for travel time
+            // uint64_t _tt_time; // time travel times were last updated
 
 
         public:
@@ -789,8 +798,8 @@ namespace Gtfs
             double arrival_error ();
             double departure_error ();
 
-            std::vector<unsigned int>& segment_travel_times ();
-            unsigned int segment_travel_time (int l);
+            std::vector<double>& segment_speed_avgs ();
+            double segment_speed_avg (int l);
             int current_segment ();
             std::vector<uint64_t>& stop_arrival_times ();
             uint64_t stop_arrival_time (int m);

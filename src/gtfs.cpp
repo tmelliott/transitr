@@ -1610,6 +1610,9 @@ namespace Gtfs
 
         sqlite3_finalize (stmt);
 
+        _system_noise = gtfs->parameters ()->nw_system_noise;
+        _measurement_error = gtfs->parameters ()->nw_measurement_error;
+
         loaded = true;
 
         // attempt to fetch parameters from `segment_parameters` table
@@ -1771,10 +1774,9 @@ namespace Gtfs
         return _data;
     }
 
-    void Segment::push_data (int time, double err, uint64_t ts)
+    void Segment::push_data (double speed, double err, uint64_t ts)
     {
         if (!loaded) load ();
-        double speed = _length / (double)time;
         if (speed <= 0 || speed > _max_speed) return;
         std::lock_guard<std::mutex> lk (data_mutex);
         _data.emplace_back (speed, fmax (_min_err, err));
@@ -2828,13 +2830,13 @@ namespace Gtfs
         return _departure_error;
     }
 
-    std::vector<unsigned int>& Vehicle::segment_travel_times ()
+    std::vector<double>& Vehicle::segment_speed_avgs ()
     {
-        return _segment_travel_times;
+        return _segment_speed_avgs;
     }
-    unsigned int Vehicle::segment_travel_time (int l)
+    double Vehicle::segment_speed_avg (int l)
     {
-        return _segment_travel_times.at (l);
+        return _segment_speed_avgs.at (l);
     }
     int Vehicle::current_segment ()
     {

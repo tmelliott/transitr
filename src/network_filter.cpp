@@ -9,12 +9,9 @@ namespace Gtfs {
         _speed = _prior_speed;
         _uncertainty = _prior_speed_var;
 
-        if (_system_noise == 0)
-            _system_noise = params->nw_system_noise;
-
         // also specify the "between vehicle" variabilty
         if (_state_var == 0)
-            _state_var = 5. / pow (3.6, 2);
+            _state_var = 2.;
 
         _measurement_error = params->nw_measurement_error;
     }
@@ -155,7 +152,8 @@ namespace Gtfs {
         auto x = predict (delta); // [speed, uncertainty]
         while (s < 0.5 || s > _max_speed)
         {
-            s = rng.rnorm () * x.second + x.first;
+            s = rng.rnorm () * (x.second + pow (_state_var, 0.5)) +
+                x.first;
             if (nmax-- == 0)
             {
                 return rng.runif () * (_max_speed - 10.) + 5.;
@@ -166,7 +164,7 @@ namespace Gtfs {
 
     int Segment::sample_travel_time (RNG& rng)
     {
-        sample_travel_time (rng, 0.);
+        sample_travel_time (rng, 0);
     }
     int Segment::sample_travel_time (RNG& rng, int delta)
     {

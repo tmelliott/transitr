@@ -722,15 +722,23 @@ eta_data <- etas %>%
 
 
 t <- etas$trip_id[1]
-for (t in unique(etas$trip_id)) {
+for (t in sample(unique(etas$trip_id))) {
     dt <- eta_data %>% filter(trip_id == t)
     if (nrow(dt) == 0) next
     p <- ggplot(dt, aes(timestamp)) +
         geom_hline(yintercept = 0) +
         geom_hline(aes(yintercept = scheduled_arrival - actual_arrival), lty = 2) +
-        geom_ribbon(aes(ymin = pf_lower - time_until_arrival, ymax = pf_upper - time_until_arrival),
+        geom_ribbon(
+            aes(
+                ymin = pf_lower - time_until_arrival,
+                ymax = pf_upper - time_until_arrival
+            ),
             fill = "orangered", alpha = 0.5) +
-        geom_ribbon(aes(ymin = normal_lower - time_until_arrival, ymax = normal_upper - time_until_arrival),
+        geom_ribbon(
+            aes(
+                ymin = normal_lower - time_until_arrival,
+                ymax = normal_upper - time_until_arrival
+            ),
             fill = "blue", alpha = 0.5) +
         geom_path(aes(y = pf_mean - time_until_arrival), colour = "orangered") +
         geom_path(aes(y = normal_mean - time_until_arrival), colour = "blue") +
@@ -741,9 +749,9 @@ for (t in unique(etas$trip_id)) {
             breaks = function(x) pretty(x/60) * 60,
             labels = function(x) x / 60
         )
-    # print(p)
-    ggsave(glue::glue("~/Dropbox/graphs/trip_{t}.jpg"), width = 16, height = 10, units = "in")
-    # grid::grid.locator()
+    print(p)
+    #ggsave(glue::glue("~/Dropbox/graphs/trip_{t}.jpg"), width = 16, height = 10, units = "in")
+    grid::grid.locator()
 }
 
 ## calculate RMSE etc

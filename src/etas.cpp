@@ -355,30 +355,31 @@ namespace Gtfs {
                         tt = fmax (tt, _stops.at (l).departure_time - Time (_timestamp));
                     }
 
+                    if (false)
                     {
                         // X = Y;
                         // sig1 = sig2;
                         Y = segs.at (l).segment->speed ();
                         sig2 = pow (segs.at (l).segment->uncertainty (), 0.5);
-                        // additional variance for forecast dispersion
-                        sig2 += pow (segs.at (l).segment->system_noise (), 2) * tt;
-                        sig2 = fmax (sig2, segs.at (l).segment->prior_speed_var () * 2);
+                        // // additional variance for forecast dispersion
+                        // sig2 += pow (segs.at (l).segment->system_noise (), 2) * tt;
+                        // sig2 = fmax (sig2, segs.at (l).segment->prior_speed_var () * 2);
 
-                        rho = 0.0;
+                        // rho = 0.0;
 
-                        if (sig2 == 0 || sig2 > 2 * Y)
-                        {
-                            Y = segs.at (l).segment->prior_speed ();
-                            sig2 = pow (segs.at (l).segment->prior_speed_var (), 0.5);
-                            if (Y == 0 || sig2 == 0)
-                            {
-                                Y = segs.at (l).segment->length () /
-                                    (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
-                                sig2 = 10. / pow (3.6, 2.);
-                            }
-                        }
+                        // if (sig2 == 0 || sig2 > 2 * Y)
+                        // {
+                        //     Y = segs.at (l).segment->prior_speed ();
+                        //     sig2 = pow (segs.at (l).segment->prior_speed_var (), 0.5);
+                        //     if (Y == 0 || sig2 == 0)
+                        //     {
+                        //         Y = segs.at (l).segment->length () /
+                        //             (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
+                        //         sig2 = 10. / pow (3.6, 2.);
+                        //     }
+                        // }
 
-                        if (X > 0 && sig1 > 0)
+                        if (false) //X > 0 && sig1 > 0)
                         {
                             mean = Y + sig2 / sig1 * rho * (x - X);
                             var = (1 - pow (rho, 2)) * pow (sig2, 2);
@@ -406,6 +407,8 @@ namespace Gtfs {
 
                         tt += x;
                     }
+
+                    tt += segs.at (l).segment->sample_travel_time (rng, tt);
                     _eta_matrix (i, l+1) = tt;
                     l++;
                 }

@@ -38,7 +38,9 @@ namespace Gtfs {
         }
 
         double d, u;
+        int si;
         Particle* p;
+        auto segs = _trip->shape ()->segments();
         for (int i=0; i<_N; ++i)
         {
             if (e.type == EventType::gps)
@@ -46,7 +48,13 @@ namespace Gtfs {
                 // initialize each particle within 100m of obs
                 u = rng.runif ();
                 d = (dist < 0 ? u * dmax : fmax(0, fmin(dmax, u * 200 - 100 + dist)));
-                _state.emplace_back (d, rng.runif () * 30.0, rng.rnorm () * _systemnoise, this);
+
+                si = find_segment_index (d, &segs);
+                _state.emplace_back (d,
+                    segs.at (si).segment->sample_speed (rng),
+                    rng.rnorm () * _systemnoise,
+                    this
+                );
             }
             else
             {
@@ -95,24 +103,24 @@ namespace Gtfs {
 
         _current_segment = 0;
         _current_stop = 0;
-        _segment_travel_times.clear ();
+        _segment_speed_avgs.clear ();
         _stop_arrival_times.clear ();
         _stop_departure_times.clear ();
-        _tt_state.clear ();
-        _tt_cov.clear ();
+        // _tt_state.clear ();
+        // _tt_cov.clear ();
 
-        _segment_travel_times.resize (_trip->shape ()->segments ().size (), 0);
+        _segment_speed_avgs.resize (_trip->shape ()->segments ().size (), 0);
         _stop_arrival_times.resize (_trip->stops ().size (), 0);
         _stop_departure_times.resize (_trip->stops ().size (), 0);
 
         // alright: initialize these using the schedule
-        _tt_state.resize (_trip->stops ().size (), 0.0);
-        _tt_cov.resize (_trip->stops ().size (),
-                        std::vector<double> (_trip->stops ().size (), 0.0));
-        for (int i=0; i<_trip->stops ().size (); i++)
-        {
-            _tt_cov.at (i).at (i) = (i+1) * 30; // 5 min error + 30 seconds per stop
-        }
+        // _tt_state.resize (_trip->stops ().size (), 0.0);
+        // _tt_cov.resize (_trip->stops ().size (),
+        //                 std::vector<double> (_trip->stops ().size (), 0.0));
+        // for (int i=0; i<_trip->stops ().size (); i++)
+        // {
+        //     _tt_cov.at (i).at (i) = (i+1) * 30; // 5 min error + 30 seconds per stop
+        // }
     }
 
     void Vehicle::mutate (RNG& rng, Gtfs* gtfs)
@@ -316,13 +324,13 @@ namespace Gtfs {
 
             {
 #if VERBOSE > 0
-                std::cout << "\n    ** estimating travel times";
+                std::cout << "\n    ** estimating speeds";
 #endif
                 // NETWORK STUFF
                 std::vector<ShapeSegment>& segs = _trip->shape ()->segments ();
 
                 // update segment travel times for intermediate ones ...
-                double tt, ttp, err;
+                double sp, ttp, err;
                 int n;
                 int M = segs.size ();
                 double segmin, segmax;
@@ -335,23 +343,26 @@ namespace Gtfs {
                 double L;
                 for (_current_segment=0; _current_segment<M; _current_segment++)
                 {
-                    if (_segment_travel_times.at (_current_segment) > 0) continue;
+                    if (_segment_speed_avgs.at (_current_segment) > 0) continue;
                     L = segs.at (_current_segment).segment->length ();
                     segmin = L / segs.at (_current_segment).segment->max_speed ();
-                    segmax = L / 0.2;
+                    segmax = L * 5.;
 
-                    // get the average travel time for particles along that segment
-                    tt = 0.0;
+                    // get the average speed for particles along that segment
+                    sp = 0.0;
                     n = 0;
                     for (auto p = _state.begin (); p != _state.end (); ++p)
                     {
                         if (p->get_travel_time (_current_segment) < segmin) continue;
                         if (p->get_travel_time (_current_segment) > segmax) continue;
                         if (p->get_segment_index () == _current_segment) continue;
-                        tt += p->get_weight () * p->get_travel_time (_current_segment);
+                        sp += p->get_weight () *
+                            L / p->get_travel_time (_current_segment);
                         n++;
                     }
-                    if (n < _N || tt < segmin || tt > segmax)
+                    if (n < _N ||
+                        sp < 0.5 ||
+                        sp > segs.at (_current_segment).segment->max_speed ())
                     {
                         continue;
                     }
@@ -359,7 +370,7 @@ namespace Gtfs {
 #if VERBOSE > 0
                     std::cout << "\n  - segment "
                         << (_current_segment + 1)
-                        << " of " << _segment_travel_times.size ();
+                        << " of " << _segment_speed_avgs.size ();
 #endif
 
                     err = std::accumulate (
@@ -368,19 +379,14 @@ namespace Gtfs {
                         0.0,
                         [=](double a, Particle& p) {
                             return a + p.get_weight () *
-                                pow (p.get_travel_time (_current_segment) - tt, 2);
+                                pow (L / p.get_travel_time (_current_segment) - sp, 2);
                         }
                     );
 
-                    // if the error is effectively 0 ...
-                    // ...  handled by Segment::update ()
-                    // if (err < 1)
-                    //     err = 3; //segs.at (_current_segment).segment->length () / 30;
-
-                    _segment_travel_times.at (_current_segment) = (tt);
-                    segs.at (_current_segment).segment->push_data (tt, err, _timestamp);
+                    _segment_speed_avgs.at (_current_segment) = (sp);
+                    segs.at (_current_segment).segment->push_data (sp, err, _timestamp);
 #if VERBOSE > 0
-                    std::cout << ": " <<  (tt) << " (" << err << ")";
+                    std::cout << ": " <<  (sp) << " (" << err << ")";
 #endif
 #if SIMULATION
                     for (auto p = _state.begin (); p != _state.end (); ++p)

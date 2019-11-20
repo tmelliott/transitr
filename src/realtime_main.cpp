@@ -173,7 +173,7 @@ void run_realtime_model (List nw)
 #endif
 #if SIMULATION
         std::vector<std::string> routes_to_keep ({
-            // "70"
+            // "NX1"
             "24B", "931", "NX1", "NX2", "866", "802", "82", "83", "25B",
             "27H", "030", "047", "003", "SKY", "321", "221X", "243X", "223X",
             "248X", "22A", "70", "028", "101", "966", "22N", "22R", "24R",
@@ -246,7 +246,7 @@ void run_realtime_model (List nw)
                 // if (sl->second.get_data ().size () == 0) continue;
                 fout << sl->second.segment_id () << ","
                     << sl->second.timestamp () << ","
-                    << sl->second.travel_time () << ","
+                    << sl->second.speed () << ","
                     << sl->second.uncertainty () << "\n";
             }
             fout.close ();
