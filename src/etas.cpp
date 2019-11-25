@@ -190,7 +190,7 @@ namespace Gtfs {
 
             // iterate over vehicle state
             int N (_vehicle->state ()->size ());
-            N = std::min (N, 100);
+            N = std::min (N, 200);
             _eta_matrix = Eigen::MatrixXi::Zero (N, M);
 
             Particle* p;
@@ -221,7 +221,9 @@ namespace Gtfs {
                 p = &(_vehicle->state ()->at (pi));
                 // time to end of current segment
                 l = find_segment_index (p->get_distance (), &segs);
-                // std::cout << "\n --- [p], l = " << l;
+                // std::cout << "\n --- [p], d = " << p->get_distance ()
+                //     << ", l = " << l
+                //     << ", D[l] = " << segs.at (l).distance;
 
                 /**
                  * START: % of the way through segment l
@@ -252,7 +254,7 @@ namespace Gtfs {
                 if (seg_prog < 1.0 || is_layover || l == 0)
                 {
                     dt = -1.0;
-                    if (rng.runif () < _vehicle->pr_stop ())
+                    if (rng.runif () < _vehicle->pr_stop () && l > 0)
                     {
                         if (_stops.at (l).sd_delay > 0)
                         {
@@ -274,8 +276,8 @@ namespace Gtfs {
                     // add dwell time to travel time to NEXT stop (l+1)
                     tt += fmax (0.0, dt);
 
-                    // layover ?
-                    if (is_layover)
+                    // layover ? and Pr(driver stops) = .7
+                    if (is_layover && rng.runif () < 0.7)
                     {
                         tt = fmax (
                             tt,
@@ -290,8 +292,8 @@ namespace Gtfs {
                 {
                     vel = rng.rnorm () * 2.0 + p->get_speed ();
                 }
-                // std::cout << ", vel = " << vel << ", v = " << v;
                 double speed = vel;
+                // std::cout << ", vel = " << vel << ", speed = " << speed;
                 if (speed > 2.0 &&
                     (seg_prog / segs.at (l).segment->length () < 0.1 || seg_prog > 100))
                 {
@@ -303,6 +305,7 @@ namespace Gtfs {
                     v = segs.at (l).segment->length () /
                         (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
                 }
+                // std::cout << ", v = " << v;
                 // std::cout
                 //     << " -> d = " << (segs.at (l).segment->length () - seg_prog)
                 //     << " -> t = " << ((segs.at (l).segment->length () - seg_prog) / v);
@@ -350,38 +353,40 @@ namespace Gtfs {
                     tt += fmax (0.0, dt);
 
                     // layover ?
-                    if (_stops.at (l).departure_time > _stops.at (l).arrival_time)
+                    if (_stops.at (l).departure_time > _stops.at (l).arrival_time &&
+                        rng.runif () < 0.7)
                     {
                         tt = fmax (tt, _stops.at (l).departure_time - Time (_timestamp));
                     }
 
-                    if (false)
+                    // if (true)
                     {
-                        // X = Y;
-                        // sig1 = sig2;
+                        X = Y;
+                        sig1 = sig2;
                         Y = segs.at (l).segment->speed ();
                         sig2 = pow (segs.at (l).segment->uncertainty (), 0.5);
                         // // additional variance for forecast dispersion
                         // sig2 += pow (segs.at (l).segment->system_noise (), 2) * tt;
                         // sig2 = fmax (sig2, segs.at (l).segment->prior_speed_var () * 2);
 
-                        // rho = 0.0;
+                        rho = 0.8;
 
-                        // if (sig2 == 0 || sig2 > 2 * Y)
-                        // {
-                        //     Y = segs.at (l).segment->prior_speed ();
-                        //     sig2 = pow (segs.at (l).segment->prior_speed_var (), 0.5);
-                        //     if (Y == 0 || sig2 == 0)
-                        //     {
-                        //         Y = segs.at (l).segment->length () /
-                        //             (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
-                        //         sig2 = 10. / pow (3.6, 2.);
-                        //     }
-                        // }
+                        if (sig2 == 0)
+                        {
+                            Y = segs.at (l).segment->prior_speed ();
+                            sig2 = pow (segs.at (l).segment->prior_speed_var (), 0.5);
+                            if (Y == 0 || sig2 == 0)
+                            {
+                                Y = segs.at (l).segment->length () /
+                                    (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
+                                sig2 = 10. / pow (3.6, 2.);
+                            }
+                        }
 
-                        if (false) //X > 0 && sig1 > 0)
+                        if (X > 0 && sig1 > 0)
                         {
                             mean = Y + sig2 / sig1 * rho * (x - X);
+                            // var(Y|X) = (1-rho^2) * sig2^2
                             var = (1 - pow (rho, 2)) * pow (sig2, 2);
                         }
                         else
@@ -395,20 +400,26 @@ namespace Gtfs {
 
                         x = 0;
                         int n=100;
+                        // x is the speed
                         while (x < 0.5 || x > segs.at (l).segment->max_speed ())
                         {
                             x = rng.rnorm () * pow (var, 0.5) + mean;
-                            x = segs.at (l).segment->length () / x;
                             if (n-- == 0)
                             {
                                 x = rng.runif () * (segs.at (l).segment->max_speed () - 10.) + 5.;
                             }
                         }
-
-                        tt += x;
+                        // travel time is L / v
+                        tt += segs.at (l).segment->length () / x;
                     }
 
-                    tt += segs.at (l).segment->sample_travel_time (rng, tt);
+                    // std::cout << "\n avg speed = ("
+                    //     << segs.at (l).distance << " - " << p->get_distance ()
+                    //     << ") / " << tt << " = "
+                    //     << ( (segs.at (l).distance - p->get_distance ()) / tt)
+                    //     << "m/s ...";
+
+                    // tt += segs.at (l).segment->sample_travel_time (rng, tt);
                     _eta_matrix (i, l+1) = tt;
                     l++;
                 }
@@ -746,9 +757,10 @@ namespace Gtfs {
              */
 
             // Write estimates to the file:
-            // trip_id, stop_sequence, timestamp, pf_obs, pf_var, pf_lower, pf_upper, normal_mean, normal_var, normal_lower, normal_upper
+            // trip_id, stop_sequence, timestamp, vehicle_dist, stop_dist, pf_obs, pf_var, pf_lower, pf_upper, normal_mean, normal_var, normal_lower, normal_upper
 #if SIMULATION
             fout << _trip_id << "," << (m) << "," << _timestamp
+                << "," << _vehicle->distance () << "," << _stops.at (m).distance
                 // particle predictions:
                 << "," << tt_mean << "," << tt_var << "," << tt_lower << "," << tt_upper
                 // normal approx pred:

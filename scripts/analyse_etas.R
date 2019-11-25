@@ -668,14 +668,16 @@ ggplot(bad_trip, aes(timestamp, arrival_time)) +
 
 ############# NEWEST
 library(tidyverse)
+library(patchwork)
 ts2dt <- function(ts) as.POSIXct(ts, origin = "1970-01-01")
 load("simulations/arrivaldata_etas.rda")
 
 etas <- read_csv("simulations/sim000/eta_state.csv",
     col_names = c("trip_id", "stop_sequence", "timestamp",
+        "vehicle_distance", "stop_distance",
         "pf_mean", "pf_var", "pf_lower", "pf_upper",
         "normal_mean", "normal_var", "normal_lower", "normal_upper"),
-    col_types = "ciinnnnnnnn"
+    col_types = "ciinnnnnnnnnn"
 )
 
 eta_data <- etas %>%
@@ -764,6 +766,47 @@ eta_results <- eta_data %>%
         gtfs_error = gtfs_eta - time_until_arrival
     )
 
+## what is the actual error?
+ers <- eta_results#[sample(nrow(eta_results), 1e5), ]
+
+pbase <- ggplot(ers %>% filter(stop_sequence < 11),
+    aes(time_until_arrival, colour = trip_id))
+pf_err <- pbase +
+        geom_point(aes(y = pf_error)) +
+        geom_smooth(aes(y = pf_error, colour = NULL))
+normal_err <- pbase +
+        geom_point(aes(y = normal_error)) +
+        geom_smooth(aes(y = normal_error, colour = NULL))
+gtfs_err <- pbase +
+        geom_point(aes(y = gtfs_error)) +
+        geom_smooth(aes(y = gtfs_error, colour = NULL))
+
+pf_err / normal_err / gtfs_err &
+    geom_abline(slope = -1, intercept = 0) &
+    facet_grid(~stop_sequence) &
+    theme(legend.position = "none") &
+    scale_y_continuous(
+        name = "Error (min)",
+        breaks = function(x) pretty(x / 60) * 60,
+        labels = function(x) x / 60,
+        limits = c(-60, 60) * 60
+    ) &
+    scale_x_continuous(
+        name = "Time until arrival (min)",
+        breaks = function(x) pretty(x / 60) * 60,
+        labels = function(x) x / 60
+    )
+
+# ers %>%
+#     mutate(
+#         pf_avg_speed = (stop_distance - vehicle_distance) / pf_mean,
+#         normal_avg_speed = (stop_distance - vehicle_distance) / normal_mean
+#     ) %>%
+#     filter(stop_distance >= vehicle_distance) %>%
+#     ggplot(aes(time_until_arrival)) +
+#         geom_point(aes(y = pf_avg_speed)) +
+#         geom_hline(yintercept = 110 / 3.6)
+
 # overall
 eta_results %>% ungroup %>%
     summarize(
@@ -772,7 +815,22 @@ eta_results %>% ungroup %>%
         normal_rmse = sqrt(mean(normal_error^2)),
         normal_ci_cov = mean(normal_ci),
         gtfs_rmse = sqrt(mean(gtfs_error^2))
-    )
+    ) %>%
+    with(
+        tibble(
+            model = c("pf", "normal", "gtfs"),
+            rmse = c(pf_rmse, normal_rmse, gtfs_rmse),
+            ci_cov = c(pf_ci_cov, normal_ci_cov, NA)
+        )
+    ) %>%
+    ggplot(aes(rmse, model)) +
+        geom_segment(
+            aes(
+                xend = 0,
+                yend = model
+            )
+        ) +
+        geom_point()
 
 # by minutes-until-arrival
 res_min <- eta_results %>%
@@ -789,13 +847,33 @@ res_min <- eta_results %>%
         gtfs_rmse = sqrt(mean(gtfs_error^2))
     )
 
-pr <- ggplot(res_min, aes(min)) +
-    geom_path(aes(y = pf_rmse), colour = "orangered") +
-    geom_path(aes(y = normal_rmse), colour = "blue") +
-    geom_path(aes(y = gtfs_rmse), colour = "magenta")
+#pr <-
+
+ggplot(res_min, aes(min)) +
+    geom_path(aes(y = pf_rmse, colour = "particle filter")) +
+    geom_path(aes(y = normal_rmse, colour = "normal")) +
+    geom_path(aes(y = gtfs_rmse, colour = "gtfs")) +
+    scale_colour_manual(
+        name = "model",
+        values = c(
+            "particle filter" = "orangered",
+            "normal" = "blue",
+            "gtfs" = "magenta"
+        )
+    )
+
+
 ggsave("~/Dropbox/rmse.jpg", pr, width = 10, height = 5, units = "in")
 
-pci <- ggplot(res_min, aes(min)) +
+# pci <-
+
+ggplot(res_min, aes(min)) +
     geom_path(aes(y = pf_ci_cov), colour = "orangered") +
-    geom_path(aes(y = normal_ci_cov), colour = "blue")
+    geom_path(aes(y = normal_ci_cov), colour = "blue") +
+    geom_hline(yintercept = 0.95, lty = 3) +
+    scale_y_continuous(
+        breaks = seq(0, 1, by = 0.2),
+        labels = function(x) glue::glue("{100*x}%")
+    )
+
 ggsave("~/Dropbox/ci.jpg", pci, width = 10, height = 5, units = "in")

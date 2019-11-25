@@ -152,7 +152,7 @@ namespace Gtfs {
         auto x = predict (delta); // [speed, uncertainty]
         while (s < 0.5 || s > _max_speed)
         {
-            s = rng.rnorm () * (x.second + pow (_state_var, 0.5)) +
+            s = rng.rnorm () * pow (x.second + _state_var, 0.5) +
                 x.first;
             if (nmax-- == 0)
             {

@@ -37,6 +37,12 @@ namespace Gtfs {
             // _current_delay = e.delay;
         }
 
+        // Trip start time:
+        Time tstart (_trip->start_time ());
+        Time curtime (_timestamp);
+        int time_to_start (tstart - curtime);
+        // std::cout << "\n -> " << time_to_start << "s until trip is scheduled to begin\n";
+
         double d, u;
         int si;
         Particle* p;
@@ -45,21 +51,35 @@ namespace Gtfs {
         {
             if (e.type == EventType::gps)
             {
-                // initialize each particle within 100m of obs
-                u = rng.runif ();
-                d = (dist < 0 ? u * dmax : fmax(0, fmin(dmax, u * 200 - 100 + dist)));
+                if (time_to_start > 60)
+                {
+                    d = 0.;
+                }
+                else
+                {
+                    // initialize each particle within 100m of obs
+                    u = rng.runif ();
+                    d = (dist < 0 ? u * dmax : fmax(0, fmin(dmax, u * 200 - 100 + dist)));
+                }
 
                 si = find_segment_index (d, &segs);
-                _state.emplace_back (d,
+                _state.emplace_back (
+                    d,
                     segs.at (si).segment->sample_speed (rng),
-                    rng.rnorm () * _systemnoise,
+                    rng.rnorm () * _systemnoise, // acceleration, not used (currently)
                     this
                 );
             }
             else
             {
                 // stick the bus AT the stop
-                _state.emplace_back (dist, rng.runif () * 30, rng.rnorm () * _systemnoise, this);
+                si = find_segment_index (dist, &segs);
+                _state.emplace_back (
+                    dist,
+                    segs.at (si).segment->sample_speed (rng), // speed
+                    rng.rnorm () * _systemnoise, // acceleration, not used (currently)
+                    this
+                );
 
                 // point to the particle
                 p = &(_state.back ());
@@ -67,15 +87,13 @@ namespace Gtfs {
                 if (e.type == EventType::departure)
                 {
                     // shift at <- dt
-                    int dwell (p->get_departure_time (e.stop_index) - p->get_arrival_time (e.stop_index));
-                    p->set_arrival_time (e.stop_index, p->get_arrival_time (e.stop_index) - dwell);
-                    p->set_departure_time (e.stop_index, p->get_departure_time (e.stop_index) - dwell);
+                    int dwell (p->get_departure_time (si) - p->get_arrival_time (si));
+                    p->set_arrival_time (si, p->get_arrival_time (si) - dwell);
+                    p->set_departure_time (si, p->get_departure_time (si) - dwell);
                 }
 
                 // and set the travel time for the segment to zero
-                auto segments = _trip->shape ()->segments ();
-                int segindex = find_segment_index (dist, &segments);
-                p->init_travel_time (segindex);
+                p->init_travel_time (si);
             }
         }
 
@@ -162,6 +180,7 @@ namespace Gtfs {
             std::cout << "\n ------------------";
         }
 #endif
+
 
         // repeat until there are no more events
         while (current_event_index < time_events.size ())
