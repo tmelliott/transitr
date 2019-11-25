@@ -769,10 +769,10 @@ eta_results <- eta_data %>%
 ## what is the actual error?
 ers <- eta_results#[sample(nrow(eta_results), 1e5), ]
 
-pbase <- ggplot(ers %>% filter(stop_sequence < 11),
+pbase <- ggplot(ers %>% filter(stop_sequence < 11) %>% arrange(timestamp),
     aes(time_until_arrival, colour = trip_id))
 pf_err <- pbase +
-        geom_point(aes(y = pf_error)) +
+        geom_path(aes(y = pf_error, group = trip_id)) +
         geom_smooth(aes(y = pf_error, colour = NULL))
 normal_err <- pbase +
         geom_point(aes(y = normal_error)) +
@@ -863,7 +863,7 @@ ggplot(res_min, aes(min)) +
     )
 
 
-ggsave("~/Dropbox/rmse.jpg", pr, width = 10, height = 5, units = "in")
+# ggsave("~/Dropbox/rmse.jpg", pr, width = 10, height = 5, units = "in")
 
 # pci <-
 
@@ -874,6 +874,7 @@ ggplot(res_min, aes(min)) +
     scale_y_continuous(
         breaks = seq(0, 1, by = 0.2),
         labels = function(x) glue::glue("{100*x}%")
-    )
+    ) +
+    xlim(0, 60)
 
-ggsave("~/Dropbox/ci.jpg", pci, width = 10, height = 5, units = "in")
+# ggsave("~/Dropbox/ci.jpg", pci, width = 10, height = 5, units = "in")

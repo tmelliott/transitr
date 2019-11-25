@@ -512,9 +512,11 @@ namespace Gtfs {
         double normal_speed = 0., normal_speed_var = 0.,
             normal_tt = 0., normal_tt_var = 0.;
         auto segs = _shape->segments ();
+        bool is_layover (false);
         // std::cout << "\n ++ starting from stop " << _stop_index;
         for (int m=_stop_index+1; m<M; m++)
         {
+            is_layover = _stops.at (m).departure_time > _stops.at (m).arrival_time;
             // std::cout << "\n\n Estimating for stop " << m << ": ";
             // travel time to get there:
             if (segs.at (m-1).segment->uncertainty () > 0.)
@@ -554,7 +556,9 @@ namespace Gtfs {
                 // initialize it
                 for (int k=0;k<2;k++)
                 {
-                    normal_pi.push_back (_vehicle->pr_stop ());
+                    int pk (_vehicle->pr_stop ());
+                    if (k == 1) pk = 1. - pk;
+                    normal_pi.push_back (pk);
                     normal_mu.push_back (_stops.at (m).average_delay * (k == 1));
                     normal_sigma2.push_back (pow (_stops.at (m).sd_delay, 2) * (k == 1));
                 }
@@ -562,13 +566,58 @@ namespace Gtfs {
                 normal_tt_var = 0.0;
                 continue;
             }
+            // else if (is_layover)
+            // {
+            //     // driver doesn't wait, doesn't stop
+            //     int pr_driver_waits = 0.7;
+            //     for (int j=0;j<curlen;j++)
+            //     {
+            //         normal_pi.push_back (
+            //             normal_pi.at (j) *
+            //                 (1. - pr_driver_waits) *
+            //                 (1. - _vehicle->pr_stop ())
+            //         );
+            //         normal_mu.push_back (normal_mu.at (j));
+            //         normal_sigma2.push_back (normal_sigma2.at (j));
+            //     }
+
+            //     // driver doesn't wait, but stops
+            //     for (int j=0;j<curlen;j++)
+            //     {
+            //         normal_pi.push_back (
+            //             normal_pi.at (j) *
+            //                 (1. - pr_driver_waits) *
+            //                 _vehicle->pr_stop ()
+            //         );
+            //         normal_mu.push_back (
+            //             normal_mu.at (j) + _stops.at (m).average_delay
+            //         );
+            //         normal_sigma2.push_back (
+            //             normal_sigma2.at (j) + pow (_stops.at (m).sd_delay, 2);
+            //         );
+            //     }
+
+            //     // driver waits
+            //     for (int j=0;j<curlen;j++)
+            //     {
+            //         normal_pi.at (j) *= pr_driver_waits;
+            //         int time_to_wait (_stops.at (m).departure_time - Time (_timestamp));
+            //         if (time_to_wait) pr_driver_waits = 0.;
+            //         if (time_to_wait > 0)
+            //         {
+            //             normal_mu.at (j) = time_to_wait;
+            //         }
+
+            //         // normal_sigma2.at (j) += pow (_stops.at (m).sd_delay, 2);
+            //     }
+            // }
             else
             {
                 // it doesn't stop
                 for (int j=0;j<curlen;j++)
                 {
 
-                    normal_pi.push_back (normal_pi.at (j) * _vehicle->pr_stop ());
+                    normal_pi.push_back (normal_pi.at (j) * (1 - _vehicle->pr_stop ()));
                     normal_mu.push_back (normal_mu.at (j));
                     normal_sigma2.push_back (normal_sigma2.at (j));
                 }
