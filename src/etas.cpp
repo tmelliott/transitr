@@ -383,7 +383,7 @@ namespace Gtfs {
                             }
                         }
 
-                        if (X > 0 && sig1 > 0)
+                        if (false) //X > 0 && sig1 > 0)
                         {
                             mean = Y + sig2 / sig1 * rho * (x - X);
                             // var(Y|X) = (1-rho^2) * sig2^2
@@ -808,7 +808,7 @@ namespace Gtfs {
             // Write estimates to the file:
             // trip_id, stop_sequence, timestamp, vehicle_dist, stop_dist, pf_obs, pf_var, pf_lower, pf_upper, normal_mean, normal_var, normal_lower, normal_upper
 #if SIMULATION
-            fout << _trip_id << "," << (m) << "," << _timestamp
+            fout << _trip_id << "," << _vehicle->vehicle_id () << "," << (m) << "," << _timestamp
                 << "," << _vehicle->distance () << "," << _stops.at (m).distance
                 // particle predictions:
                 << "," << tt_mean << "," << tt_var << "," << tt_lower << "," << tt_upper

@@ -13,37 +13,40 @@ tufiles <- list.files(tudir, pattern = "^trip_updates.+\\.pb$", full.names = TRU
 if (file.exists("simulations/arrivaldata_etas.rda")) {
     load("simulations/arrivaldata_etas.rda")
 } else {
-    arrivaldata <- readr::read_csv(
-        "arrivaldata.csv",
-        col_names = c(
-            "trip_id", "route_id", "vehicle_id", "timestamp",
-            "stop_sequence", "current_delay",
-            "arrival_time", "scheduled_arrival",
-            "lower", "upper", "type"
-        ),
-        col_types = "ccciiiiiiif"
-    ) %>%
-    mutate(
-        scheduled_arrival = ts2dt(scheduled_arrival),
-        delay = current_delay,
-        arrival_time = scheduled_arrival + delay
-    ) %>%
-    select(trip_id, route_id, vehicle_id, stop_sequence,
-        scheduled_arrival, arrival_time, delay) %>%
-    unique() %>%
-    group_by(trip_id) %>%
-    do({
-        x <- (.) %>% unique() %>%
-            filter(between(delay, -30*60, 60*60))
-        x <- x %>% group_by(stop_sequence) %>%
-            do({
-                ## the smallest absolute delay
-                z <- (.)
-                z[which.min(abs(z$delay)), ]
-            })
-        vids <- table(x$vehicle_id)
-        x %>% filter(vehicle_id == names(vids)[which.max(vids)])
-    })
+    arrivaldata <-
+        readr::read_csv(
+            "arrivaldata.csv",
+            col_names = c(
+                "trip_id", "route_id", "vehicle_id", "timestamp",
+                "stop_sequence", "current_delay",
+                "arrival_time", "scheduled_arrival",
+                "lower", "upper", "type"
+            ),
+            col_types = "ccciiiiiiif"
+        ) %>%
+        mutate(
+            scheduled_arrival = ts2dt(scheduled_arrival),
+            delay = current_delay,
+            arrival_time = scheduled_arrival + delay
+        ) %>%
+        select(trip_id, route_id, vehicle_id, stop_sequence,
+            scheduled_arrival, arrival_time, delay) %>%
+        unique()
+    save(arrivaldata, file = "simulations/raw_arrivaldata.rda")
+    arrivaldata <- arrivaldata %>%
+        group_by(trip_id) %>%
+        do({
+            x <- (.) %>% unique() %>%
+                filter(between(delay, -30*60, 60*60))
+            x <- x %>% group_by(stop_sequence) %>%
+                do({
+                    ## the smallest absolute delay
+                    z <- (.)
+                    z[which.min(abs(z$delay)), ]
+                })
+            vids <- table(x$vehicle_id)
+            x %>% filter(vehicle_id == names(vids)[which.max(vids)])
+        })
     save(arrivaldata, file = "simulations/arrivaldata_etas.rda")
 }
 
@@ -670,14 +673,16 @@ ggplot(bad_trip, aes(timestamp, arrival_time)) +
 library(tidyverse)
 library(patchwork)
 ts2dt <- function(ts) as.POSIXct(ts, origin = "1970-01-01")
+load("simulations/raw_arrivaldata.rda")
+rawarrival <- arrivaldata
 load("simulations/arrivaldata_etas.rda")
 
 etas <- read_csv("simulations/sim000/eta_state.csv",
-    col_names = c("trip_id", "stop_sequence", "timestamp",
+    col_names = c("trip_id", "vehicle_id", "stop_sequence", "timestamp",
         "vehicle_distance", "stop_distance",
         "pf_mean", "pf_var", "pf_lower", "pf_upper",
         "normal_mean", "normal_var", "normal_lower", "normal_upper"),
-    col_types = "ciinnnnnnnnnn"
+    col_types = "cciinnnnnnnnnn"
 )
 
 eta_data <- etas %>%
@@ -690,12 +695,17 @@ eta_data <- etas %>%
         actual_arrival = as.integer(actual_arrival),
         time_until_arrival = actual_arrival - timestamp
     ) %>%
-    group_by(trip_id) %>%
+    group_by(trip_id, vehicle_id) %>%
     group_modify(~ {
         # .y <- tibble(trip_id = unique(etas$trip_id)[2])
         # .x <- eta_data %>% filter(trip_id == .y$trip_id)
 
-        d <- arrivaldata %>% filter(trip_id == .y$trip_id & !is.na(delay))
+        d <- rawarrival %>%
+            filter(
+                trip_id == .y$trip_id &
+                vehicle_id == .y$vehicle_id &
+                !is.na(delay)
+            )
         dat <- tibble(timestamp = unique(.x$timestamp)) %>%
             mutate(
                 current_delay = sapply(
@@ -728,6 +738,7 @@ for (t in sample(unique(etas$trip_id))) {
     dt <- eta_data %>% filter(trip_id == t)
     if (nrow(dt) == 0) next
     p <- ggplot(dt, aes(timestamp)) +
+        geom_path(aes(y = -time_until_arrival)) +
         geom_hline(yintercept = 0) +
         geom_hline(aes(yintercept = scheduled_arrival - actual_arrival), lty = 2) +
         geom_ribbon(
