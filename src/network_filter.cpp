@@ -10,7 +10,7 @@ namespace Gtfs {
         _uncertainty = _prior_speed_var;
 
         // also specify the "between vehicle" variabilty
-        if (_state_var == 0)
+        if (_state_var == 0.)
             _state_var = 2.;
 
         _measurement_error = params->nw_measurement_error;
@@ -101,7 +101,7 @@ namespace Gtfs {
         for (int j=0; j<_data.size (); j++)
         {
             dj = &(_data.at (j));
-            err = fmax (_measurement_error, dj->second) + pow (_state_var, 2);
+            err = fmax (_measurement_error, dj->second) + _state_var;
             if (log)
                 std::cout << "{"
                     << round (dj->first) << ", " << round (err)

@@ -738,7 +738,7 @@ for (t in sample(unique(etas$trip_id))) {
     dt <- eta_data %>% filter(trip_id == t)
     if (nrow(dt) == 0) next
     p <- ggplot(dt, aes(timestamp)) +
-        geom_path(aes(y = -time_until_arrival)) +
+        # geom_path(aes(y = -time_until_arrival)) +
         geom_hline(yintercept = 0) +
         geom_hline(aes(yintercept = scheduled_arrival - actual_arrival), lty = 2) +
         geom_ribbon(
@@ -747,12 +747,12 @@ for (t in sample(unique(etas$trip_id))) {
                 ymax = pf_upper - time_until_arrival
             ),
             fill = "orangered", alpha = 0.5) +
-        geom_ribbon(
-            aes(
-                ymin = normal_lower - time_until_arrival,
-                ymax = normal_upper - time_until_arrival
-            ),
-            fill = "blue", alpha = 0.5) +
+        # geom_ribbon(
+        #     aes(
+        #         ymin = normal_lower - time_until_arrival,
+        #         ymax = normal_upper - time_until_arrival
+        #     ),
+        #     fill = "blue", alpha = 0.5) +
         geom_path(aes(y = pf_mean - time_until_arrival), colour = "orangered") +
         geom_path(aes(y = normal_mean - time_until_arrival), colour = "blue") +
         geom_path(aes(y = gtfs_eta - time_until_arrival), colour = "magenta") +
@@ -770,8 +770,14 @@ for (t in sample(unique(etas$trip_id))) {
 ## calculate RMSE etc
 eta_results <- eta_data %>%
     mutate(
+        pf_lower_min = as.POSIXct(format(timestamp + pf_lower, "%Y-%m-%d %H:%M:00")) - timestamp,
+        pf_upper_min = as.POSIXct(format(timestamp + pf_upper + 60, "%Y-%m-%d %H:%M:00")) - timestamp,
         pf_error = pf_mean - time_until_arrival,
         pf_ci = ifelse(pf_lower <= time_until_arrival & time_until_arrival <= pf_upper, 1, 0),
+        pf_ci_min = ifelse(
+            pf_lower_min <= time_until_arrival & time_until_arrival <= pf_upper_min,
+            1, 0
+        ),
         normal_error = normal_mean - time_until_arrival,
         normal_ci = ifelse(normal_lower <= time_until_arrival & time_until_arrival <= normal_upper, 1, 0),
         gtfs_error = gtfs_eta - time_until_arrival
@@ -853,6 +859,7 @@ res_min <- eta_results %>%
     summarize(
         pf_rmse = sqrt(mean(pf_error^2)),
         pf_ci_cov = mean(pf_ci),
+        pf_ci_cov_min = mean(pf_ci_min),
         normal_rmse = sqrt(mean(normal_error^2)),
         normal_ci_cov = mean(normal_ci),
         gtfs_rmse = sqrt(mean(gtfs_error^2))
@@ -880,6 +887,7 @@ ggplot(res_min, aes(min)) +
 
 ggplot(res_min, aes(min)) +
     geom_path(aes(y = pf_ci_cov), colour = "orangered") +
+    geom_path(aes(y = pf_ci_cov_min), colour = "orangered", lty = 2) +
     geom_path(aes(y = normal_ci_cov), colour = "blue") +
     geom_hline(yintercept = 0.95, lty = 3) +
     scale_y_continuous(
@@ -889,3 +897,17 @@ ggplot(res_min, aes(min)) +
     xlim(0, 60)
 
 # ggsave("~/Dropbox/ci.jpg", pci, width = 10, height = 5, units = "in")
+
+# ## Error versus error
+# eta_results %>%
+#     mutate(arrival_error = (scheduled_arrival - actual_arrival)) %>%
+#     filter(abs(arrival_error) < 20*60) %>%
+#     ggplot(aes(arrival_error)) +
+#     geom_point(aes(y = (pf_error)), colour = "orangered") +
+#     geom_point(aes(y = (normal_error)), colour = "blue") +
+#     geom_point(aes(y = (gtfs_error)), colour = "magenta") +
+#     scale_x_continuous(
+#         name = "Arrival delay (mins)",
+#         breaks = function(x) pretty(x / 60) * 60,
+#         labels = function(x) x / 60
+#     )

@@ -12,7 +12,7 @@ nw_obs <- read_csv("simulations/sim000/segment_observations.csv",
 sids <- nw_state %>% pull(segment_id) %>% table %>%
     sort(decreasing = TRUE) %>% names %>% head(20)
 
-sids <- c(38, 46, 97, 161, 187, 155)
+# sids <- c(38, 46, 97, 161, 187, 155)
 
 ggplot(nw_state %>% filter(segment_id %in% sids), aes(timestamp)) +
     geom_pointrange(
@@ -42,7 +42,7 @@ ggplot(nw_state %>% filter(segment_id %in% sids), aes(timestamp)) +
     geom_path(aes(y = avg_speed),
         colour = "orangered"
     ) +
-    facet_wrap(~segment_id, ncol = 2) +
+    facet_wrap(~segment_id, ncol = 3) +
     scale_y_continuous(
         name = "speed (m/s)",
         limits = c(0, 110 / 3.6),

@@ -392,6 +392,7 @@ namespace Gtfs {
                         << " of " << _segment_speed_avgs.size ();
 #endif
 
+                    // this is the variance
                     err = std::accumulate (
                         _state.begin (),
                         _state.end (),
@@ -1009,10 +1010,11 @@ namespace Gtfs {
             // or when passing segment/stop
             double vel = speed + rng.rnorm () * vehicle->system_noise ();
             int nn = 100;
-            while (vel <= 0 || vel > 30)
+            double vmax = segments.at (segment_index).segment->max_speed ();
+            while (vel <= 0 || vel > vmax)
             {
                 vel = speed + rng.rnorm () * vehicle->system_noise ();
-                if (nn-- == 0) vel = rng.runif () * 30.0;
+                if (nn-- == 0) vel = rng.runif () * vmax;
             }
             speed = vel;
 #if VERBOSE > 3

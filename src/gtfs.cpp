@@ -1669,7 +1669,7 @@ namespace Gtfs
             _system_noise = sqlite3_column_double (stmt, 0);
             _state_var = pow (sqlite3_column_double (stmt, 1), 2);
             _prior_speed = sqlite3_column_double (stmt, 2);
-            _prior_speed_var = fmax (20.0, sqlite3_column_double (stmt, 3));
+            _prior_speed_var = fmax (1.5, sqlite3_column_double (stmt, 3));
             _max_speed = sqlite3_column_double (stmt, 4);
         }
 
