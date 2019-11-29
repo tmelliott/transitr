@@ -681,8 +681,9 @@ etas <- read_csv("simulations/sim000/eta_state.csv",
     col_names = c("trip_id", "vehicle_id", "stop_sequence", "timestamp",
         "vehicle_distance", "stop_distance",
         "pf_mean", "pf_var", "pf_lower", "pf_upper",
-        "normal_mean", "normal_var", "normal_lower", "normal_upper"),
-    col_types = "cciinnnnnnnnnn"
+        "normal_mean", "normal_var", "normal_lower", "normal_upper",
+        "X", "P"),
+    col_types = "cciinnnnnnnnnnnn"
 )
 
 eta_data <- etas %>%
@@ -734,35 +735,102 @@ eta_data <- etas %>%
 
 
 t <- etas$trip_id[1]
+t <- "51357146318-20190806160740_v82.21"
 for (t in sample(unique(etas$trip_id))) {
-    dt <- eta_data %>% filter(trip_id == t)
+    dt <- eta_data %>% filter(trip_id == t) %>%
+        mutate(t = as.integer(timestamp))
     if (nrow(dt) == 0) next
     p <- ggplot(dt, aes(timestamp)) +
+        facet_wrap(~stop_sequence, scale = "free_y", ncol = 1) +
         # geom_path(aes(y = -time_until_arrival)) +
-        geom_hline(yintercept = 0) +
-        geom_hline(aes(yintercept = scheduled_arrival - actual_arrival), lty = 2) +
+        geom_hline(aes(yintercept = scheduled_arrival),
+            data = dt %>% ungroup() %>%
+                select(stop_sequence, scheduled_arrival) %>% distinct(),
+            lty = 3
+        ) +
         geom_ribbon(
             aes(
-                ymin = pf_lower - time_until_arrival,
-                ymax = pf_upper - time_until_arrival
+                ymin = pf_lower + t,
+                ymax = pf_upper + t
             ),
             fill = "orangered", alpha = 0.5) +
+        geom_ribbon(
+            aes(
+                ymin = t + qnorm(0.025, X, sqrt(P + X)),
+                ymax = t + qnorm(0.975, X, sqrt(P + X))
+            ),
+            fill = "gold", alpha = 0.5) +
         # geom_ribbon(
         #     aes(
         #         ymin = normal_lower - time_until_arrival,
         #         ymax = normal_upper - time_until_arrival
         #     ),
         #     fill = "blue", alpha = 0.5) +
-        geom_path(aes(y = pf_mean - time_until_arrival), colour = "orangered") +
-        geom_path(aes(y = normal_mean - time_until_arrival), colour = "blue") +
-        geom_path(aes(y = gtfs_eta - time_until_arrival), colour = "magenta") +
-        facet_wrap(~stop_sequence, scale = "free_y") +
+        geom_hline(aes(yintercept = as.integer(arrival_time)),
+            data = rawarrival %>% filter(trip_id == t)
+        ) +
+        geom_path(aes(y = pf_mean + t),
+            colour = "orangered") +
+        geom_path(aes(y = normal_mean + t),
+            colour = "blue") +
+        geom_path(aes(y = gtfs_eta + t),
+            colour = "magenta") +
+        geom_point(aes(x = arrival_time, y = as.integer(arrival_time)),
+            rawarrival %>% filter(trip_id == t)
+        ) +
         theme(legend.position = "none") +
         scale_y_continuous(
-            breaks = function(x) pretty(x/60) * 60,
-            labels = function(x) x / 60
+            labels = function(x) as.POSIXct(x, origin="1970-01-01") %>% format("%H:%M")
         )
-    print(p)
+    # dtd <- rawarrival %>% filter(trip_id == t) %>% mutate(stop_sequence = stop_sequence - 1) %>%
+    #     left_join(dt %>% ungroup() %>% select(stop_sequence, stop_distance), by = "stop_sequence")
+    p2 <- ggplot(dt, aes(timestamp)) +
+        geom_point(aes(y = vehicle_distance)) +
+        geom_point(aes(y = stop_distance), size = 1, colour = "red") +
+        geom_point(aes(x = arrival_time, y = stop_distance),
+            data = rawarrival %>% filter(trip_id == t) %>% select(stop_sequence, arrival_time) %>% unique %>%
+                left_join(dt %>% ungroup %>% select(stop_sequence, stop_distance) %>% unique),
+            colour = "blue"
+        ) +
+        geom_hline(aes(yintercept = stop_distance),
+            data = dt %>% ungroup %>% select(stop_sequence, stop_distance) %>% unique,
+            colour = "gray", lty = 2
+        ) +
+        scale_y_continuous(
+            sec.axis = sec_axis(~., name = "Distance (m)"),
+            name = "stop index",
+            breaks = dt$stop_distance %>% unique,
+            labels = dt$stop_sequence %>% unique
+        )
+    #print(p + p2 + plot_layout(width = c(1, 1)))
+
+    p3 <- ggplot(dt, aes(y = timestamp)) +
+        facet_wrap(~stop_sequence) +
+        geom_abline(colour = "white") +
+        geom_vline(aes(xintercept = arrival_time),
+            data = rawarrival %>% filter(trip_id == t) %>%
+                select(stop_sequence, arrival_time) %>% unique
+        ) +
+        geom_vline(aes(xintercept = scheduled_arrival),
+            data = dt %>% ungroup() %>% select(stop_sequence, scheduled_arrival) %>% unique,
+            colour = "gray", lty = 2
+        ) +
+        # geom_point(aes(y = vehicle_distance)) +
+        # geom_hline(aes(yintercept = stop_distance),
+        #     data = dt %>% ungroup %>% select(stop_sequence, stop_distance) %>% unique,
+        #     colour = "gray", lty = 2
+        # ) +
+        geom_segment(aes(
+            timestamp + pf_lower,
+            timestamp,
+            xend = timestamp + pf_upper,
+            yend = timestamp
+        )) +
+        geom_path(aes(x = timestamp + gtfs_eta), colour = "magenta") +
+        geom_point(aes(x = timestamp + pf_mean, timestamp))
+
+    print(p3 + p2 + plot_layout(width = c(1, 1)))
+
     #ggsave(glue::glue("~/Dropbox/graphs/trip_{t}.jpg"), width = 16, height = 10, units = "in")
     grid::grid.locator()
 }
@@ -782,6 +850,10 @@ eta_results <- eta_data %>%
         normal_ci = ifelse(normal_lower <= time_until_arrival & time_until_arrival <= normal_upper, 1, 0),
         gtfs_error = gtfs_eta - time_until_arrival
     )
+
+ggplot(eta_results) +
+    geom_point(aes(pf_error/60, gtfs_error/60, colour=time_until_arrival/60))+
+    scale_colour_viridis_c()
 
 ## what is the actual error?
 ers <- eta_results#[sample(nrow(eta_results), 1e5), ]
@@ -867,7 +939,40 @@ res_min <- eta_results %>%
 
 #pr <-
 
-ggplot(res_min, aes(min)) +
+ggplot(res_min %>% filter(min <= 90), aes(min)) +
+    geom_path(aes(y = pf_rmse, colour = "particle filter")) +
+    # geom_path(aes(y = normal_rmse, colour = "normal")) +
+    geom_path(aes(y = gtfs_rmse, colour = "gtfs")) +
+    scale_colour_manual(
+        name = "model",
+        values = c(
+            "particle filter" = "orangered",
+            # "normal" = "blue",
+            "gtfs" = "magenta"
+        )
+    ) +
+    scale_y_continuous(
+        limits = c(0, 1100)
+    )
+
+# by time of day
+eta_results %>%
+    ungroup() %>%
+    mutate(
+        hour = timestamp %>% format("%H") %>% as.integer,
+        minute = timestamp %>% format("%M") %>% as.integer,
+        hour = hour + floor(minute / 10) * 10
+    ) %>%
+    group_by(hour) %>%
+    summarize(
+        pf_rmse = sqrt(mean(pf_error^2)),
+        pf_ci_cov = mean(pf_ci),
+        pf_ci_cov_min = mean(pf_ci_min),
+        normal_rmse = sqrt(mean(normal_error^2)),
+        normal_ci_cov = mean(normal_ci),
+        gtfs_rmse = sqrt(mean(gtfs_error^2))
+    ) %>%
+    ggplot(aes(hour)) +
     geom_path(aes(y = pf_rmse, colour = "particle filter")) +
     geom_path(aes(y = normal_rmse, colour = "normal")) +
     geom_path(aes(y = gtfs_rmse, colour = "gtfs")) +
@@ -878,7 +983,38 @@ ggplot(res_min, aes(min)) +
             "normal" = "blue",
             "gtfs" = "magenta"
         )
-    )
+    ) +
+    ggtitle("No pattern.")
+
+# by distance away
+eta_results %>%
+    ungroup() %>%
+    mutate(
+        dist_to_go = floor((stop_distance - vehicle_distance) / 1000) * 1000
+    ) %>%
+    group_by(dist_to_go) %>%
+    summarize(
+        pf_rmse = sqrt(mean(pf_error^2)),
+        pf_ci_cov = mean(pf_ci),
+        pf_ci_cov_min = mean(pf_ci_min),
+        normal_rmse = sqrt(mean(normal_error^2)),
+        normal_ci_cov = mean(normal_ci),
+        gtfs_rmse = sqrt(mean(gtfs_error^2))
+    ) %>%
+    ggplot(aes(dist_to_go)) +
+    geom_path(aes(y = pf_rmse, colour = "particle filter")) +
+    geom_path(aes(y = normal_rmse, colour = "normal")) +
+    geom_path(aes(y = gtfs_rmse, colour = "gtfs")) +
+    scale_colour_manual(
+        name = "model",
+        values = c(
+            "particle filter" = "orangered",
+            "normal" = "blue",
+            "gtfs" = "magenta"
+        )
+    ) +
+    ggtitle("No pattern.")
+
 
 
 # ggsave("~/Dropbox/rmse.jpg", pr, width = 10, height = 5, units = "in")

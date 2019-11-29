@@ -7,6 +7,10 @@
 #include "timing.h"
 #endif
 
+#ifndef NORMALAPPROX
+#define NORMALAPPROX 0
+#endif
+
 // template <typename T>
 // T pnorm (T x, T m, T s)
 // {
@@ -110,12 +114,13 @@ namespace Gtfs {
             }
         }
         _delta = (_timestamp > 0 ? t - _timestamp : 0);
-        _timestamp = t;
         if (_delta == 0)
         {
+            if (_timestamp == 0) _timestamp = t;
             if (log) std::cout << " - no update, skipping.";
             return;
         }
+        _timestamp = t;
 
         if (log && _vehicle != nullptr)
             std::cout
@@ -187,6 +192,7 @@ namespace Gtfs {
             }
             std::cout << "\n  ===================\n\n";
 #endif
+
 
             // iterate over vehicle state
             int N (_vehicle->state ()->size ());
@@ -276,8 +282,18 @@ namespace Gtfs {
                     // add dwell time to travel time to NEXT stop (l+1)
                     tt += fmax (0.0, dt);
 
+                    // first stop?
+                    if (l == 0 && rng.runif () < 0.9)
+                    {
+                        tt = fmax (
+                            0.,
+                            _stops.at (l).departure_time -
+                                Time (_timestamp) +
+                                rng.rnorm () * 5.
+                        );
+                    }
                     // layover ? and Pr(driver stops) = .7
-                    if (is_layover && rng.runif () < 0.7)
+                    else if (is_layover && rng.runif () < 0.7)
                     {
                         tt = fmax (
                             tt,
@@ -288,36 +304,54 @@ namespace Gtfs {
 
                 // std::cout << ", prog = " << seg_prog;
                 double vel = 0.0;
-                while (vel < 2.0 || vel > 30.0)
+                if (rng.runif () < 0.5 && (segs.at (l).segment->length () - seg_prog) < 500.)
                 {
-                    vel = rng.rnorm () * 2.0 + p->get_speed ();
-                }
-                double speed = vel;
-                // std::cout << ", vel = " << vel << ", speed = " << speed;
-                if (speed > 2.0 &&
-                    (seg_prog / segs.at (l).segment->length () < 0.1 || seg_prog > 100))
-                {
-                    v = speed;
+                    while (vel < 2.0 || vel > 30.0)
+                    {
+                        vel = rng.rnorm () * 2.0 + p->get_speed ();
+                    }
+                    double speed = vel;
+                    // std::cout << ", vel = " << vel << ", speed = " << speed;
+                    if (speed > 2.0 &&
+                        (seg_prog / segs.at (l).segment->length () > 0.2 || seg_prog > 100))
+                    {
+                        v = speed;
+                    }
+                    else
+                    {
+                        // use the scheduled time
+                        v = segs.at (l).segment->length () /
+                            (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
+                    }
                 }
                 else
                 {
-                    // use the scheduled time
-                    v = segs.at (l).segment->length () /
-                        (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
+                    if (rng.runif () < 0.0)
+                    {
+                        v = segs.at (l).segment->length () /
+                            (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
+                    }
+                    else
+                    {
+                        v = segs.at (l).segment->sample_speed (rng);
+                    }
                 }
+
                 // std::cout << ", v = " << v;
                 // std::cout
                 //     << " -> d = " << (segs.at (l).segment->length () - seg_prog)
                 //     << " -> t = " << ((segs.at (l).segment->length () - seg_prog) / v);
 
-                xx = segs.at (l).segment->sample_travel_time (rng, tt);
-                tt += fmin(xx,
-                    round ((
-                        segs.at (l).distance +
-                        segs.at (l).segment->length () -
-                        p->get_distance ()
-                    ) / v)
-                );
+                // xx = segs.at (l).segment->sample_speed (rng, tt);
+                tt += (segs.at (l).segment->length () - seg_prog) / v;
+                // std::cout << " -> new tt is " << tt;
+                // tt += fmin(xx,
+                //     round ((
+                //         segs.at (l).distance +
+                //         segs.at (l).segment->length () -
+                //         p->get_distance ()
+                //     ) / v)
+                // );
 
                 _eta_matrix (i, l+1) = tt; // no slower than 0.5m/s
 
@@ -409,6 +443,12 @@ namespace Gtfs {
                                 x = rng.runif () * (segs.at (l).segment->max_speed () - 10.) + 5.;
                             }
                         }
+                        // if (rng.runif () < 0.)
+                        // {
+                        //     x = rng.rnorm () * 2.;
+                        //     x += segs.at (l).segment->length () /
+                        //         (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
+                        // }
                         // travel time is L / v
                         tt += segs.at (l).segment->length () / x;
                     }
@@ -466,6 +506,7 @@ namespace Gtfs {
         double tt_mean, tt_var, tt_lower, tt_median, tt_upper;
         double X, P, y, S, K;
 
+#if NORMALAPPROX==0
         int normal_n;
         std::vector<double> normal_pi, normal_mu, normal_sigma2;
         std::vector<double> normal_mean, normal_var, normal_lower, normal_median, normal_upper;
@@ -720,6 +761,43 @@ namespace Gtfs {
                 normal_sigma2.at (0) = normal_var.at (m);
             }
         }
+#endif
+#if NORMALAPPROX==1
+        std::vector<double> normal_mean, normal_var, normal_lower, normal_upper;
+        {
+            if (_vehicle == nullptr || _stop_index == M)
+            {
+                return etas;
+            }
+
+            normal_mean.resize (M, 0.);
+            normal_var.resize (M, 0.);
+            normal_lower.resize (M, 0.);
+            normal_upper.resize (M, 0.);
+
+            double tt = 0., var = 0.;
+            auto segs = _shape->segments ();
+            for (int m=_stop_index; m<M-1; m++)
+            {
+                if (m > _stop_index ||
+                    _stops.at (m).distance + 20.0 >= _vehicle->distance ())
+                {
+                    // still at current stop
+                    tt += _stops.at (m).average_delay * _vehicle->pr_stop ();
+                    var += pow (_stops.at (m).sd_delay * _vehicle->pr_stop (), 2);
+                }
+
+                tt += segs.at (m).segment->length () / segs.at (m).segment->speed ();
+                var +=
+                    pow (segs.at (m).segment->length () / segs.at (m).segment->speed (), 2) *
+                        segs.at (m).segment->uncertainty ();
+                normal_mean.at (m+1) = tt;
+                normal_var.at (m+1) = var;
+                normal_lower.at (m+1) = fmax (0., R::qnorm (0.025, tt, pow (var, 0.5), 1, 0));
+                normal_upper.at (m+1) = R::qnorm (0.975, tt, pow (var, 0.5), 1, 0);
+            }
+        }
+#endif
 
         uint64_t ts;
         if (log) std::cout << " - get state starts at stop " << (_stop_index+1) << "\n";
@@ -808,13 +886,13 @@ namespace Gtfs {
             // Write estimates to the file:
             // trip_id, stop_sequence, timestamp, vehicle_dist, stop_dist, pf_obs, pf_var, pf_lower, pf_upper, normal_mean, normal_var, normal_lower, normal_upper
 #if SIMULATION
-            fout << _trip_id << "," << _vehicle->vehicle_id () << "," << (m) << "," << _timestamp
+            fout << _trip_id << "," << _vehicle->vehicle_id () << "," << (m+1) << "," << _timestamp
                 << "," << _vehicle->distance () << "," << _stops.at (m).distance
                 // particle predictions:
-                << "," << tt_mean << "," << tt_var << "," << tt_lower << "," << tt_upper
+                << "," << tt_median << "," << tt_var << "," << tt_lower << "," << tt_upper
                 // normal approx pred:
                 << "," << normal_mean.at (m) << "," << normal_var.at (m) << ","
-                << normal_lower.at (m) << "," << normal_upper.at (m) << "\n";
+                << normal_lower.at (m) << "," << normal_upper.at (m);
 #endif
 
             // update the estimate state
@@ -833,11 +911,11 @@ namespace Gtfs {
                 }
                 if (P == 0)
                 {
-                    P = abs (X);
+                    P = tt_var + pow (_stops.at (m).sd_delay, 2.);
                 }
 
                 if (log)
-                    std::cout << "\n stop " << std::setw (2) << m
+                    std::cout << "\n stop " << std::setw (2) << (m+1)
                         << " -> X = " << std::setw (8) << (round (X * 100) / 100)
                         << ", P = " << std::setw (8) << (round (P * 100) / 100);
 
@@ -858,7 +936,8 @@ namespace Gtfs {
                 //     X = F * X;
                 //     P = F * P * F;
                 // }
-                P += _delta;
+                double eta_noise = 0.1;
+                P += pow (eta_noise, 2.) * (1. + pow (_delta / (X + _delta), 2.0));
                 // if (avg_eta > 0) P += avg_eta;
 
                 // X = F * X;
@@ -902,8 +981,8 @@ namespace Gtfs {
 
                 if (tt_var < 1e6 && tt_mean < 2*60*60)
                 {
-                    tt_var += pow (tt_mean, 2);
                     y = tt_mean - X;
+                    // tt_var += pow (_delta, 2.);
                     S = P + tt_var;
                     K = P / S;
                     X += K * y;
@@ -917,9 +996,9 @@ namespace Gtfs {
 
                 // P += pow (y, 2);
 
-// #if SIMULATION
-//                 fout << "," << X << "," << P;
-// #endif
+#if SIMULATION
+                fout << "," << X << "," << P << "\n";
+#endif
 
                 // insert back into state
                 _eta_state.at (m) = std::make_tuple (_timestamp + round (X), P);

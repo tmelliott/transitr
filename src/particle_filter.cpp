@@ -1130,7 +1130,8 @@ namespace Gtfs {
 
                         // Pr(stop) inverse proportional to speed
                         // [0m/s -> 1, 35m/s -> 0]
-                        if (rng.runif () > vehicle->params ()->pr_stop)
+                        //if (rng.runif () > vehicle->params ()->pr_stop)
+                        if (rng.runif () > 1. - speed / 35.)
                         {
 #if VERBOSE > 3
                             std::cout << "\n   -> dwell time at stop: ";

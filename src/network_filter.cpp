@@ -37,10 +37,10 @@ namespace Gtfs {
             switch (_model_type)
             {
                 case 0:
-                    Phat = 50. / 4.; // approx 50~km/h/s
+                    Phat = 30. / 4.; // approx 50~km/h/s
                     break;
                 case 1:
-                    Phat = 50. / 4.; // fix this
+                    Phat = 30. / 4.; // fix this
                     break;
             }
         }
