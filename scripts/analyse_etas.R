@@ -733,10 +733,26 @@ eta_data <- etas %>%
     filter(time_until_arrival >= 0) %>%
     mutate(timestamp = ts2dt(timestamp))
 
+## By route:
+library(RSQLite)
+library(dbplyr)
+con <- dbConnect(SQLite(), "at_gtfs.db")
+con %>% tbl("trips") %>%
+    left_join(con %>% tbl("routes")) %>%
+    filter(trip_id %in% !!unique(etas$trip_id)) %>%
+    select(trip_id, route_id, route_short_name) %>%
+    collect() -> trip_routes
+dbDisconnect(con)
+
+eta_data <- eta_data %>% left_join(trip_routes) %>% ungroup()
+errr <- eta_data %>%
+    # filter(route_short_name %in% c("SKY")) %>%
+    pluck("trip_id") %>% unique
 
 t <- etas$trip_id[1]
 t <- "51357146318-20190806160740_v82.21"
-for (t in sample(unique(etas$trip_id))) {
+t <- "8301165813-20190806160740_v82.21"
+for (t in sample(errr)) {
     dt <- eta_data %>% filter(trip_id == t) %>%
         mutate(t = as.integer(timestamp))
     if (nrow(dt) == 0) next
@@ -940,9 +956,14 @@ res_min <- eta_results %>%
         pf_rmse = sqrt(mean(pf_error^2)),
         pf_ci_cov = mean(pf_ci),
         pf_ci_cov_min = mean(pf_ci_min),
-        normal_rmse = sqrt(mean(normal_error^2)),
-        normal_ci_cov = mean(normal_ci),
-        gtfs_rmse = sqrt(mean(gtfs_error^2))
+        normggplot(aes(rmse, model)) +
+        geom_segment(
+            aes(
+                xend = 0,
+                yend = model
+            )
+        ) +
+        geom_point()_rmse = sqrt(mean(gtfs_error^2))
     )
 
 #pr <-
@@ -1067,3 +1088,56 @@ eta_results %>%
     ggplot(aes(distance_to_go, pf_error/60)) +
         geom_hex() +
         geom_smooth()
+
+
+eta_res_route <- eta_results %>%
+    group_by(route_short_name) %>%
+    summarize(
+        pf_rmse = sqrt(mean(pf_error^2)),
+        normal_rmse = sqrt(mean(normal_error^2)),
+        gtfs_rmse = sqrt(mean(gtfs_error^2)),
+        n = length(unique(trip_id))
+    ) %>%
+    gather(key = "model", value = "rmse", -route_short_name, -n)
+
+pA <- eta_res_route  %>%
+    ggplot(aes(rmse, model, colour = model)) +
+        geom_segment(
+            aes(
+                xend = 0,
+                yend = model
+            )
+        ) +
+        geom_point() +
+        facet_grid(route_short_name~.)
+
+pB <- eta_res_route %>%
+    ggplot(aes(n, as.integer(n > 0))) +
+        geom_segment(aes(xend = 0, yend = 1)) +
+        geom_point() +
+        facet_grid(route_short_name~.) +
+        theme(
+            axis.text.y = element_blank(),
+            axis.ticks.y = element_blank(),
+            axis.title.y = element_blank()
+        )
+
+pA + pB + plot_layout(width = c(4, 1))
+
+
+
+## P(miss bus | arrive 1~min before arrival/at lower bound)
+eta_results %>%
+    # filter(time_until_arrival > 180) %>%
+    mutate(
+        pf_miss = as.integer(time_until_arrival < pf_lower),
+        gtfs_miss = as.integer(time_until_arrival < gtfs_eta - 12*60),
+        pf_wait = ifelse(pf_miss, NA, time_until_arrival - pf_lower),
+        gtfs_wait = ifelse(gtfs_miss, NA, time_until_arrival - gtfs_eta + 12*60)
+    ) %>%
+    summarize(
+        pf_pr_miss = mean(pf_miss),
+        gtfs_pr_miss = mean(gtfs_miss),
+        pf_e_wait = mean(pf_wait, na.rm = TRUE) / 60,
+        gtfs_e_wait = mean(gtfs_wait, na.rm = TRUE) / 60
+    )

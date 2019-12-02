@@ -26,7 +26,6 @@ namespace Gtfs {
     {
         // Update trip state
         if (!loaded) load ();
-
         bool log (false);
 #if VERBOSE > 1
         log = true;
@@ -114,9 +113,10 @@ namespace Gtfs {
                     _segment_index = find_segment_index (d, &(_shape->segments ()));
                 }
                 if (log) std::cout << ")";
+                _delta = (_timestamp > 0 ? t - _timestamp : 0);
             }
         }
-        _delta = (_timestamp > 0 ? t - _timestamp : 0);
+
         if (_delta == 0)
         {
             if (_timestamp == 0) _timestamp = t;
@@ -130,6 +130,7 @@ namespace Gtfs {
                 << "\n   - Event Type: " << _event_type
                 << "\n   - Stop index: " << (_stop_index+1)
                 << " of " << _stops.size ()
+                << "\n   - Vehicle distance: " << _vehicle->distance () << "m"
                 << "\n   - Segment index: " << (_segment_index+1)
                 << " of " << _shape->segments ().size ()
                 << " (" << (_segment_progress*100) << "%)";
@@ -155,6 +156,9 @@ namespace Gtfs {
      */
     void Trip::forecast (RNG& rng)
     {
+        if (_vehicle == nullptr) return;
+        if (_vehicle->timestamp () == _timestamp) return;
+
         Eigen::IOFormat intMat (
             Eigen::StreamPrecision, 0, ", ", "\n", "  [", "]"
         );
@@ -332,6 +336,10 @@ namespace Gtfs {
                     //     vel = rng.rnorm () * 2. + p->get_speed ();
                     // }
                 }
+                // if (rng.runif () < 0.1)
+                // {
+                //     v = rng.runif () * (segs.at (l).segment->max_speed () - 10.) + 5.;
+                // }
 
                 // v = segs.at (l).segment->length () /
                 //     (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
@@ -444,7 +452,7 @@ namespace Gtfs {
                             }
                         }
 
-                        if (false) //X > 0 && sig1 > 0)
+                        if (X > 0 && sig1 > 0)
                         {
                             mean = Y + sig2 / sig1 * rho * (x - X);
                             // var(Y|X) = (1-rho^2) * sig2^2
@@ -485,6 +493,11 @@ namespace Gtfs {
 
                         // x = segs.at (l).segment->length () /
                         //     (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
+
+                        // if (rng.runif () < 0.1)
+                        // {
+                        //     x = rng.runif () * (segs.at (l).segment->max_speed () - 10.) + 5.;
+                        // }
                         tt += segs.at (l).segment->length () / x;
                     }
 
@@ -817,15 +830,27 @@ namespace Gtfs {
                 if (m > _stop_index ||
                     _stops.at (m).distance + 20.0 >= _vehicle->distance ())
                 {
-                    // still at current stop
+                    // still at current stop: dwell time
                     tt += _stops.at (m).average_delay * _vehicle->pr_stop ();
                     var += pow (_stops.at (m).sd_delay * _vehicle->pr_stop (), 2);
+
+                    // then segment travel time
+                    tt += segs.at (m).segment->length () / segs.at (m).segment->speed ();
+                    var +=
+                        pow (segs.at (m).segment->length () / segs.at (m).segment->speed (), 2) *
+                            segs.at (m).segment->uncertainty ();
+                }
+                else
+                {
+                    // only part of the segment remains
+                    double dist_travelled (_vehicle->distance () - segs.at (m).distance);
+                    tt += (segs.at (m).segment->length () - dist_travelled) /
+                        segs.at (m).segment->speed ();
+                    double pr (1. - dist_travelled / segs.at (m).segment->length ());
+                    var += pow (pr, 2.) * segs.at (m).segment->uncertainty ();
                 }
 
-                tt += segs.at (m).segment->length () / segs.at (m).segment->speed ();
-                var +=
-                    pow (segs.at (m).segment->length () / segs.at (m).segment->speed (), 2) *
-                        segs.at (m).segment->uncertainty ();
+
                 normal_mean.at (m+1) = tt;
                 normal_var.at (m+1) = var;
                 normal_lower.at (m+1) = fmax (0., R::qnorm (0.025, tt, pow (var, 0.5), 1, 0));

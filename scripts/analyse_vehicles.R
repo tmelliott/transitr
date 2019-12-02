@@ -7,7 +7,7 @@ vehicles <- list.files("simulations/sim000/history",
     pattern = "vehicle_.{4}.csv",
     full.names = TRUE
 )
-vi <- vehicles[grepl("5636", vehicles)]
+vi <- vehicles[grepl("6225", vehicles)]
 vdata <- read_csv(vi) %>% filter(trip_id == t)
 
 con <- dbConnect(SQLite(), "at_gtfs.db")
@@ -47,8 +47,11 @@ pmap <- ggplot(vdata %>% filter(state_type != "mutate")) +
     ) +
     coord_fixed(ratio = cos(mean(vdata$event_latitude * pi / 180., na.rm = TRUE)))
 
-pdist <- ggplot(vdata %>% filter(state_type != "mutate")) +
-    geom_point(aes(event_timestamp, vehicle_distance, colour = event_type))
+
+pdist <- ggplot(vdata %>% filter(state_type != "mutate"),
+    aes(as.POSIXct(event_timestamp, origin="1970-01-01"))) +
+    geom_point(aes(y = vehicle_distance, colour = event_type)) +
+    geom_point(aes(y = event_dist_along_route), shape = 4)
 
 pmap + pdist
 
