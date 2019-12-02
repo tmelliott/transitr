@@ -805,7 +805,7 @@ for (t in sample(unique(etas$trip_id))) {
     #print(p + p2 + plot_layout(width = c(1, 1)))
 
     p3 <- ggplot(dt, aes(y = timestamp)) +
-        facet_wrap(~stop_sequence) +
+        facet_wrap(~stop_sequence, scales = "free_x") +
         geom_abline(colour = "white") +
         geom_vline(aes(xintercept = arrival_time),
             data = rawarrival %>% filter(trip_id == t) %>%
@@ -826,7 +826,9 @@ for (t in sample(unique(etas$trip_id))) {
             xend = timestamp + pf_upper,
             yend = timestamp
         )) +
-        geom_path(aes(x = timestamp + gtfs_eta), colour = "magenta") +
+        geom_point(aes(x = timestamp + gtfs_eta), colour = "magenta") +
+        geom_point(aes(x = timestamp + X), colour = "blue") +
+        geom_point(aes(x = timestamp + normal_mean), colour = "green4") +
         geom_point(aes(x = timestamp + pf_mean, timestamp))
 
     print(p3 + p2 + plot_layout(width = c(1, 1)))
@@ -850,13 +852,17 @@ eta_results <- eta_data %>%
         normal_ci = ifelse(normal_lower <= time_until_arrival & time_until_arrival <= normal_upper, 1, 0),
         gtfs_error = gtfs_eta - time_until_arrival
     )
+tOK <- eta_results %>% ungroup() %>% group_by(trip_id) %>%
+    summarize(ok = all(abs(pf_error) < 45*60)) %>%
+    filter(ok)
 
-ggplot(eta_results) +
+
+ggplot(eta_results %>% filter(trip_id %in% tOK$trip_id)) +
     geom_point(aes(pf_error/60, gtfs_error/60, colour=time_until_arrival/60))+
     scale_colour_viridis_c()
 
 ## what is the actual error?
-ers <- eta_results#[sample(nrow(eta_results), 1e5), ]
+ers <- eta_results %>% filter(trip_id %in% tOK$trip_id)
 
 pbase <- ggplot(ers %>% filter(stop_sequence < 11) %>% arrange(timestamp),
     aes(time_until_arrival, colour = trip_id))
@@ -897,7 +903,9 @@ pf_err / normal_err / gtfs_err &
 #         geom_hline(yintercept = 110 / 3.6)
 
 # overall
-eta_results %>% ungroup %>%
+eta_results %>%
+    filter(trip_id %in% tOK$trip_id) %>%
+    ungroup %>%
     summarize(
         pf_rmse = sqrt(mean(pf_error^2)),
         pf_ci_cov = mean(pf_ci),
@@ -961,7 +969,7 @@ eta_results %>%
     mutate(
         hour = timestamp %>% format("%H") %>% as.integer,
         minute = timestamp %>% format("%M") %>% as.integer,
-        hour = hour + floor(minute / 10) * 10
+        hour = hour + (floor(minute / 10) * 10 / 60)
     ) %>%
     group_by(hour) %>%
     summarize(
@@ -1028,7 +1036,8 @@ ggplot(res_min, aes(min)) +
     geom_hline(yintercept = 0.95, lty = 3) +
     scale_y_continuous(
         breaks = seq(0, 1, by = 0.2),
-        labels = function(x) glue::glue("{100*x}%")
+        labels = function(x) glue::glue("{100*x}%"),
+        limits = c(0, 1)
     ) +
     xlim(0, 60)
 
@@ -1047,3 +1056,14 @@ ggplot(res_min, aes(min)) +
 #         breaks = function(x) pretty(x / 60) * 60,
 #         labels = function(x) x / 60
 #     )
+
+## Uncertainty by ...
+
+# distance
+eta_results %>%
+    mutate(distance_to_go = stop_distance - vehicle_distance) %>%
+    ungroup %>%
+    filter(distance_to_go > 0 & abs(pf_error / 60 < 30)) %>%
+    ggplot(aes(distance_to_go, pf_error/60)) +
+        geom_hex() +
+        geom_smooth()

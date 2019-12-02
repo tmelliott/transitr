@@ -45,6 +45,14 @@ if test x"${PKGCONFIG}" == x"yes"; then
     curl_cxxflags=""
     curl_libs="-libcurl"
   fi
+
+  if pkg-config --exists gsl; then
+    gsl_cxxflags=`pkg-config --cflags gsl`
+    gsl_libs=`pkg-config --libs gsl`
+  else
+    gsl_cxxflags=""
+    gsl_libs="-lm -lgsl -lgslcblas"
+  fi
 else
   # Add a reasonable default of -lprotobuf and -lcurl if we don't have pkg-config
   protobuf_cxxflags=""
@@ -52,6 +60,9 @@ else
 
   curl_cxxflags=""
   curl_libs="-libcurl"
+
+  gsl_cxxflags=""
+  gsl_libs="-lm -lgsl -lgslcblas"
 fi
 
 ## And make sure these flags are used for the tests below.
@@ -120,7 +131,7 @@ AC_PROG_R
 
 # ## now use all these
 AC_SUBST([PKG_CPPFLAGS],["${PKG_CPPFLAGS} ${CXXFLAGS} ${protobuf_cxxflags} ${curl_cxxflags} ${OPENMP_CXXFLAGS}"])
-AC_SUBST([PKG_LIBS],["${PKG_LIBS} ${protobuf_libs} ${curl_libs}"])
+AC_SUBST([PKG_LIBS],["${PKG_LIBS} ${protobuf_libs} ${curl_libs} ${gsl_libs}"])
 AC_CONFIG_FILES([src/Makevars])
 AC_OUTPUT
 
@@ -128,7 +139,7 @@ echo "
 transitr $PACKAGE_VERSION
 =========================
 
-cflags:   ${PKG_CPPFLAGS} 
+cflags:   ${PKG_CPPFLAGS}
 libs:     ${PKG_LIBS}
 cppflags: ${CPPFLAGS}
 cxxflags: ${CXXFLAGS}

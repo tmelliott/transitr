@@ -11,6 +11,9 @@
 #define NORMALAPPROX 0
 #endif
 
+#include <gsl/gsl_rng.h>
+#include "vendor/rtnorm/rtnorm.hpp"
+
 // template <typename T>
 // T pnorm (T x, T m, T s)
 // {
@@ -169,6 +172,11 @@ namespace Gtfs {
         // std::cout << "\n a big matrix ...\n" << Hseg.format (intMat) << "\n";
 
 
+        gsl_rng_env_setup();                          // Read variable environnement
+        const gsl_rng_type* type = gsl_rng_default;   // Default algorithm 'twister'
+        gsl_rng *gen = gsl_rng_alloc (type);          // Rand generator allocation
+
+
         if (gtfs->parameters ()->eta_model == 0 && _vehicle != nullptr)
         {
             // current NW state
@@ -259,25 +267,24 @@ namespace Gtfs {
                 bool is_layover (_stops.at (l).departure_time > _stops.at (l).arrival_time);
                 if (seg_prog < 1.0 || is_layover || l == 0)
                 {
-                    dt = -1.0;
-                    if (rng.runif () < _vehicle->pr_stop () && l > 0)
+                    dt = 0.;
+                    if (rng.runif () < _vehicle->pr_stop ())
                     {
                         if (_stops.at (l).sd_delay > 0)
                         {
-                            while (dt < 0.0)
-                            {
-                                dt = rng.rnorm () * _stops.at (l).sd_delay +
-                                    _stops.at (l).average_delay;
-                            }
+                            dt = rtnorm (gen, 0., 5 * 60.,
+                                _stops.at (l).average_delay,
+                                _stops.at (l).sd_delay
+                            ).first;
                         }
                         else
                         {
-                            while (dt < 0 || dt > 5*60)
-                            {
-                                dt = rng.rnorm () * _vehicle->dwell_time_var () +
-                                    _vehicle->dwell_time ();
-                            }
+                            dt = rtnorm (gen, 0., 5 * 60.,
+                                _vehicle->dwell_time (),
+                                pow (_vehicle->dwell_time_var (), 0.5)
+                            ).first;
                         }
+                        dt += _vehicle->gamma ();
                     }
                     // add dwell time to travel time to NEXT stop (l+1)
                     tt += fmax (0.0, dt);
@@ -304,38 +311,63 @@ namespace Gtfs {
 
                 // std::cout << ", prog = " << seg_prog;
                 double vel = 0.0;
-                if (rng.runif () < 0.5 && (segs.at (l).segment->length () - seg_prog) < 500.)
+
+                /** figuring out particle's speed:
+                 * if there's less than 500m, OR segment progress is less than 20%,
+                 * use segment state.
+                 * Otherwise, sample particle's speed.
+                 */
+
+                if ((segs.at (l).segment->length () - seg_prog) > 500. ||
+                    seg_prog / segs.at (l).segment->length () < 0.5)
                 {
-                    while (vel < 2.0 || vel > 30.0)
-                    {
-                        vel = rng.rnorm () * 2.0 + p->get_speed ();
-                    }
-                    double speed = vel;
-                    // std::cout << ", vel = " << vel << ", speed = " << speed;
-                    if (speed > 2.0 &&
-                        (seg_prog / segs.at (l).segment->length () > 0.2 || seg_prog > 100))
-                    {
-                        v = speed;
-                    }
-                    else
-                    {
-                        // use the scheduled time
-                        v = segs.at (l).segment->length () /
-                            (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
-                    }
+                    v = segs.at (l).segment->sample_speed (rng);
                 }
                 else
                 {
-                    if (rng.runif () < 0.0)
-                    {
-                        v = segs.at (l).segment->length () /
-                            (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
-                    }
-                    else
-                    {
-                        v = segs.at (l).segment->sample_speed (rng);
-                    }
+                    auto vt = rtnorm (gen, 2., segs.at (l).segment->max_speed (), p->get_speed (), 2.);
+                    v = vt.first;
+                    // while (vel < 2.0 || vel > segs.at (l).segment->max_speed ())
+                    // {
+                    //     vel = rng.rnorm () * 2. + p->get_speed ();
+                    // }
                 }
+
+                // v = segs.at (l).segment->length () /
+                //     (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
+
+                // if (rng.runif () < 0.5 && (segs.at (l).segment->length () - seg_prog) < 500.)
+                // {
+                //     while (vel < 2.0 || vel > 30.0)
+                //     {
+                //         vel = rng.rnorm () * 2.0 + p->get_speed ();
+                //     }
+                //     double speed = vel;
+                //     // std::cout << ", vel = " << vel << ", speed = " << speed;
+                //     if (speed > 2.0 &&
+                //         (seg_prog / segs.at (l).segment->length () > 0.2 || seg_prog > 100))
+                //     {
+                //         v = speed;
+                //     }
+                //     else
+                //     {
+                //         // use the scheduled time
+                //         v = segs.at (l).segment->length () /
+                //             (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
+                //     }
+                // }
+                // else
+                // {
+                //     if (rng.runif () < 0.0)
+                //     {
+                //         v = segs.at (l).segment->length () /
+                //             (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
+                //     }
+                //     else
+                //     {
+                //         v = segs.at (l).segment->sample_speed (rng);
+                //     }
+                // }
 
                 // std::cout << ", v = " << v;
                 // std::cout
@@ -364,25 +396,24 @@ namespace Gtfs {
                 x = tt;
                 while (l < L)
                 {
-                    dt = -1.0;
+                    dt = 0.;
                     if (rng.runif () < _vehicle->pr_stop ())
                     {
                         if (_stops.at (l).sd_delay > 0)
                         {
-                            while (dt < 0.0)
-                            {
-                                dt = rng.rnorm () * _stops.at (l).sd_delay +
-                                    _stops.at (l).average_delay;
-                            }
+                            dt = rtnorm (gen, 0., 5 * 60.,
+                                _stops.at (l).average_delay,
+                                _stops.at (l).sd_delay
+                            ).first;
                         }
                         else
                         {
-                            while (dt < 0 || dt > 5*60)
-                            {
-                                dt = rng.rnorm () * _vehicle->dwell_time_var () +
-                                    _vehicle->dwell_time ();
-                            }
+                            dt = rtnorm (gen, 0., 5 * 60.,
+                                _vehicle->dwell_time (),
+                                pow (_vehicle->dwell_time_var (), 0.5)
+                            ).first;
                         }
+                        dt += _vehicle->gamma ();
                     }
                     tt += fmax (0.0, dt);
 
@@ -399,10 +430,6 @@ namespace Gtfs {
                         sig1 = sig2;
                         Y = segs.at (l).segment->speed ();
                         sig2 = pow (segs.at (l).segment->uncertainty (), 0.5);
-                        // // additional variance for forecast dispersion
-                        // sig2 += pow (segs.at (l).segment->system_noise (), 2) * tt;
-                        // sig2 = fmax (sig2, segs.at (l).segment->prior_speed_var () * 2);
-
                         rho = 0.8;
 
                         if (sig2 == 0)
@@ -430,19 +457,24 @@ namespace Gtfs {
                         }
 
                         // between vehicle variance
-                        var += segs.at (l).segment->state_var ();
+                        var += fmin (
+                            segs.at (l).segment->prior_speed_var (),
+                            segs.at (l).segment->state_var ()
+                        );
 
                         x = 0;
                         int n=100;
                         // x is the speed
-                        while (x < 0.5 || x > segs.at (l).segment->max_speed ())
-                        {
-                            x = rng.rnorm () * pow (var, 0.5) + mean;
-                            if (n-- == 0)
-                            {
-                                x = rng.runif () * (segs.at (l).segment->max_speed () - 10.) + 5.;
-                            }
-                        }
+                        auto vt = rtnorm (gen, 2., segs.at (l).segment->max_speed (), mean, pow (var, 0.5));
+                        x = vt.first;
+                        // while (x < 0.5 || x > segs.at (l).segment->max_speed ())
+                        // {
+                        //     x = rng.rnorm () * pow (var, 0.5) + mean;
+                        //     if (n-- == 0)
+                        //     {
+                        //         x = rng.runif () * (segs.at (l).segment->max_speed () - 10.) + 5.;
+                        //     }
+                        // }
                         // if (rng.runif () < 0.)
                         // {
                         //     x = rng.rnorm () * 2.;
@@ -450,6 +482,9 @@ namespace Gtfs {
                         //         (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
                         // }
                         // travel time is L / v
+
+                        // x = segs.at (l).segment->length () /
+                        //     (_stops.at (l+1).arrival_time - _stops.at (l).departure_time);
                         tt += segs.at (l).segment->length () / x;
                     }
 
@@ -907,7 +942,8 @@ namespace Gtfs {
                 if (X > 2*60*60)
                 {
                     // reset X because it's going stupid!
-                    X = _stops.at (m).departure_time.asUNIX (_timestamp) - _timestamp;
+                    // X = _stops.at (m).departure_time.asUNIX (_timestamp) - _timestamp;
+                    X = _stops.at (m).average_delay;
                 }
                 if (P == 0)
                 {
@@ -936,7 +972,7 @@ namespace Gtfs {
                 //     X = F * X;
                 //     P = F * P * F;
                 // }
-                double eta_noise = 0.1;
+                double eta_noise = 0.5;
                 P += pow (eta_noise, 2.) * (1. + pow (_delta / (X + _delta), 2.0));
                 // if (avg_eta > 0) P += avg_eta;
 

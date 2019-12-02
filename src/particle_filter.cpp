@@ -404,6 +404,15 @@ namespace Gtfs {
                     );
 
                     _segment_speed_avgs.at (_current_segment) = (sp);
+
+                    if (_stop_arrival_times.at (_current_segment+1) > 0 &&
+                        _stop_departure_times.at (_current_segment) > 0)
+                    {
+                        sp = _stop_arrival_times.at (_current_segment+1) -
+                            _stop_departure_times.at (_current_segment);
+                        err = 3.;
+                    }
+
                     segs.at (_current_segment).segment->push_data (sp, err, _timestamp);
 #if VERBOSE > 0
                     std::cout << ": " <<  (sp) << " (" << err << ")";
