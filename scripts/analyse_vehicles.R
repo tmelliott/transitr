@@ -3,6 +3,39 @@ library(RSQLite)
 library(dbplyr)
 library(patchwork)
 
+
+
+
+
+vdata <-
+    read_csv("simulations/sim000/vehicle_states.csv",
+        col_names = c("vehicle_id", "trip_id", "route_id", "timestamp", "distance", "speed"),
+        col_types = "cccidd"
+    ) %>%
+    mutate(timestamp = as.POSIXct(timestamp, origin = "1970-01-01"))
+tvdata <-
+    read_csv("simulations/sim000/trip_vehicle_states.csv",
+        col_names = c("vehicle_id", "trip_id", "route_id", "timestamp", "distance", "speed"),
+        col_types = "cccidd"
+    ) %>%
+    mutate(timestamp = as.POSIXct(timestamp, origin = "1970-01-01"))
+
+vi <- vdata %>% filter(vehicle_id == "6225")
+ti <- tvdata %>% filter(vehicle_id == "6225")
+
+pv <- ggplot(vi, aes(timestamp, distance, colour = speed)) +
+    geom_point() + ggtitle("Vehicle state")
+pt <- ggplot(vi, aes(timestamp, distance, colour = speed)) +
+    geom_point() + ggtitle("Trip vehicle state")
+
+pv + pt &
+    facet_wrap(~trip_id, scales = "free", ncol = 1) &
+    scale_colour_viridis_c()
+
+
+
+
+
 vehicles <- list.files("simulations/sim000/history",
     pattern = "vehicle_.{4}.csv",
     full.names = TRUE

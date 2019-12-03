@@ -173,11 +173,11 @@ void run_realtime_model (List nw)
 #endif
 #if SIMULATION
         std::vector<std::string> routes_to_keep ({
-            "SKY"
-            // "24B", "931", "NX1", "NX2", "866", "802", "82", "83", "25B",
-            // "27H", "030", "047", "003", "SKY", "321", "221X", "243X", "223X",
-            // "248X", "22A", "70", "028", "101", "966", "22N", "22R", "24R",
-            // "24W", "25L", "27T", "27W", "75", "INN", "OUT", "923", "924"
+            // "NX1" "NX1", "NX2","INN", "OUT",
+            "24B", "931", "866", "802", "82", "83", "25B",
+            "27H", "030", "047", "003", "SKY", "321", "221X", "243X", "223X",
+            "248X", "22A", "70", "028", "101", "966", "22N", "22R", "24R",
+            "24W", "25L", "27T", "27W", "75",  "923", "924"
         });
 #endif
         #pragma omp parallel for num_threads(params.n_core)
@@ -194,7 +194,7 @@ void run_realtime_model (List nw)
                     {
                         if (rsn == *rtk) skip = false;
                     }
-                    if (skip) continue;
+                    // if (skip) continue;
                 }
 #endif
                 v->second.mutate (rngs.at (omp_get_thread_num ()), &gtfs);
@@ -243,11 +243,12 @@ void run_realtime_model (List nw)
             for (auto sl = gtfs.segments ().begin (); sl != gtfs.segments ().end (); ++sl)
             {
                 if (sl->second.timestamp () < rtfeed.feed()->header ().timestamp ()) continue;
-                // if (sl->second.get_data ().size () == 0) continue;
                 fout << sl->second.segment_id () << ","
                     << sl->second.timestamp () << ","
                     << sl->second.speed () << ","
-                    << sl->second.uncertainty () << "\n";
+                    << sl->second.uncertainty () << ","
+                    << sl->second.prior_speed () << ","
+                    << sl->second.prior_speed_var () << "\n";
             }
             fout.close ();
         }
@@ -255,6 +256,24 @@ void run_realtime_model (List nw)
 
 #if VERBOSE > 0
         Rcout << "\n\n >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ETA Predictions\n";
+#endif
+
+#if SIMULATION
+        {
+            std::ofstream fout;
+            fout.open ("vehicle_states.csv", std::ofstream::app);
+            for (auto vehicle = vehicles.begin (); vehicle != vehicles.end (); ++vehicle)
+            {
+                if (vehicle->second.trip () == nullptr) continue;
+                fout << "\n" << vehicle->second.vehicle_id ()
+                    << "," << vehicle->second.trip ()->trip_id ()
+                    << "," << vehicle->second.trip ()->route ()->route_id ()
+                    << "," << vehicle->second.timestamp ()
+                    << "," << vehicle->second.distance ()
+                    << "," << vehicle->second.speed ();
+            }
+            fout.close ();
+        }
 #endif
 
         // Predict ETAs
@@ -272,7 +291,7 @@ void run_realtime_model (List nw)
                 {
                     if (rsn == *rtk) skip = false;
                 }
-                if (skip) continue;
+                // if (skip) continue;
 #endif
                 if (trip->second.is_active (curtime))
                 {

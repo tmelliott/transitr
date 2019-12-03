@@ -150,13 +150,27 @@ namespace Gtfs {
         int nmax = 100;
         double s = 0.0;
         auto x = predict (delta); // [speed, uncertainty]
+
+        double
+            mean = x.first,
+            var = x.second + _state_var;
+        double sd = pow (var, 0.5);
+        double u;
         while (s < 0.5 || s > _max_speed)
         {
-            s = rng.rnorm () * pow (x.second + _state_var, 0.5) +
-                x.first;
             if (nmax-- == 0)
             {
                 return rng.runif () * (_max_speed - 10.) + 5.;
+            }
+
+            u = rng.rnorm ();
+            if (u < 0. && mean < sd)
+            {
+                s = rng.runif () * (mean - 0.5) + 0.5;
+            }
+            else
+            {
+                s = u * sd + mean;
             }
         }
         return s;

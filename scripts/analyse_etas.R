@@ -746,7 +746,9 @@ dbDisconnect(con)
 
 eta_data <- eta_data %>% left_join(trip_routes) %>% ungroup()
 errr <- eta_data %>%
-    # filter(route_short_name %in% c("SKY")) %>%
+    # filter(route_short_name %in% rkeep) %>%
+    # filter(route_short_name %in% c("125X")) %>%
+    # filter(vehicle_id == "6225") %>%
     pluck("trip_id") %>% unique
 
 t <- etas$trip_id[1]
@@ -842,6 +844,12 @@ for (t in sample(errr)) {
             xend = timestamp + pf_upper,
             yend = timestamp
         )) +
+        # geom_segment(aes(
+        #     timestamp + normal_lower,
+        #     timestamp,
+        #     xend = timestamp + normal_upper,
+        #     yend = timestamp
+        # ), colour = "green4") +
         geom_point(aes(x = timestamp + gtfs_eta), colour = "magenta") +
         geom_point(aes(x = timestamp + X), colour = "blue") +
         geom_point(aes(x = timestamp + normal_mean), colour = "green4") +
@@ -870,8 +878,33 @@ eta_results <- eta_data %>%
     )
 tOK <- eta_results %>% ungroup() %>% group_by(trip_id) %>%
     summarize(ok = all(abs(pf_error) < 45*60)) %>%
+    # summarize(ok = any(current_delay != 0)) %>%
     filter(ok)
 
+con <- dbConnect(SQLite(), "at_gtfs.db")
+hist_delays <- con %>% tbl("stop_delays") %>%
+    filter(trip_id %in% !!unique(gsub("-.*", "", eta_results$trip_id))) %>%
+    select(trip_id, stop_sequence, avg, sd) %>%
+    collect()
+dbDisconnect(con)
+
+eta_results <- eta_results %>%
+    mutate(tid = gsub("-.*", "", trip_id)) %>%
+    left_join(
+        hist_delays,
+        by = c("tid" = "trip_id", "stop_sequence")
+    ) %>%
+    mutate(
+        historical_mean = scheduled_arrival + avg - timestamp,
+        historical_var = sd^2,
+        historical_lower = qnorm(0.05, historical_mean, sd),
+        historical_upper = qnorm(0.9, historical_mean, sd)
+    )
+
+for (i in 0:5) {
+    etai <- eta_results[(i*1000000L+1L):min(nrow(eta_results),((i+1L)*1000000L)),]
+    save(etai, file = glue::glue("../phd-thesis/chapters/chapter05/data/eta_results{i}.rda"))
+}
 
 ggplot(eta_results %>% filter(trip_id %in% tOK$trip_id)) +
     geom_point(aes(pf_error/60, gtfs_error/60, colour=time_until_arrival/60))+
@@ -921,6 +954,7 @@ pf_err / normal_err / gtfs_err &
 # overall
 eta_results %>%
     filter(trip_id %in% tOK$trip_id) %>%
+    filter(route_short_name %in% rkeep) %>%
     ungroup %>%
     summarize(
         pf_rmse = sqrt(mean(pf_error^2)),
@@ -947,6 +981,7 @@ eta_results %>%
 
 # by minutes-until-arrival
 res_min <- eta_results %>%
+    filter(route_short_name %in% rkeep) %>%
     ungroup() %>%
     mutate(
         min = time_until_arrival %/% 60
@@ -956,14 +991,7 @@ res_min <- eta_results %>%
         pf_rmse = sqrt(mean(pf_error^2)),
         pf_ci_cov = mean(pf_ci),
         pf_ci_cov_min = mean(pf_ci_min),
-        normggplot(aes(rmse, model)) +
-        geom_segment(
-            aes(
-                xend = 0,
-                yend = model
-            )
-        ) +
-        geom_point()_rmse = sqrt(mean(gtfs_error^2))
+        gtfs_rmse = sqrt(mean(gtfs_error^2))
     )
 
 #pr <-
@@ -1012,8 +1040,7 @@ eta_results %>%
             "normal" = "blue",
             "gtfs" = "magenta"
         )
-    ) +
-    ggtitle("No pattern.")
+    )
 
 # by distance away
 eta_results %>%
@@ -1041,9 +1068,7 @@ eta_results %>%
             "normal" = "blue",
             "gtfs" = "magenta"
         )
-    ) +
-    ggtitle("No pattern.")
-
+    )
 
 
 # ggsave("~/Dropbox/rmse.jpg", pr, width = 10, height = 5, units = "in")
@@ -1053,8 +1078,8 @@ eta_results %>%
 ggplot(res_min, aes(min)) +
     geom_path(aes(y = pf_ci_cov), colour = "orangered") +
     geom_path(aes(y = pf_ci_cov_min), colour = "orangered", lty = 2) +
-    geom_path(aes(y = normal_ci_cov), colour = "blue") +
-    geom_hline(yintercept = 0.95, lty = 3) +
+    # geom_path(aes(y = normal_ci_cov), colour = "blue") +
+    geom_hline(yintercept = 0.85, lty = 3) +
     scale_y_continuous(
         breaks = seq(0, 1, by = 0.2),
         labels = function(x) glue::glue("{100*x}%"),
@@ -1084,11 +1109,18 @@ ggplot(res_min, aes(min)) +
 eta_results %>%
     mutate(distance_to_go = stop_distance - vehicle_distance) %>%
     ungroup %>%
-    filter(distance_to_go > 0 & abs(pf_error / 60 < 30)) %>%
+    filter(distance_to_go > 0 & abs(pf_error / 60) < 30) %>%
     ggplot(aes(distance_to_go, pf_error/60)) +
         geom_hex() +
         geom_smooth()
 
+# time
+eta_results %>%
+    ungroup() %>%
+    filter(abs(pf_error / 60) < 30) %>%
+    ggplot(aes(as.integer(timestamp), pf_error / 60)) +
+        geom_hex() +
+        geom_smooth()
 
 eta_res_route <- eta_results %>%
     group_by(route_short_name) %>%
@@ -1098,31 +1130,35 @@ eta_res_route <- eta_results %>%
         gtfs_rmse = sqrt(mean(gtfs_error^2)),
         n = length(unique(trip_id))
     ) %>%
-    gather(key = "model", value = "rmse", -route_short_name, -n)
+    mutate(pf_rmse_comp = pf_rmse / gtfs_rmse)
 
-pA <- eta_res_route  %>%
-    ggplot(aes(rmse, model, colour = model)) +
-        geom_segment(
-            aes(
-                xend = 0,
-                yend = model
-            )
+rkeep <- eta_res_route %>% filter(n > 10 & pf_rmse_comp < 1.2) %>% pull(route_short_name)
+
+eta_res_route %>%
+    filter(n > 10) %>%
+    ggplot(aes(pf_rmse_comp)) +
+        geom_histogram(
+            aes(fill = pf_rmse_comp < 1),
+            boundary = 1,
+            bins = 20
         ) +
-        geom_point() +
-        facet_grid(route_short_name~.)
+        geom_vline(xintercept = 1) +
+        ggtitle(glue::glue("{round(mean(eta_res_route$pf_rmse_comp < 1)*100)}% of routes are better"))
 
-pB <- eta_res_route %>%
-    ggplot(aes(n, as.integer(n > 0))) +
-        geom_segment(aes(xend = 0, yend = 1)) +
-        geom_point() +
-        facet_grid(route_short_name~.) +
-        theme(
-            axis.text.y = element_blank(),
-            axis.ticks.y = element_blank(),
-            axis.title.y = element_blank()
-        )
+        # facet_grid(route_short_name~.)
 
-pA + pB + plot_layout(width = c(4, 1))
+# pB <- eta_res_route %>%
+#     ggplot(aes(n, as.integer(n > 0))) +
+#         geom_segment(aes(xend = 0, yend = 1)) +
+#         geom_point() +
+#         facet_grid(route_short_name~.) +
+#         theme(
+#             axis.text.y = element_blank(),
+#             axis.ticks.y = element_blank(),
+#             axis.title.y = element_blank()
+#         )
+
+# pA + pB + plot_layout(width = c(4, 1))
 
 
 
@@ -1131,9 +1167,9 @@ eta_results %>%
     # filter(time_until_arrival > 180) %>%
     mutate(
         pf_miss = as.integer(time_until_arrival < pf_lower),
-        gtfs_miss = as.integer(time_until_arrival < gtfs_eta - 12*60),
+        gtfs_miss = as.integer(time_until_arrival < gtfs_eta - 8*60),
         pf_wait = ifelse(pf_miss, NA, time_until_arrival - pf_lower),
-        gtfs_wait = ifelse(gtfs_miss, NA, time_until_arrival - gtfs_eta + 12*60)
+        gtfs_wait = ifelse(gtfs_miss, NA, time_until_arrival - gtfs_eta + 8*60)
     ) %>%
     summarize(
         pf_pr_miss = mean(pf_miss),
@@ -1141,3 +1177,19 @@ eta_results %>%
         pf_e_wait = mean(pf_wait, na.rm = TRUE) / 60,
         gtfs_e_wait = mean(gtfs_wait, na.rm = TRUE) / 60
     )
+
+
+# Interval width
+eta_results %>%
+    mutate(
+        pf_width = pf_upper - pf_lower,
+        in_ci = case_when(
+            pf_lower > time_until_arrival ~ "early",
+            pf_upper < time_until_arrival ~ "late",
+            TRUE ~ "on_time"
+        )
+    ) %>%
+    ggplot(aes(time_until_arrival/60, pf_width/60)) +
+        geom_hex() +
+        scale_y_continuous(limits=c(0,60)) +
+        geom_abline()

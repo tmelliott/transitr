@@ -1,8 +1,8 @@
 library(tidyverse)
 
 nw_state <- read_csv("simulations/sim000/segment_states.csv",
-    col_names = c("segment_id", "timestamp", "avg_speed", "uncertainty"),
-    col_types = "iinn"
+    col_names = c("segment_id", "timestamp", "avg_speed", "uncertainty", "prior", "prior_var"),
+    col_types = "iinnnn"
 ) %>% mutate(timestamp = as.POSIXct(timestamp, origin = "1970-01-01"))
 nw_obs <- read_csv("simulations/sim000/segment_observations.csv",
     col_names = c("segment_id", "timestamp", "speed", "error"),
@@ -15,6 +15,9 @@ sids <- nw_state %>% pull(segment_id) %>% table %>%
 # sids <- c(38, 46, 97, 161, 187, 155)
 
 ggplot(nw_state %>% filter(segment_id %in% sids), aes(timestamp)) +
+    geom_path(aes(y = prior), lty = 2) +
+    geom_path(aes(y = qnorm(0.025, prior, sqrt(prior_var))), lty = 3) +
+    geom_path(aes(y = qnorm(0.975, prior, sqrt(prior_var))), lty = 3) +
     geom_pointrange(
         aes(
             y = speed,

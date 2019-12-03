@@ -30,11 +30,13 @@ if (file.exists("segment_states.csv")) unlink("segment_states.csv")
 if (file.exists("segment_observations.csv")) unlink("segment_observations.csv")
 if (file.exists("particle_travel_times.csv")) unlink("particle_travel_times.csv")
 if (file.exists("eta_state.csv")) unlink("eta_state.csv")
+if (file.exists("vehicle_states.csv")) unlink("vehicle_states.csv")
+if (file.exists("trip_vehicle_states.csv")) unlink("trip_vehicle_states.csv")
 
 nw <- load_gtfs("../../at_gtfs.db", output = "etas.pb") %>%
-    realtime_feed(c(sprintf("http://localhost:3000/%s/vehicle_positions", ca[1]), 
-    # realtime_feed(c(sprintf("http://localhost:3000/%s/50/100/vehicle_positions", ca[1]), 
-    # realtime_feed(c(sprintf("http://localhost:3000/%s/1566165600/minutes/0/vehicle_positions", ca[1]), 
+    realtime_feed(c(sprintf("http://localhost:3000/%s/vehicle_positions", ca[1]),
+    # realtime_feed(c(sprintf("http://localhost:3000/%s/50/100/vehicle_positions", ca[1]),
+    # realtime_feed(c(sprintf("http://localhost:3000/%s/1566165600/minutes/0/vehicle_positions", ca[1]),
                     sprintf("http://localhost:3000/%s/trip_updates", ca[1])),
                   response = "protobuf")
 nw <- do.call(set_parameters, c(list(nw), config))
