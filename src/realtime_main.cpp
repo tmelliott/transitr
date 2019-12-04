@@ -258,23 +258,23 @@ void run_realtime_model (List nw)
         Rcout << "\n\n >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ETA Predictions\n";
 #endif
 
-#if SIMULATION
-        {
-            std::ofstream fout;
-            fout.open ("vehicle_states.csv", std::ofstream::app);
-            for (auto vehicle = vehicles.begin (); vehicle != vehicles.end (); ++vehicle)
-            {
-                if (vehicle->second.trip () == nullptr) continue;
-                fout << "\n" << vehicle->second.vehicle_id ()
-                    << "," << vehicle->second.trip ()->trip_id ()
-                    << "," << vehicle->second.trip ()->route ()->route_id ()
-                    << "," << vehicle->second.timestamp ()
-                    << "," << vehicle->second.distance ()
-                    << "," << vehicle->second.speed ();
-            }
-            fout.close ();
-        }
-#endif
+// #if SIMULATION
+//         {
+//             std::ofstream fout;
+//             fout.open ("vehicle_states.csv", std::ofstream::app);
+//             for (auto vehicle = vehicles.begin (); vehicle != vehicles.end (); ++vehicle)
+//             {
+//                 if (vehicle->second.trip () == nullptr) continue;
+//                 fout << "\n" << vehicle->second.vehicle_id ()
+//                     << "," << vehicle->second.trip ()->trip_id ()
+//                     << "," << vehicle->second.trip ()->route ()->route_id ()
+//                     << "," << vehicle->second.timestamp ()
+//                     << "," << vehicle->second.distance ()
+//                     << "," << vehicle->second.speed ();
+//             }
+//             fout.close ();
+//         }
+// #endif
 
         // Predict ETAs
         uint64_t curtime (rtfeed.feed()->header ().timestamp ());

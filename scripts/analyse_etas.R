@@ -895,11 +895,24 @@ eta_results <- eta_results %>%
         by = c("tid" = "trip_id", "stop_sequence")
     ) %>%
     mutate(
-        historical_mean = scheduled_arrival + avg - timestamp,
+        historical_mean = scheduled_arrival + avg - as.integer(timestamp),
         historical_var = sd^2,
         historical_lower = qnorm(0.05, historical_mean, sd),
         historical_upper = qnorm(0.9, historical_mean, sd)
     )
+
+eta_res_route <- eta_results %>%
+    group_by(route_short_name) %>%
+    summarize(
+        pf_rmse = sqrt(mean(pf_error^2)),
+        normal_rmse = sqrt(mean(normal_error^2)),
+        gtfs_rmse = sqrt(mean(gtfs_error^2)),
+        n = length(unique(trip_id))
+    ) %>%
+    mutate(pf_rmse_comp = pf_rmse / gtfs_rmse)
+
+rkeep <- eta_res_route %>% filter(n > 10 & pf_rmse_comp < 1.5) %>% pull(route_short_name)
+
 
 for (i in 0:5) {
     etai <- eta_results[(i*1000000L+1L):min(nrow(eta_results),((i+1L)*1000000L)),]
@@ -954,7 +967,7 @@ pf_err / normal_err / gtfs_err &
 # overall
 eta_results %>%
     filter(trip_id %in% tOK$trip_id) %>%
-    filter(route_short_name %in% rkeep) %>%
+    # filter(route_short_name %in% rkeep) %>%
     ungroup %>%
     summarize(
         pf_rmse = sqrt(mean(pf_error^2)),
@@ -1121,18 +1134,6 @@ eta_results %>%
     ggplot(aes(as.integer(timestamp), pf_error / 60)) +
         geom_hex() +
         geom_smooth()
-
-eta_res_route <- eta_results %>%
-    group_by(route_short_name) %>%
-    summarize(
-        pf_rmse = sqrt(mean(pf_error^2)),
-        normal_rmse = sqrt(mean(normal_error^2)),
-        gtfs_rmse = sqrt(mean(gtfs_error^2)),
-        n = length(unique(trip_id))
-    ) %>%
-    mutate(pf_rmse_comp = pf_rmse / gtfs_rmse)
-
-rkeep <- eta_res_route %>% filter(n > 10 & pf_rmse_comp < 1.2) %>% pull(route_short_name)
 
 eta_res_route %>%
     filter(n > 10) %>%

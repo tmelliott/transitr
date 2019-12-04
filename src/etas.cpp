@@ -31,18 +31,18 @@ namespace Gtfs {
         log = true;
 #endif
 
-        if (log && _vehicle != nullptr)
-        {
-            std::ofstream fout;
-            fout.open ("trip_vehicle_states.csv", std::ostream::app);
-            fout << "\n" << _vehicle->vehicle_id ()
-                << "," << _vehicle->trip ()->trip_id ()
-                << "," << _vehicle->trip ()->route ()->route_id ()
-                << "," << _vehicle->timestamp ()
-                << "," << _vehicle->distance ()
-                << "," << _vehicle->speed ();
-            fout.close ();
-        }
+        // if (log && _vehicle != nullptr)
+        // {
+        //     std::ofstream fout;
+        //     fout.open ("trip_vehicle_states.csv", std::ostream::app);
+        //     fout << "\n" << _vehicle->vehicle_id ()
+        //         << "," << _vehicle->trip ()->trip_id ()
+        //         << "," << _vehicle->trip ()->route ()->route_id ()
+        //         << "," << _vehicle->timestamp ()
+        //         << "," << _vehicle->distance ()
+        //         << "," << _vehicle->speed ();
+        //     fout.close ();
+        // }
 
         if (log)
             std::cout << "\n * Updating trip " << _trip_id
