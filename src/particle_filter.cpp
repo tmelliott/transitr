@@ -355,8 +355,8 @@ namespace Gtfs {
                 double segmin, segmax;
 
 #if SIMULATION
-                std::ofstream fout;
-                fout.open ("particle_travel_times.csv", std::ofstream::app);
+                // std::ofstream fout;
+                // fout.open ("particle_travel_times.csv", std::ofstream::app);
 #endif
 
                 double L;
@@ -418,15 +418,15 @@ namespace Gtfs {
                     std::cout << ": " <<  (sp) << " (" << err << ")";
 #endif
 #if SIMULATION
-                    for (auto p = _state.begin (); p != _state.end (); ++p)
-                    {
-                        fout << _timestamp
-                            << "," << _vehicle_id
-                            << "," << segs.at (_current_segment).segment->segment_id ()
-                            << "," << p->get_travel_time (_current_segment)
-                            << "," << p->get_weight ()
-                            << "\n";
-                    }
+                    // for (auto p = _state.begin (); p != _state.end (); ++p)
+                    // {
+                    //     fout << _timestamp
+                    //         << "," << _vehicle_id
+                    //         << "," << segs.at (_current_segment).segment->segment_id ()
+                    //         << "," << p->get_travel_time (_current_segment)
+                    //         << "," << p->get_weight ()
+                    //         << "\n";
+                    // }
 #endif
                 }
 
@@ -435,7 +435,7 @@ namespace Gtfs {
 
 
 #if SIMULATION
-                fout.close ();
+                // fout.close ();
 #endif
             }
 
