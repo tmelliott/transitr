@@ -14,7 +14,7 @@ SystemRequirements:
     libcurl,
     GNU Make
 Depends:
-    R (>= 3.4.0)
+    R (>= 3.5.0)
 Imports:
     Rcpp,
     tools,
