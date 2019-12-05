@@ -14,4 +14,4 @@
 ^simulations$
 ^.running_pid$
 ^old_files$
-
+^.vscode$

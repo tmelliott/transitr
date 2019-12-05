@@ -3,14 +3,14 @@
 //  This implements an extension of Chopin's algorithm detailed in
 //  N. Chopin, "Fast simulation of truncated Gaussian distributions",
 //  Stat Comput (2011) 21:275-288
-//  
+//
 //  Copyright (C) 2012 Guillaume Dollé, Vincent Mazet
 //  (LSIIT, CNRS/Université de Strasbourg)
 //  Version 2012-07-04, Contact: vincent.mazet@unistra.fr
-//  
+//
 //  06/07/2012:
 //  - first launch of rtnorm.cpp
-//  
+//
 //  Licence: GNU General Public License Version 2
 //  This program is free software; you can redistribute it and/or modify it
 //  under the terms of the GNU General Public License as published by the
@@ -21,7 +21,7 @@
 //  GNU General Public License for more details. You should have received a
 //  copy of the GNU General Public License along with this program; if not,
 //  see http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
-//  
+//
 //  Depends: LibGSL
 //  OS: Unix based system
 
@@ -62,28 +62,29 @@ std::pair<double, double> rtnorm(
 
   double r, z, e, ylk, simy, lbound, u, d, sim, Z, p;
   int i, ka, kb, k;
-  
+
   // Scaling
   if(mu!=0 || sigma!=1)
   {
     a=(a-mu)/sigma;
     b=(b-mu)/sigma;
   }
-  
+
   //-----------------------------
-  
+
   // Check if a < b
   if(a>=b)
   {
-    std::cerr<<"*** B must be greater than A ! ***"<<std::endl;
-    exit(1);
+    // std::cerr<<"*** B must be greater than A ! ***"<<std::endl;
+    // exit(1);
+    return std::make_pair (0., 0.);
   }
 
   // Check if |a| < |b|
   else if(fabs(a)>fabs(b))
     r = -rtnorm(gen,-b,-a).first;  // Pair (r,p)
 
-  // If a in the right tail (a > xmax), use rejection algorithm with a truncated exponential proposal  
+  // If a in the right tail (a > xmax), use rejection algorithm with a truncated exponential proposal
   else if(a>xmax)
     r = rtexp(gen,a,b);
 
@@ -116,16 +117,16 @@ std::pair<double, double> rtnorm(
     if(abs(kb-ka) < kmin)
     {
       r = rtexp(gen,a,b);
-      stop = true;  
+      stop = true;
     }
-    
+
     while(!stop)
     {
       // Sample integer between ka and kb
       k = floor(gsl_rng_uniform(gen) * (kb-ka+1)) + ka;
-    
+
       if(k == N)
-      {    
+      {
         // Right tail
         lbound = Rtnorm::x[xsize-1];
         z = -log(gsl_rng_uniform(gen));
@@ -142,7 +143,7 @@ std::pair<double, double> rtnorm(
 
       else if ((k <= ka+1) || (k>=kb-1 && b<xmax))
       {
-          
+
         // Two leftmost and rightmost regions
         sim = Rtnorm::x[k] + (Rtnorm::x[k+1]-Rtnorm::x[k]) * gsl_rng_uniform(gen);
 
@@ -155,18 +156,18 @@ std::pair<double, double> rtnorm(
             r = sim;
             stop = true;
           }
-        }        
+        }
       }
 
       else // All the other boxes
-      {    
+      {
         u = gsl_rng_uniform(gen);
         simy = Rtnorm::yu[k] * u;
         d = Rtnorm::x[k+1] - Rtnorm::x[k];
         ylk = yl(k);
-        if(simy < ylk)  // That's what happens most of the time 
-        {  
-          r = Rtnorm::x[k] + u*d*Rtnorm::yu[k]/ylk;  
+        if(simy < ylk)  // That's what happens most of the time
+        {
+          r = Rtnorm::x[k] + u*d*Rtnorm::yu[k]/ylk;
           stop = true;
         }
         else
@@ -180,22 +181,22 @@ std::pair<double, double> rtnorm(
             stop = true;
           }
         }
-        
+
       }
-    }  
+    }
   }
-  
+
   //-----------------------------
 
   // Scaling
   if(mu!=0 || sigma!=1)
     r = r*sigma + mu;
-  
+
   // Compute the probability
   Z = sqpi *sq2 * sigma * ( gsl_sf_erf(b*sq2) - gsl_sf_erf(a*sq2) );
-  p = exp(-pow((r-mu)/sigma,2)/2) / Z; 
+  p = exp(-pow((r-mu)/sigma,2)/2) / Z;
 
-  return std::pair<double,double>(r,p);  
+  return std::pair<double,double>(r,p);
 }
 
 //------------------------------------------------------------
@@ -204,16 +205,16 @@ double yl(int k)
 {
   double yl0 = 0.053513975472;                  // y_l of the leftmost rectangle
   double ylN = 0.000914116389555;               // y_l of the rightmost rectangle
-  
+
   if (k == 0)
     return yl0;
-    
+
   else if(k == N-1)
     return ylN;
-          
+
   else if(k <= 1953)
     return Rtnorm::yu[k-1];
-          
+
   else
     return Rtnorm::yu[k+1];
 }
@@ -235,4 +236,3 @@ double rtexp(gsl_rng *gen, double a, double b)
   }
   return a - z/a;
 }
-
