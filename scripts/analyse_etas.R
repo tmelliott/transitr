@@ -875,7 +875,8 @@ eta_results <- eta_data %>%
         normal_error = normal_mean - time_until_arrival,
         normal_ci = ifelse(normal_lower <= time_until_arrival & time_until_arrival <= normal_upper, 1, 0),
         gtfs_error = gtfs_eta - time_until_arrival
-    )
+    ) %>%
+    filter(gtfs_error > -60*60 & gtfs_error < 2*60*60)
 tOK <- eta_results %>% ungroup() %>% group_by(trip_id) %>%
     summarize(ok = all(abs(pf_error) < 45*60)) %>%
     # summarize(ok = any(current_delay != 0)) %>%
@@ -1004,6 +1005,8 @@ res_min <- eta_results %>%
         pf_rmse = sqrt(mean(pf_error^2)),
         pf_ci_cov = mean(pf_ci),
         pf_ci_cov_min = mean(pf_ci_min),
+        normal_rmse = sqrt(mean(normal_error^2)),
+        normal_ci_cov = mean(normal_ci),
         gtfs_rmse = sqrt(mean(gtfs_error^2))
     )
 
@@ -1011,13 +1014,13 @@ res_min <- eta_results %>%
 
 ggplot(res_min %>% filter(min <= 90), aes(min)) +
     geom_path(aes(y = pf_rmse, colour = "particle filter")) +
-    # geom_path(aes(y = normal_rmse, colour = "normal")) +
+    geom_path(aes(y = normal_rmse, colour = "normal")) +
     geom_path(aes(y = gtfs_rmse, colour = "gtfs")) +
     scale_colour_manual(
         name = "model",
         values = c(
             "particle filter" = "orangered",
-            # "normal" = "blue",
+            "normal" = "blue",
             "gtfs" = "magenta"
         )
     ) +
@@ -1091,7 +1094,7 @@ eta_results %>%
 ggplot(res_min, aes(min)) +
     geom_path(aes(y = pf_ci_cov), colour = "orangered") +
     geom_path(aes(y = pf_ci_cov_min), colour = "orangered", lty = 2) +
-    # geom_path(aes(y = normal_ci_cov), colour = "blue") +
+    geom_path(aes(y = normal_ci_cov), colour = "blue") +
     geom_hline(yintercept = 0.85, lty = 3) +
     scale_y_continuous(
         breaks = seq(0, 1, by = 0.2),
