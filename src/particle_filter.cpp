@@ -22,9 +22,9 @@ namespace Gtfs {
         int x, dr;
         if (e.type == EventType::gps)
         {
-            dmax = _trip->shape ()->path ().back ().distance;
-            dist = _trip->shape ()->distance_of (_position);
-            auto pt = _trip->shape ()->coordinates_of (dist);
+            dmax = this->trip ()->shape ()->path ().back ().distance;
+            dist = this->trip ()->shape ()->distance_of (_position);
+            auto pt = this->trip ()->shape ()->coordinates_of (dist);
             if (distanceEarth (pt, _position) > 50)
             {
                 dist = -1.0;
@@ -32,13 +32,13 @@ namespace Gtfs {
         }
         else
         {
-            if (_stop_index >= _trip->stops ().size ()) return;
-            dist = _trip->stops ().at (_stop_index).distance;
+            if (_stop_index >= this->trip ()->stops ().size ()) return;
+            dist = this->trip ()->stops ().at (_stop_index).distance;
             // _current_delay = e.delay;
         }
 
         // Trip start time:
-        Time tstart (_trip->start_time ());
+        Time tstart (this->trip ()->start_time ());
         Time curtime (_timestamp);
         int time_to_start (tstart - curtime);
         // std::cout << "\n -> " << time_to_start << "s until trip is scheduled to begin\n";
@@ -46,7 +46,7 @@ namespace Gtfs {
         double d, u;
         int si;
         Particle* p;
-        auto segs = _trip->shape ()->segments();
+        auto segs = this->trip ()->shape ()->segments();
         for (int i=0; i<_N; ++i)
         {
             if (e.type == EventType::gps)
@@ -112,7 +112,7 @@ namespace Gtfs {
         _state.reserve (_N);
         resample_count = 0;
 
-        if (_trip == nullptr || _trip->shape () == nullptr) return;
+        if (_trip == nullptr || this->trip ()->shape () == nullptr) return;
 
         _newtrip = false;
         _complete = false;
@@ -127,15 +127,15 @@ namespace Gtfs {
         // _tt_state.clear ();
         // _tt_cov.clear ();
 
-        _segment_speed_avgs.resize (_trip->shape ()->segments ().size (), 0);
-        _stop_arrival_times.resize (_trip->stops ().size (), 0);
-        _stop_departure_times.resize (_trip->stops ().size (), 0);
+        _segment_speed_avgs.resize (this->trip ()->shape ()->segments ().size (), 0);
+        _stop_arrival_times.resize (this->trip ()->stops ().size (), 0);
+        _stop_departure_times.resize (this->trip ()->stops ().size (), 0);
 
         // alright: initialize these using the schedule
-        // _tt_state.resize (_trip->stops ().size (), 0.0);
-        // _tt_cov.resize (_trip->stops ().size (),
-        //                 std::vector<double> (_trip->stops ().size (), 0.0));
-        // for (int i=0; i<_trip->stops ().size (); i++)
+        // _tt_state.resize (this->trip ()->stops ().size (), 0.0);
+        // _tt_cov.resize (this->trip ()->stops ().size (),
+        //                 std::vector<double> (this->trip ()->stops ().size (), 0.0));
+        // for (int i=0; i<this->trip ()->stops ().size (); i++)
         // {
         //     _tt_cov.at (i).at (i) = (i+1) * 30; // 5 min error + 30 seconds per stop
         // }
@@ -173,8 +173,8 @@ namespace Gtfs {
             else
             {
                 std::cout
-                    << _trip->route ()->route_short_name ()
-                    << " (" << _trip->stops ().at (0).departure_time << "): ";
+                    << this->trip ()->route ()->route_short_name ()
+                    << " (" << this->trip ()->stops ().at (0).departure_time << "): ";
             }
             time_events.at (current_event_index - 1).print ();
             std::cout << "\n ------------------";
@@ -190,10 +190,10 @@ namespace Gtfs {
             auto e = time_events.at (current_event_index);
             _latest_event = &(time_events.at (current_event_index));
 
-            if (_trip == nullptr || _trip->trip_id () != e.trip_id)
+            if (_trip == nullptr || this->trip ()->trip_id () != e.trip_id)
             {
                 // unload old trip
-                if (_trip != nullptr) _trip->unload (true);
+                if (_trip != nullptr) this->trip ()->unload (true);
 
                 // assign trip <--> vehicle
                 try
@@ -234,16 +234,16 @@ namespace Gtfs {
 
 #if VERBOSE > 0
             std::cout << "\n    [" << e.timestamp << "] "
-                << _trip->route ()->route_short_name ();
-            if (_trip->stops ().size () == 0)
+                << this->trip ()->route ()->route_short_name ();
+            if (this->trip ()->stops ().size () == 0)
             {
                 std::cout << " -> has no stops ... :/";
             }
             else
             {
                 std::cout
-                    << " (" << _trip->stops ().at (0).departure_time
-                    << ", " << _trip->stops ().size () << " stops"
+                    << " (" << this->trip ()->stops ().at (0).departure_time
+                    << ", " << this->trip ()->stops ().size () << " stops"
                     << "): ";
             }
             e.print ();
@@ -256,8 +256,8 @@ namespace Gtfs {
                 case EventType::gps :
                     {
                         // if the distance to the route > 50m, it's bad (skip it)
-                        double dist = _trip->shape ()->distance_of (e.position);
-                        latlng coord = _trip->shape ()->coordinates_of (dist);
+                        double dist = this->trip ()->shape ()->distance_of (e.position);
+                        latlng coord = this->trip ()->shape ()->coordinates_of (dist);
                         dist_to_route = distanceEarth (e.position, coord);
 #if VERBOSE > 0
                         std::cout << " -> distance to route = " << dist_to_route << "m";
@@ -271,7 +271,7 @@ namespace Gtfs {
                         // if the estimated distance is less than the previous
                         // estimated distance, do something about that
                         auto pos = latlng (e.position.latitude, e.position.longitude);
-                        auto est_dist = _trip->shape ()->distance_of (pos);
+                        auto est_dist = this->trip ()->shape ()->distance_of (pos);
                         // std::cout << "\n-> from " << estimated_dist << " to " << est_dist;
                         if (est_dist - estimated_dist < -5.0)
                         {
@@ -288,8 +288,8 @@ namespace Gtfs {
                 case EventType::arrival :
                     {
                         // this is tricky ...
-                        _trip->set_arrival_time (e.stop_index, e.timestamp);
-                        // if (e.stop_index == _trip->stops ().size () - 1)
+                        this->trip ()->set_arrival_time (e.stop_index, e.timestamp);
+                        // if (e.stop_index == this->trip ()->stops ().size () - 1)
                         // {
                         //     _complete = true;
                         // }
@@ -298,8 +298,8 @@ namespace Gtfs {
                 case EventType::departure :
                     {
                         // no checks
-                        _trip->set_departure_time (e.stop_index, e.timestamp);
-                        // if (e.stop_index == _trip->stops ().size () - 1)
+                        this->trip ()->set_departure_time (e.stop_index, e.timestamp);
+                        // if (e.stop_index == this->trip ()->stops ().size () - 1)
                         // {
                         //     _complete = true;
                         // }
@@ -312,7 +312,7 @@ namespace Gtfs {
             if (e.type == EventType::gps)
             {
                 _position = latlng (e.position.latitude, e.position.longitude);
-                estimated_dist = _trip->shape ()->distance_of (_position);
+                estimated_dist = this->trip ()->shape ()->distance_of (_position);
             }
             else
             {
@@ -320,9 +320,9 @@ namespace Gtfs {
                 _current_delay = e.delay;
                 // ----------------------------------- CHECK STOP INDEX
 #if VERBOSE > 0
-                std::cout << " - there are " << _trip->stops ().size ()
+                std::cout << " - there are " << this->trip ()->stops ().size ()
                     << " stops " << " (d = "
-                    << _trip->stops ().at (_stop_index).distance << "m)";
+                    << this->trip ()->stops ().at (_stop_index).distance << "m)";
 #endif
             }
             // std::cout << "\n - the vehicle's current delay is " << _current_delay << "s";
@@ -346,7 +346,7 @@ namespace Gtfs {
                 std::cout << "\n    ** estimating speeds";
 #endif
                 // NETWORK STUFF
-                std::vector<ShapeSegment>& segs = _trip->shape ()->segments ();
+                std::vector<ShapeSegment>& segs = this->trip ()->shape ()->segments ();
 
                 // update segment travel times for intermediate ones ...
                 double sp, ttp, err;
@@ -563,9 +563,9 @@ namespace Gtfs {
                 case EventType::gps :
                     {
                         double err = fmax (_gpserror, dist_to_route);
-                        p.calculate_likelihood (e.position, _trip->shape ()->path (), err);
+                        p.calculate_likelihood (e.position, this->trip ()->shape ()->path (), err);
                         double d = p.get_distance ();
-                        auto pos = _trip->shape ()->coordinates_of (d);
+                        auto pos = this->trip ()->shape ()->coordinates_of (d);
                         ddbar += distanceEarth (e.position, pos) * p.get_weight ();
 #if VERBOSE > 0
                         if (firstN > 0) {
@@ -625,7 +625,7 @@ namespace Gtfs {
         {
             case EventType::gps :
                 {
-                    px = _trip->shape ()->coordinates_of (dbar2);
+                    px = this->trip ()->shape ()->coordinates_of (dbar2);
                     std::cout << "d(h(X), y) = " << ddbar
                         << " [" << px.latitude << ", " << px.longitude << "]";
                     break;
@@ -691,7 +691,7 @@ namespace Gtfs {
                 case EventType::gps :
                     {
                         double d = p.get_distance ();
-                        auto pos = _trip->shape ()->coordinates_of (d);
+                        auto pos = this->trip ()->shape ()->coordinates_of (d);
                         ddbar += distanceEarth (e.position, pos) * p.get_weight ();
                         break;
                     }
@@ -712,8 +712,8 @@ namespace Gtfs {
             case EventType::gps :
                 {
                     std::cout << "(getpx_len="
-                        << _trip->shape ()->path ().size () << ")";
-                    px = _trip->shape ()->coordinates_of (dbar);
+                        << this->trip ()->shape ()->path ().size () << ")";
+                    px = this->trip ()->shape ()->coordinates_of (dbar);
                     std::cout << "d(h(X), y) = " << ddbar
                         << " [" << px.latitude << ", " << px.longitude << "]";
                     break;
@@ -813,7 +813,7 @@ namespace Gtfs {
     int Vehicle::progress ()
     {
         double d = distance ();
-        double dmax = _trip->shape ()->path ().back ().distance;
+        double dmax = this->trip ()->shape ()->path ().back ().distance;
         return (100 * d / dmax) + 0.5;
     }
 
