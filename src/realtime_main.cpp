@@ -197,7 +197,23 @@ void run_realtime_model (List nw)
                     // if (skip) continue;
                 }
 #endif
-                v->second.mutate (rngs.at (omp_get_thread_num ()), &gtfs);
+                try
+                {
+                    v->second.mutate (rngs.at (omp_get_thread_num ()), &gtfs);
+                }
+                catch(const std::exception& e)
+                {
+                    std::cerr
+                        << " x Error mutating vehicle:\n  "
+                        << e.what() << '\n';
+
+                    if (v->second.is_errored ())
+                    {
+                        // delete vehicle
+                        vehicles.erase (v->second.vehicle_id ());
+                        std::cout << " -> vehicle deleted x_x" << std::endl;
+                    }
+                }
             }
         }
 #if VERBOSE > 0

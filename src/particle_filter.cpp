@@ -332,10 +332,10 @@ namespace Gtfs {
                 _previous_state = _state;
                 mutate_to (e, rng);
             }
-            if (_skip_observation)
-            {
-                std::cout << "\n - skipping observation ...";
-            }
+            // if (_skip_observation)
+            // {
+            //     std::cout << "\n - skipping observation ...";
+            // }
             _skip_observation = false;
 
             // if the current iteration fails, start again from here
@@ -843,6 +843,7 @@ namespace Gtfs {
         }
 #endif
         // Shape is:
+        if (vehicle->trip () == nullptr) return;
         Shape* shape = vehicle->trip ()->shape ();
         std::vector<ShapeNode>& nodes = shape->nodes ();
         std::vector<StopTime>& stops = vehicle->trip ()->stops ();

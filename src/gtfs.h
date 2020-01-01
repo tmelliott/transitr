@@ -675,6 +675,7 @@ namespace Gtfs
 
     class Vehicle {
         private:
+            std::mutex vehicle_lock;  // only one vehicle can do stuff at a time?
             std::string _vehicle_id;
             Trip* _trip = nullptr;
             latlng _position;
@@ -735,6 +736,7 @@ namespace Gtfs
             // std::vector<std::vector<double> > _tt_cov; // covariance matrix for travel time
             // uint64_t _tt_time; // time travel times were last updated
 
+            int error = 0;
 
         public:
             Vehicle (std::string& id, par* pars);
@@ -807,6 +809,8 @@ namespace Gtfs
             int current_stop ();
 
             Time& trip_start_time (); // the time the trip started (using schedule)
+
+            bool is_errored ();
 
 #if SIMULATION
             std::ofstream f;

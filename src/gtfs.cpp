@@ -1086,6 +1086,7 @@ namespace Gtfs
     }
     Shape* Trip::shape () {
         if (!loaded) load ();
+        if (_shape == nullptr) throw std::runtime_error ("shape is null");
         return _shape;
     }
     Calendar* Trip::calendar () {
@@ -1426,6 +1427,10 @@ namespace Gtfs
     std::vector<ShapeSegment>& Shape::segments ()
     {
         if (!loaded) load ();
+        if (_segments.size () == 0)
+        {
+            throw std::runtime_error ("no loaded segments");
+        }
         return _segments;
     }
 
@@ -2480,6 +2485,10 @@ namespace Gtfs
 
     Trip* Vehicle::trip ()
     {
+        if (_trip == nullptr)
+        {
+            if (_trip == nullptr) throw std::runtime_error ("trip is null");
+        }
         return _trip;
     }
 
@@ -2923,7 +2932,10 @@ namespace Gtfs
         // recalculate Neff, etc
     }
 
-
+    bool Vehicle::is_errored ()
+    {
+        return ++error > 2;
+    }
 
     Particle::Particle (double d, double s, double a, Vehicle* v)
     {
