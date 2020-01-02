@@ -186,7 +186,7 @@ void run_realtime_model (List nw)
             for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
             {
 #if SIMULATION
-                if (v->second.trip () != nullptr)
+                if (v->second.has_trip ())
                 {
                     auto rsn = v->second.trip ()->route ()->route_short_name ();
                     bool skip = true;
@@ -280,7 +280,7 @@ void run_realtime_model (List nw)
 //             fout.open ("vehicle_states.csv", std::ofstream::app);
 //             for (auto vehicle = vehicles.begin (); vehicle != vehicles.end (); ++vehicle)
 //             {
-//                 if (vehicle->second.trip () == nullptr) continue;
+//                 if (!vehicle->second.has_trip ()) continue;
 //                 fout << "\n" << vehicle->second.vehicle_id ()
 //                     << "," << vehicle->second.trip ()->trip_id ()
 //                     << "," << vehicle->second.trip ()->route ()->route_id ()

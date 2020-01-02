@@ -2485,11 +2485,12 @@ namespace Gtfs
 
     Trip* Vehicle::trip ()
     {
-        if (_trip == nullptr)
-        {
-            if (_trip == nullptr) throw std::runtime_error ("trip is null");
-        }
+        if (! this->has_trip () ) throw std::runtime_error ("trip is null");
         return _trip;
+    }
+    bool Vehicle::has_trip ()
+    {
+        return _trip != nullptr;
     }
 
     latlng& Vehicle::position ()

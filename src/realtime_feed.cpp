@@ -28,8 +28,8 @@ RealtimeFeed::RealtimeFeed (std::vector<std::string>& urls, List& hdrs) : _urls 
  *
  * Each URL will be iteratively added to the feed - trip updates
  * and vehicle positions will be combined into a single feed.
- * 
- * @return integer return code: 0 - ok, 1 - curl failed, 2 - parse feed failed, 
+ *
+ * @return integer return code: 0 - ok, 1 - curl failed, 2 - parse feed failed,
  *                 5 - simuation has completed
  */
 int RealtimeFeed::update ()
@@ -136,7 +136,7 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
             if (vs == vehicles->end ())
             {
                 auto r = vehicles->emplace (std::piecewise_construct,
-                                            std::forward_as_tuple (id), 
+                                            std::forward_as_tuple (id),
                                             std::forward_as_tuple (id, params));
                 if (r.second)
                 {
@@ -148,7 +148,7 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
                 vs->second.update (ent.vehicle (), &(*gtfs));
             }
         } // end if vehicle position
-        
+
         if (ent.has_trip_update () && ent.trip_update ().stop_time_update ().size () > 0)
         {
             std::string id (ent.trip_update ().vehicle ().id ());
@@ -157,7 +157,7 @@ void load_vehicles (Gtfs::vehicle_map* vehicles,
             if (vs == vehicles->end ())
             {
                 auto r = vehicles->emplace (std::piecewise_construct,
-                                            std::forward_as_tuple (id), 
+                                            std::forward_as_tuple (id),
                                             std::forward_as_tuple (id, params));
                 if (r.second)
                 {
@@ -200,11 +200,11 @@ void write_vehicles (Gtfs::vehicle_map* vehicles, std::string& file)
 
     //     // --- Vehicle Position
     //     transit_realtime::VehiclePosition* vp = entity->mutable_vehicle ();
-    //     if (v->second.trip () != nullptr) 
+    //     if (v->second.has_trip ())
     //     {
     //         transit_realtime::TripDescriptor* trip = vp->mutable_trip ();
     //         trip->set_trip_id (v->second.trip ()->trip_id ());
-    //         if (v->second.trip ()->route () != nullptr) 
+    //         if (v->second.trip ()->route () != nullptr)
     //         {
     //             trip->set_route_id (v->second.trip ()->route ()->route_id ());
     //         }
@@ -218,7 +218,7 @@ void write_vehicles (Gtfs::vehicle_map* vehicles, std::string& file)
     //     position->set_longitude (v->second.position ().longitude);
 
     //     // the modeled position
-    //     transit_realtime::Position* 
+    //     transit_realtime::Position*
     //     position_estimate = vp->MutableExtension (transit_network::position_estimate);
     //     double dbar = v->second.distance ();
     //     if (v->second.trip ()->shape () != nullptr)
@@ -232,11 +232,11 @@ void write_vehicles (Gtfs::vehicle_map* vehicles, std::string& file)
 
     //     // --- Trip Update (ETAs)
     //     transit_realtime::TripUpdate* tu = entity->mutable_trip_update ();
-    //     if (v->second.trip () != nullptr)
+    //     if (v->second.has_trip ())
     //     {
     //         transit_realtime::TripDescriptor* trip = tu->mutable_trip ();
     //         trip->set_trip_id (v->second.trip ()->trip_id ());
-    //         if (v->second.trip ()->route () != nullptr) 
+    //         if (v->second.trip ()->route () != nullptr)
     //         {
     //             trip->set_route_id (v->second.trip ()->route ()->route_id ());
     //         }
@@ -264,7 +264,7 @@ void write_vehicles (Gtfs::vehicle_map* vehicles, std::string& file)
 
     // // write the feed to a file
     // std::fstream output (file.c_str (), std::ios::out | std::ios::trunc | std::ios::binary);
-    // if (!feed.SerializeToOstream (&output)) 
+    // if (!feed.SerializeToOstream (&output))
     // {
     //     Rcpp::Rcerr << "\n x Failed to write feed to `" << file << "`\n";
     // }
@@ -292,14 +292,14 @@ void write_trip_updates (Gtfs::trip_map* trips, std::string& file, uint64_t& cur
         transit_realtime::FeedEntity* entity = feed.add_entity ();
         entity->set_id (t->second.trip_id ());
 
-        // later can add vehicle 
+        // later can add vehicle
         // // --- Vehicle Position
         // transit_realtime::VehiclePosition* vp = entity->mutable_vehicle ();
-        // if (v->second.trip () != nullptr) 
+        // if (v->second.has_trip ())
         // {
         //     transit_realtime::TripDescriptor* trip = vp->mutable_trip ();
         //     trip->set_trip_id (v->second.trip ()->trip_id ());
-        //     if (v->second.trip ()->route () != nullptr) 
+        //     if (v->second.trip ()->route () != nullptr)
         //     {
         //         trip->set_route_id (v->second.trip ()->route ()->route_id ());
         //     }
@@ -313,7 +313,7 @@ void write_trip_updates (Gtfs::trip_map* trips, std::string& file, uint64_t& cur
         // position->set_longitude (v->second.position ().longitude);
 
         // // the modeled position
-        // transit_realtime::Position* 
+        // transit_realtime::Position*
         // position_estimate = vp->MutableExtension (transit_network::position_estimate);
         // double dbar = v->second.distance ();
         // if (v->second.trip ()->shape () != nullptr)
@@ -332,7 +332,7 @@ void write_trip_updates (Gtfs::trip_map* trips, std::string& file, uint64_t& cur
         tu->set_timestamp (t->second.timestamp ());
         transit_realtime::TripDescriptor* trip = tu->mutable_trip ();
         trip->set_trip_id (t->second.trip_id ());
-        if (t->second.route () != nullptr) 
+        if (t->second.route () != nullptr)
         {
             trip->set_route_id (t->second.route ()->route_id ());
         }
@@ -362,7 +362,7 @@ void write_trip_updates (Gtfs::trip_map* trips, std::string& file, uint64_t& cur
 
     // write the feed to a file
     std::fstream output (file.c_str (), std::ios::out | std::ios::trunc | std::ios::binary);
-    if (!feed.SerializeToOstream (&output)) 
+    if (!feed.SerializeToOstream (&output))
     {
         Rcpp::Rcerr << "\n x Failed to write feed to `" << file << "`\n";
     }

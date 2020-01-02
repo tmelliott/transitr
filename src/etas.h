@@ -7,6 +7,7 @@
 #include <boost/math/tools/minima.hpp>
 #include <cmath>
 #include <algorithm>
+#include <map>
 #include "gtfs.h"
 
 // template <typename T>

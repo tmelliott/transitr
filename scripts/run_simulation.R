@@ -30,6 +30,7 @@ if (file.exists("segment_states.csv")) unlink("segment_states.csv")
 if (file.exists("segment_observations.csv")) unlink("segment_observations.csv")
 if (file.exists("particle_travel_times.csv")) unlink("particle_travel_times.csv")
 if (file.exists("eta_state.csv")) unlink("eta_state.csv")
+if (file.exists("eta_quantiles.csv")) unlink("eta_quantiles.csv")
 if (file.exists("vehicle_states.csv")) unlink("vehicle_states.csv")
 if (file.exists("trip_vehicle_states.csv")) unlink("trip_vehicle_states.csv")
 

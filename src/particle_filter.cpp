@@ -843,7 +843,7 @@ namespace Gtfs {
         }
 #endif
         // Shape is:
-        if (vehicle->trip () == nullptr) return;
+        if ( !vehicle->has_trip () ) return;
         Shape* shape = vehicle->trip ()->shape ();
         std::vector<ShapeNode>& nodes = shape->nodes ();
         std::vector<StopTime>& stops = vehicle->trip ()->stops ();

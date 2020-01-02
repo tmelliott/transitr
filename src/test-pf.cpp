@@ -79,9 +79,9 @@ context ("Vehicle states") {
     Gtfs::Stop* s1 = t0->stops ().at (0).stop;
 
     test_that ("Vehicle loads OK with a trip") {
-        expect_true (v.trip () == nullptr);
+        expect_false (v.has_trip ());
         v.set_trip (t0);
-        expect_false (v.trip () == nullptr);
+        expect_true (v.has_trip ());
     }
 
     test_that ("Vehicle initializes OK with position update at stop 1") {

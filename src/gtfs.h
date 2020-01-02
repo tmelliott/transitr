@@ -743,6 +743,7 @@ namespace Gtfs
 
             std::string& vehicle_id ();
             Trip* trip ();
+            bool has_trip ();
             latlng& position ();
             uint64_t timestamp ();
             unsigned delta ();

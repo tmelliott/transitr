@@ -1029,9 +1029,7 @@ namespace Gtfs {
                     std::get<0> (_eta_state.at (m)) +
                         std::ceil (1.96 * pow (std::get<1> (_eta_state.at (m)), 0.5))
                 );
-#if SIMULATION
 
-#endif
             }
             else
             {
@@ -1083,6 +1081,55 @@ namespace Gtfs {
 #if SIMULATION
         {
             fout.close ();
+        }
+
+
+        {
+            /** INTERGER QUANTILES:
+             *
+             *  - Convert ETA to an integer minute (by integer division, rounded down)
+             *  - Compute quantile of each value (by arranging particles ...)
+             */
+
+            std::ofstream qout;
+            qout.open ("eta_quantiles.csv", std::ofstream::app);
+            std::vector<int> eta_integer;
+            eta_integer.resize (tt_wt.size ());
+
+            std::map<int, double> eta_quantiles;
+            for (int m=_stop_index;m<M;m++)
+            {
+                eta_quantiles.clear ();
+                for (int i=0; i<tt_wt.size (); ++i)
+                {
+                    eta_integer.at (i) = std::get<0> (tt_wt.at (i)) / 60;
+                }
+                std::sort (eta_integer.begin (), eta_integer.end ());
+                for (int z : eta_integer)
+                {
+                    if (eta_quantiles.count (z))
+                    {
+                        eta_quantiles[z]++;
+                    }
+                    else
+                    {
+                        eta_quantiles[z] = 1;
+                    }
+                }
+
+                double qsum = 0.;
+                for (auto it = eta_quantiles.begin (); it != eta_quantiles.end (); ++it)
+                {
+                    // trip_id, vehicle_id, stop_sequence, timestamp, eta, quantile
+                    qout
+                        << _trip_id << "," << _vehicle->vehicle_id () << "," << (m+1) << "," << _vehicle->timestamp ()
+                        << "," << it->first << "," << std::round (qsum * 100.) / 100. << "\n";
+                    it->second /= tt_wt.size ();
+                    qsum += it->second;
+                }
+
+            }
+            qout.close ();
         }
 #endif
 
