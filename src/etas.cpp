@@ -1099,10 +1099,13 @@ namespace Gtfs {
             std::map<int, double> eta_quantiles;
             for (int m=_stop_index;m<M;m++)
             {
+                col_m = _eta_matrix.col (m);
+                if (col_m.isZero ()) continue;
+
                 eta_quantiles.clear ();
-                for (int i=0; i<tt_wt.size (); ++i)
+                for (int i=0; i<col_m.size (); ++i)
                 {
-                    eta_integer.at (i) = std::get<0> (tt_wt.at (i)) / 60;
+                    eta_integer.at (i) = col_m (i) / 60;
                 }
                 std::sort (eta_integer.begin (), eta_integer.end ());
                 for (int z : eta_integer)
