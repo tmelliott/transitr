@@ -4,57 +4,120 @@ load("simulations/raw_arrivaldata.rda")
 rawarrival <- arrivaldata
 load("simulations/arrivaldata_etas.rda")
 
-eta_quantiles <-
-    read_csv("simulations/sim002/eta_quantiles.csv",
-        col_names = c("trip_id", "vehicle_id", "stop_sequence", "timestamp", "eta", "quantile"),
-        col_types = "cciiin"
-    ) %>%
-    left_join(
-        arrivaldata %>%
-            rename(actual_arrival = arrival_time) %>%
-            select(trip_id, vehicle_id, stop_sequence, scheduled_arrival, actual_arrival, delay),
-        by = c("trip_id", "vehicle_id", "stop_sequence")
-    ) %>%
-    mutate(
-        scheduled_arrival = as.integer(scheduled_arrival),
-        actual_arrival = as.integer(actual_arrival),
-        time_until_arrival = actual_arrival - timestamp
-    ) %>%
-    group_by(trip_id, vehicle_id) %>%
-    group_modify(~ {
-        # .y <- tibble(trip_id = unique(etas$trip_id)[2])
-        # .x <- eta_data %>% filter(trip_id == .y$trip_id)
+# if (!file.exists("eta_quantiles_A.rda")) {
+#     eta_quantiles <-
+#         read_csv("simulations/sim002/eta_quantiles.csv",
+#             col_names = c("trip_id", "vehicle_id", "stop_sequence", "timestamp", "eta", "quantile"),
+#             col_types = "cciiin"
+#         )
+#     save(eta_quantiles, file = "eta_quantiles_A.rda")
+# } else {
+#     load("eta_quantiles_A.rda")
+# }
 
-        d <- rawarrival %>%
-            filter(
-                trip_id == .y$trip_id &
-                vehicle_id == .y$vehicle_id &
-                !is.na(delay)
-            )
-        dat <- tibble(timestamp = unique(.x$timestamp)) %>%
-            mutate(
-                current_delay = sapply(
-                    timestamp,
-                    function(t) {
-                        suppressWarnings(a <- d$delay[max(which(d$arrival_time <= t))])
-                        ifelse(is.na(a), 0, a)
-                    }
+## Write CSV to SQLite db
+library(RSQLite)
+library(dbplyr)
+db <- "simulations/sim002/eta_quantiles.sqlite"
+con <- dbConnect(SQLite(), db)
+
+if (!dbExistsTable(con, "quantiles")) {
+    dbCreateTable(con, "quantiles",
+        c(
+            trip_id = "text",
+            vehicle_id = "text",
+            stop_sequence = "int",
+            timestamp = "int",
+            eta = "int",
+            quantile = "real"
+        )
+    )
+    cat(".mode csv\n.import simulations/sim002/eta_quantiles.csv quantiles\n",
+        file = "simulations/sim002/imp.sql")
+    system("sqlite3 simulations/sim002/eta_quantiles.sqlite < simulations/sim002/imp.sql")
+    unlink("simulations/sim002/imp.sql")
+}
+
+# clean up:
+# dbRemoveTable(con, "etas")
+if (!dbExistsTable(con, "etas")) {
+    dbCreateTable(con, "etas",
+        c(
+            trip_id = "text",
+            vehicle_id = "text",
+            stop_sequence = "int",
+            timestamp = "int",
+            eta = "int",
+            quantile = "real",
+            scheduled_arrival = "int",
+            actual_arrival = "int",
+            delay = "int",
+            time_until_arrival = "int",
+            current_delay = "int",
+            gtfs_arrival_time = "int",
+            gtfs_eta = "int"
+        )
+    )
+}
+
+trips <- con %>% tbl("quantiles") %>% select(trip_id) %>% distinct() %>% collect() %>% pull("trip_id")
+pbapply::pblapply(trips, function(trip) {
+    if (con %>% tbl("etas") %>% filter(trip_id == !!trip) %>% tally() > 0) return()
+    eta_quantiles <- con %>%
+        tbl("quantiles") %>%
+        filter(trip_id == !!trip) %>%
+        collect() %>%
+        left_join(
+            arrivaldata %>%
+                filter(trip_id == trip) %>%
+                rename(actual_arrival = arrival_time) %>%
+                select(trip_id, vehicle_id, stop_sequence, scheduled_arrival, actual_arrival, delay),
+            by = c("trip_id", "vehicle_id", "stop_sequence")
+        ) %>%
+        mutate(
+            scheduled_arrival = as.integer(scheduled_arrival),
+            actual_arrival = as.integer(actual_arrival),
+            time_until_arrival = actual_arrival - timestamp
+        ) %>%
+        group_by(vehicle_id) %>%
+        group_modify(~ {
+            # .y <- tibble(trip_id = unique(etas$trip_id)[2])
+            # .x <- eta_data %>% filter(trip_id == .y$trip_id)
+
+            d <- rawarrival %>%
+                filter(
+                    trip_id == trip &
+                    vehicle_id == .y$vehicle_id &
+                    !is.na(delay)
                 )
-            )
+            dat <- tibble(timestamp = unique(.x$timestamp)) %>%
+                mutate(
+                    current_delay = sapply(
+                        timestamp,
+                        function(t) {
+                            suppressWarnings(a <- d$delay[max(which(d$arrival_time <= t))])
+                            ifelse(is.na(a), 0, a)
+                        }
+                    )
+                )
 
-        .x %>%
-            left_join(dat, by = "timestamp") %>%
-            mutate(
-                scheduled_arrival = as.integer(scheduled_arrival),
-                timestamp = as.integer(timestamp)
-            ) %>%
-            arrange(stop_sequence) %>%
-            mutate(
-                gtfs_arrival_time = scheduled_arrival + current_delay,
-                gtfs_eta = scheduled_arrival + current_delay - timestamp
-            )
-    }) %>%
-    filter(time_until_arrival >= 0) %>%
+            .x %>%
+                left_join(dat, by = "timestamp") %>%
+                mutate(
+                    scheduled_arrival = as.integer(scheduled_arrival),
+                    timestamp = as.integer(timestamp)
+                ) %>%
+                arrange(stop_sequence) %>%
+                mutate(
+                    gtfs_arrival_time = scheduled_arrival + current_delay,
+                    gtfs_eta = scheduled_arrival + current_delay - timestamp
+                )
+        }) %>%
+        filter(time_until_arrival >= 0)
+    dbWriteTable(con, "etas", eta_quantiles, append = TRUE)
+})
+
+eta_quantiles <- eta_quantiles %>%
     mutate(timestamp = ts2dt(timestamp))
 
 eta_smry <- eta_quantiles %>% ungroup %>%
