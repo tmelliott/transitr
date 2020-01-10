@@ -32,6 +32,7 @@ if (!dbExistsTable(con, "quantiles")) {
             quantile = "real"
         )
     )
+    dbExecute(con, "CREATE INDEX tid ON quantiles(trip_id);")
     cat(".mode csv\n.import simulations/sim002/eta_quantiles.csv quantiles\n",
         file = "simulations/sim002/imp.sql")
     system("sqlite3 simulations/sim002/eta_quantiles.sqlite < simulations/sim002/imp.sql")
@@ -58,11 +59,13 @@ if (!dbExistsTable(con, "etas")) {
             gtfs_eta = "int"
         )
     )
+    dbExecute(con, "CREATE INDEX tid ON etas(trip_id);")
 }
 
 trips <- con %>% tbl("quantiles") %>% select(trip_id) %>% distinct() %>% collect() %>% pull("trip_id")
+trips_complete <- con %>% tbl("etas") %>% select(trip_id) %>% distinct() %>% collect() %>% pull("trip_id")
+trips <- trips[!trips %in% trips_complete]
 pbapply::pblapply(trips, function(trip) {
-    if (con %>% tbl("etas") %>% filter(trip_id == !!trip) %>% tally() > 0) return()
     eta_quantiles <- con %>%
         tbl("quantiles") %>%
         filter(trip_id == !!trip) %>%
@@ -117,26 +120,44 @@ pbapply::pblapply(trips, function(trip) {
     dbWriteTable(con, "etas", eta_quantiles, append = TRUE)
 })
 
-eta_quantiles <- eta_quantiles %>%
-    mutate(timestamp = ts2dt(timestamp))
+eta_quantiles <- con %>% tbl("etas") %>%
+    select(trip_id, vehicle_id, stop_sequence, timestamp,
+        eta, quantile, actual_arrival, time_until_arrival, gtfs_eta)
 
-eta_smry <- eta_quantiles %>% ungroup %>%
-    group_by(trip_id, vehicle_id, stop_sequence, timestamp) %>%
-    group_modify(~{
-        etaq50 <- with(.x, eta[max(which(quantile <= 0.5))])
-        etaq40 <- with(.x, eta[max(which(quantile <= 0.4))])
-        etaq25 <- with(.x, eta[max(which(quantile <= 0.25))])
-        tibble(
-            err50 = .x$time_until_arrival[1] / 60 - etaq50,
-            err40 = .x$time_until_arrival[1] / 60 - etaq40,
-            err25 = .x$time_until_arrival[1] / 60 - etaq25,
-            err_gtfs = (.x$time_until_arrival[1] - .x$gtfs_eta[1]) / 60
-        )
-    })
+
+# eta_quantiles <- eta_quantiles %>%
+#     mutate(timestamp = ts2dt(timestamp))
+trips <- con %>% tbl("etas") %>% select(trip_id) %>% distinct() %>% collect() %>% pull(trip_id)
+
+smry_file <- "simulations/sim002/eta_smry.rda"
+if (file.exists(smry_file)) {
+    load(smry_file)
+} else {
+    eta_smry <- pbapply::pblapply(trips,
+        function(trip) {
+            eta_quantiles %>% filter(trip_id == !!trip) %>%
+                collect() %>%
+                mutate(timestamp = ts2dt(timestamp)) %>%
+                group_by(trip_id, vehicle_id, stop_sequence, timestamp) %>%
+                group_modify(~{
+                    etaq50 <- with(.x, eta[max(which(quantile <= 0.5))])
+                    etaq40 <- with(.x, eta[max(which(quantile <= 0.4))])
+                    etaq25 <- with(.x, eta[max(which(quantile <= 0.25))])
+                    tibble(
+                        err50 = .x$time_until_arrival[1] / 60 - etaq50,
+                        err40 = .x$time_until_arrival[1] / 60 - etaq40,
+                        err25 = .x$time_until_arrival[1] / 60 - etaq25,
+                        err_gtfs = (.x$time_until_arrival[1] - .x$gtfs_eta[1]) / 60
+                    )
+                })
+        }
+    ) %>% bind_rows %>% ungroup()
+    save(eta_smry, file = smry_file)
+}
 
 ggplot(eta_smry, aes(stop_sequence, err50)) + geom_point()
 
-i <- 10000
+i <- 5000
 T <- eta_quantiles$trip_id[i]
 S <- eta_quantiles$stop_sequence[i]
 TS <- eta_quantiles$timestamp[i]
@@ -155,4 +176,4 @@ ggplot(eta1, aes(eta, quantile)) +
     geom_hline(yintercept = c(0.25, 0.4, 0.5), lty = 2) +
     geom_vline(xintercept = c(etaq25, etaq40, etaq50), lty = 3) +
     geom_vline(xintercept = eta1$time_until_arrival[1] / 60, colour = "orangered") +
-    geom_vline(xintercept = eta1$gtfs_eta[1] / 60, colour = "magenta")
+    geom_vline(xintercept = floor(eta1$gtfs_eta[1] / 60), colour = "magenta")
