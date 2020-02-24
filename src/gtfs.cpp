@@ -756,14 +756,20 @@ namespace Gtfs
 
     void Trip::load ()
     {
-        std::lock_guard<std::recursive_mutex> lk (load_mutex);
-        if (loaded) return;
+        // std::lock_guard<std::recursive_mutex> lk (load_mutex);
+        load_mutex.lock ();
+        if (loaded)
+        {
+            load_mutex.unlock ();
+            return;
+        }
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
         {
             Rcpp::Rcerr << " x Unable to connect to database\n  "
                 << sqlite3_errmsg (db) << "\n";
             gtfs->close_connection ();
+            load_mutex.unlock ();
             return;
         }
 
@@ -777,6 +783,7 @@ namespace Gtfs
                 << "TRIP ID = " << _trip_id << "\n";
             sqlite3_finalize (stmt);
             gtfs->close_connection ();
+            load_mutex.unlock ();
             return;
         }
         const char* tstr = _trip_id.c_str ();
@@ -786,6 +793,7 @@ namespace Gtfs
                 << sqlite3_errmsg (db) << "\n";
             sqlite3_finalize (stmt);
             gtfs->close_connection ();
+            load_mutex.unlock ();
             return;
         }
         if (sqlite3_step (stmt) != SQLITE_ROW)
@@ -794,6 +802,7 @@ namespace Gtfs
                 << sqlite3_errmsg (db) << "\n";
             sqlite3_finalize (stmt);
             gtfs->close_connection ();
+            load_mutex.unlock ();
             return;
         }
 
@@ -832,6 +841,7 @@ namespace Gtfs
                     << sqlite3_errmsg (db) << "\n";
                 sqlite3_finalize (stmt);
                 gtfs->close_connection ();
+                load_mutex.unlock ();
                 return;
             }
             if (sqlite3_bind_text (stmt, 1, tstr, -1, SQLITE_STATIC) != SQLITE_OK)
@@ -848,6 +858,7 @@ namespace Gtfs
                     << sqlite3_errmsg (db) << "\n";
                 sqlite3_finalize (stmt);
                 gtfs->close_connection ();
+                load_mutex.unlock ();
                 return;
             }
             _stops.reserve (sqlite3_column_int (stmt, 0));
@@ -861,6 +872,7 @@ namespace Gtfs
                     << sqlite3_errmsg (db) << "\n";
                 sqlite3_finalize (stmt);
                 gtfs->close_connection ();
+                load_mutex.unlock ();
                 return;
             }
             if (sqlite3_bind_text (stmt, 1, tstr, -1, SQLITE_STATIC) != SQLITE_OK)
@@ -869,6 +881,7 @@ namespace Gtfs
                     << sqlite3_errmsg (db) << "\n";
                 sqlite3_finalize (stmt);
                 gtfs->close_connection ();
+                load_mutex.unlock ();
                 return;
             }
 
@@ -932,6 +945,7 @@ namespace Gtfs
         _segment_index = 0;
 
         loaded = true;
+        load_mutex.unlock ();
     }
 
     void Trip::get_db_delays ()
@@ -1017,7 +1031,7 @@ namespace Gtfs
     void Trip::unload (bool complete)
     {
         if (!loaded) return;
-        std::lock_guard<std::mutex> lk (load_mutex);
+        load_mutex.lock ();
 
         completed = complete;
         loaded = false;
@@ -1033,6 +1047,7 @@ namespace Gtfs
 #if VERBOSE > 0
         std::cout << " + Trip " << _trip_id << " is unloaded\n";
 #endif
+        load_mutex.unlock ();
     }
 
     void Trip::complete ()
