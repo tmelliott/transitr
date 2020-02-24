@@ -758,6 +758,8 @@ namespace Gtfs
     {
         // std::lock_guard<std::recursive_mutex> lk (load_mutex);
         load_mutex.lock ();
+        std::cout << " * loading trip with ID = "
+            << _trip_id << "\n";
         if (loaded)
         {
             load_mutex.unlock ();
@@ -772,7 +774,6 @@ namespace Gtfs
             load_mutex.unlock ();
             return;
         }
-
         sqlite3_stmt* stmt;
         std::string qry = "SELECT route_id, shape_id, service_id, block_id, direction_id, trip_headsign, version FROM trips WHERE trip_id=?";
         const char* qrystr = qry.c_str ();
