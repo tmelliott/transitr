@@ -756,7 +756,7 @@ namespace Gtfs
 
     void Trip::load ()
     {
-        std::lock_guard<std::mutex> lk (load_mutex);
+        std::lock_guard<std::recursive_mutex> lk (load_mutex);
         if (loaded) return;
         sqlite3* db = gtfs->get_connection ();
         if (db == nullptr)
@@ -1525,7 +1525,7 @@ namespace Gtfs
         // }
     }
 
-    latlng Shape::coordinates_of (double& d)
+    latlng Shape::coordinates_of (double& d, double offset)
     {
         if (!loaded) load();
 
@@ -1556,9 +1556,21 @@ namespace Gtfs
         // distance difference
         double b = bearing (_path[i].pt, _path[i+1].pt);
 
-        return destinationPoint (_path[i].pt, b, dd);
+        latlng dest = destinationPoint (_path[i].pt, b, dd);
+
+        if (offset > 0)
+        {
+            double b2 = fmod (b + 270., 360.);
+            dest = destinationPoint (dest, b2, offset);
+        }
+
+        return dest;
     }
 
+    latlng Shape::coordinates_of (double& d)
+    {
+        return coordinates_of (d, 0.0);
+    }
 
     /***************************************************** Segment */
     Segment::Segment (int id, Gtfs* gtfs) :

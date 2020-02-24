@@ -262,7 +262,7 @@ namespace Gtfs
         std::vector<uint64_t> _arrival_times;
         std::vector<uint64_t> _departure_times;
 
-        std::mutex load_mutex;
+        std::recursive_mutex load_mutex;
 
         Vehicle* _vehicle = nullptr;
 
@@ -342,6 +342,7 @@ namespace Gtfs
         float version ();
 
         double distance_of (latlng& pt);
+        latlng coordinates_of (double& d, double offset);
         latlng coordinates_of (double& d);
     };
 
