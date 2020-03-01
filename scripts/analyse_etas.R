@@ -677,7 +677,7 @@ load("simulations/raw_arrivaldata.rda")
 rawarrival <- arrivaldata
 load("simulations/arrivaldata_etas.rda")
 
-etas <- read_csv("simulations/sim000/eta_state.csv",
+etas <- read_csv("simulations/sim_100/eta_state.csv",
     col_names = c("trip_id", "vehicle_id", "stop_sequence", "timestamp",
         "vehicle_distance", "stop_distance",
         "pf_mean", "pf_var", "pf_lower", "pf_upper",
@@ -903,10 +903,13 @@ eta_results <- eta_results %>%
     )
 
 eta_res_route <- eta_results %>%
-    group_by(route_short_name) %>%
+    filter(time_until_arrival > 0) %>%
+    # group_by(route_short_name) %>%
     summarize(
         pf_rmse = sqrt(mean(pf_error^2)),
         normal_rmse = sqrt(mean(normal_error^2)),
+        historical_rmse =
+            sqrt(mean((historical_mean - time_until_arrival)^2, na.rm = TRUE)),
         gtfs_rmse = sqrt(mean(gtfs_error^2)),
         n = length(unique(trip_id))
     ) %>%

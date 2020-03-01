@@ -6,6 +6,7 @@ if (length(ca) == 0)
 library(transitr)
 library(magrittr)
 
+curdir <- getwd()
 simdir <- file.path("simulations", ca[1])
 
 setwd(simdir)
@@ -34,7 +35,7 @@ if (file.exists("eta_quantiles.csv")) unlink("eta_quantiles.csv")
 if (file.exists("vehicle_states.csv")) unlink("vehicle_states.csv")
 if (file.exists("trip_vehicle_states.csv")) unlink("trip_vehicle_states.csv")
 
-nw <- load_gtfs("../../at_gtfs.db", output = "etas.pb") %>%
+nw <- load_gtfs(file.path(curdir, "at_gtfs.db"), output = "etas.pb") %>%
     realtime_feed(c(sprintf("http://localhost:3000/%s/vehicle_positions", ca[1]),
     # realtime_feed(c(sprintf("http://localhost:3000/%s/50/100/vehicle_positions", ca[1]),
     # realtime_feed(c(sprintf("http://localhost:3000/%s/1566165600/minutes/0/vehicle_positions", ca[1]),

@@ -146,7 +146,7 @@ for (trip in unique(eta_final$trip_id)) {
         Nt <- length(unique(ev$timestamp))
         tti <- 0
         for (t in unique(ev$timestamp)) {
-            cur_delay <- gt[timestamp <= t]$current_delay
+            cur_delay <- max(gt[timestamp <= t]$current_delay)
             eta_final[
                 trip_id == trip_id &
                 vehicle_id == vehicle &
@@ -245,6 +245,15 @@ eta_joined <- eta_quantiles_df %>%
     )
 
 
+
+
+## START HERE ???
+
+## some more setup
+library(tidyverse)
+ts2dt <- function(ts) as.POSIXct(ts, origin = "1970-01-01")
+load("simulations/raw_arrivaldata.rda")
+rawarrival <- arrivaldata
 load("simulations/arrivaldata_etas.rda")
 
 # if (!file.exists("eta_quantiles_A.rda")) {
@@ -261,7 +270,7 @@ load("simulations/arrivaldata_etas.rda")
 ## Write CSV to SQLite db
 library(RSQLite)
 library(dbplyr)
-db <- "simulations/sim002/eta_quantiles.sqlite"
+db <- "simulations/sim_100/eta_quantiles.sqlite"
 con <- dbConnect(SQLite(), db)
 
 if (!dbExistsTable(con, "quantiles")) {
@@ -276,10 +285,10 @@ if (!dbExistsTable(con, "quantiles")) {
         )
     )
     dbExecute(con, "CREATE INDEX tid ON quantiles(trip_id);")
-    cat(".mode csv\n.import simulations/sim002/eta_quantiles.csv quantiles\n",
-        file = "simulations/sim002/imp.sql")
-    system("sqlite3 simulations/sim002/eta_quantiles.sqlite < simulations/sim002/imp.sql")
-    unlink("simulations/sim002/imp.sql")
+    cat(".mode csv\n.import simulations/sim_100/eta_quantiles.csv quantiles\n",
+        file = "simulations/sim_100/imp.sql")
+    system("sqlite3 simulations/sim_100/eta_quantiles.sqlite < simulations/sim_100/imp.sql")
+    unlink("simulations/sim_100/imp.sql")
 }
 
 # clean up:
@@ -302,7 +311,7 @@ if (!dbExistsTable(con, "etas")) {
             gtfs_eta = "int"
         )
     )
-    dbExecute(con, "CREATE INDEX tid ON etas(trip_id);")
+    dbExecute(con, "CREATE INDEX eta_tid ON etas(trip_id);")
 }
 
 trips <- con %>% tbl("quantiles") %>% select(trip_id) %>% distinct() %>% collect() %>% pull("trip_id")
