@@ -79,7 +79,7 @@ void run_realtime_model (List nw)
     signal (SIGTERM, intHandler);
     Timer timer;
     if (params.save_timings) {
-        timer.save_to ("timings.csv", "iteration,timestamp,nvehicles");
+        timer.save_to ("timings.csv", "iteration,timestamp,nvehicles,ntripupdates");
     }
 
     // Initialize an RNG
@@ -129,7 +129,8 @@ void run_realtime_model (List nw)
             {
                 tinfo << rtfeed.feed()->header ().timestamp ();
             }
-            tinfo << "," << rtfeed.feed ()->entity_size ();
+            // tinfo << "," << rtfeed.feed ()->entity_size ();
+            tinfo << "," << rtfeed.n_vehicles () << "," << rtfeed.n_trip_updates ();
 
             timer.set_info (tinfo.str ());
         }
