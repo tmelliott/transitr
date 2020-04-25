@@ -4,7 +4,7 @@ Version: 0.4.9000
 Authors@R: person("Tom", "Elliott", email = "tom.elliott@auckland.ac.nz",
                   role = c("aut", "cre"))
 Description: GTFS is an API specification used globally for transit data, including realtime vehicle locations. This package allows users to a) construct a transit network, b) track vehicles in real time to update the network, and c) obtain arrival time predictions.
-License: GPL-3 | file LICENSE
+License: GPL-3
 URL: https://github.com/tmelliott/transitr
 BugReports: https://github.com/tmelliott/transitr/issues
 Encoding: UTF-8
