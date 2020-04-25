@@ -3,7 +3,7 @@ source("scripts/common.R")
 load("simulations/arrivaldata.rda")
 arrivaldata <- arrivaldata %>% ungroup()
 
-res <- all_sims("sim000", n = 200) %>%
+res <- all_sims("sim000") %>%
     ungroup() %>%
     mutate(dt = as.integer(time - timestamp)) %>%
     filter(dt < 5*60*60) %>%

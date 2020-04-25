@@ -5,6 +5,10 @@ construct_network <- function(nw, shapes) {
     .Call(`_transitr_construct_network`, nw, shapes)
 }
 
+processEtas <- function(files, out, dbname) {
+    invisible(.Call(`_transitr_processEtas`, files, out, dbname))
+}
+
 shapes_df_to_list <- function(x) {
     .Call(`_transitr_shapes_df_to_list`, x)
 }

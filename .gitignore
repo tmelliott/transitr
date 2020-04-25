@@ -13,6 +13,7 @@ at_gtfs.db
 *.rda
 *.zip
 *.backup
+*.code-workspace
 
 scripts/simulation_traveltime_*
 

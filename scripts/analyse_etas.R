@@ -1,0 +1,1202 @@
+## Read ETAs from pb files in simulations/simXXX/etas
+## using a cpp function to speed things up ...
+# library(devtools)
+library(tidyverse)
+
+ts2dt <- function(ts) as.POSIXct(ts, origin = "1970-01-01")
+
+# Load the actual arrival times?
+tudir <- file.path("simulations", "archive")
+tufiles <- list.files(tudir, pattern = "^trip_updates.+\\.pb$", full.names = TRUE)
+# system.time( transitr:::processEtas(tufiles, "arrivaldata.csv", "at_gtfs.db") )
+
+if (file.exists("simulations/arrivaldata_etas.rda")) {
+    load("simulations/arrivaldata_etas.rda")
+} else {
+    arrivaldata <-
+        readr::read_csv(
+            "arrivaldata.csv",
+            col_names = c(
+                "trip_id", "route_id", "vehicle_id", "timestamp",
+                "stop_sequence", "current_delay",
+                "arrival_time", "scheduled_arrival",
+                "lower", "upper", "type"
+            ),
+            col_types = "ccciiiiiiif"
+        ) %>%
+        mutate(
+            scheduled_arrival = ts2dt(scheduled_arrival),
+            delay = current_delay,
+            arrival_time = scheduled_arrival + delay
+        ) %>%
+        select(trip_id, route_id, vehicle_id, stop_sequence,
+            scheduled_arrival, arrival_time, delay) %>%
+        unique()
+    save(arrivaldata, file = "simulations/raw_arrivaldata.rda")
+    arrivaldata <- arrivaldata %>%
+        group_by(trip_id) %>%
+        do({
+            x <- (.) %>% unique() %>%
+                filter(between(delay, -30*60, 60*60))
+            x <- x %>% group_by(stop_sequence) %>%
+                do({
+                    ## the smallest absolute delay
+                    z <- (.)
+                    z[which.min(abs(z$delay)), ]
+                })
+            vids <- table(x$vehicle_id)
+            x %>% filter(vehicle_id == names(vids)[which.max(vids)])
+        })
+    save(arrivaldata, file = "simulations/arrivaldata_etas.rda")
+}
+
+
+tids <- arrivaldata %>% group_by(trip_id) %>%
+    summarize(n_vehicle = length(unique(vehicle_id))) %>%
+    filter(n_vehicle > 1) %>%
+    pull(trip_id)
+
+## quick inspection of the raw arrival data
+# egg::ggarrange(
+# ggplot(arrivaldata %>% filter(!trip_id %in% tids) %>% arrange(arrival_time),
+#     aes(arrival_time, vehicle_id, group = trip_id, colour = trip_id)) +
+#     xlab("time") + theme(legend.position = "none") +
+#     geom_path(),
+# ggplot(arrivaldata %>% filter(trip_id %in% tids) %>% arrange(arrival_time),
+#     aes(arrival_time, vehicle_id, group = trip_id, colour = trip_id)) +
+#     xlab("time") + theme(legend.position = "none") +
+#     geom_path(),
+# ncol = 2
+# )
+
+
+sim <- "sim000"
+etadir <- file.path("simulations", sim, "etas")
+etafiles <- list.files(etadir, pattern = ".pb$", full.names = TRUE)
+
+# load_all()
+system.time( transitr:::processEtas(etafiles, "etas.csv", "at_gtfs.db") )
+
+system.time(
+    etas <- readr::read_csv(
+        "etas.csv",
+        col_names = c(
+            "trip_id", "route_id", "vehicle_id", "timestamp",
+            "stop_sequence", "current_delay",
+            "arrival_time", "scheduled_arrival",
+            "lower", "upper", "type"
+        ),
+        col_types = "ccciiiiiiif"
+    )
+)
+etas <- etas %>%
+    mutate(
+        timestamp = ts2dt(timestamp),
+        eta_prediction = ts2dt(arrival_time),
+        scheduled_arrival = ts2dt(scheduled_arrival),
+        lower_prediction = ts2dt(lower),
+        upper_prediction = ts2dt(upper)
+        # gtfs_eta = scheduled_arrival + current_delay
+    ) %>%
+    select(trip_id, route_id, timestamp, stop_sequence, eta_prediction,
+        current_delay, lower_prediction, upper_prediction)
+
+
+## silly plot of the ETAs
+# for (TRIP_ID in unique(etas$trip_id)) {
+#     ad <- arrivaldata %>% filter(trip_id == TRIP_ID)
+#     p <- ggplot(etas %>% filter(trip_id == TRIP_ID)) +
+#         geom_point(aes(eta_prediction, timestamp)) +
+#         geom_segment(
+#             aes(
+#                 x = lower_prediction, y = timestamp,
+#                 xend = upper_prediction, yend = timestamp
+#             )
+#         ) +
+#         geom_vline(aes(xintercept = arrival_time),
+#             data = arrivaldata %>% filter(trip_id == TRIP_ID),
+#             colour = "orangered"
+#         ) +
+#         geom_vline(aes(xintercept = scheduled_arrival),
+#             data = ad
+#         ) +
+#         ggtitle(TRIP_ID) +
+#         facet_wrap(~stop_sequence)
+#     print(p)
+#     grid::grid.locator()
+# }
+
+
+library(RSQLite())
+con <- dbConnect(SQLite(), "at_gtfs.db")
+HMS2sec <- function(hms) {
+    sapply(strsplit(hms, ":"), function(z) {
+        sum(as.integer(z) * c(60*60, 60, 1))
+    })
+}
+t00 <- paste(format(arrivaldata$arrival_time[1], "%Y-%m-%d"), "00:00:00") %>%
+    as.POSIXct %>% as.integer
+adata <- arrivaldata %>% select(trip_id, stop_sequence, scheduled_arrival, arrival_time, delay)
+
+# ## convert this to a form [trip_id, timestamp, delay]
+# adata %>% full_join(etas, by = c("trip_id"))
+
+#  group_by(trip_id, arrival_time) %>%
+#     group_modify(~{
+#         tid <- .y$trip_id
+#         ts <- etas %>% filter(trip_id == tid) %>% pull(timestamp) %>% unique()
+#         if (length(ts) == 0) return(NULL)
+#         .x
+#     })
+
+eta_data <- etas %>% select(-current_delay) %>%
+    # filter(trip_id %in% unique(etas$trip_id)) %>%
+    left_join(adata %>% rename(actual_arrival = arrival_time) %>%
+            select(trip_id, stop_sequence, scheduled_arrival, actual_arrival, delay),
+        by = c("trip_id", "stop_sequence")
+    ) %>%
+    mutate(
+        time_until_arrival = as.integer(actual_arrival - timestamp),
+        eta = as.integer(eta_prediction - timestamp)
+    ) %>%
+    group_by(trip_id) %>%
+    group_modify(~ {
+        # .y <- tibble(trip_id = unique(etas$trip_id)[2])
+        # .x <- eta_data %>% filter(trip_id == .y$trip_id)
+
+        d <- adata %>% filter(trip_id == .y$trip_id & !is.na(delay))
+        dat <- tibble(timestamp = unique(.x$timestamp)) %>%
+            mutate(
+                current_delay = sapply(timestamp,
+                    function(t) {
+                        suppressWarnings(a <- d$delay[max(which(d$arrival_time <= t))])
+                        ifelse(is.na(a), 0, a)
+                    }
+                )
+            )
+
+        .x %>% left_join(dat, by = "timestamp") %>% arrange(stop_sequence) %>%
+            mutate(
+                gtfs_arrival_time = scheduled_arrival + current_delay,
+                gtfs_eta = as.integer(scheduled_arrival + current_delay) - as.integer(timestamp)
+            )
+    }) %>%
+    filter(time_until_arrival >= 0)
+
+## A VERY VERY BASIC RMSE THING
+RMSE <- list(
+    transitr = sqrt(mean(eta_data$eta^2, na.rm = TRUE)),
+    ci_cov = mean(with(eta_data, actual_arrival > lower_prediction & actual_arrival < upper_prediction), na.rm = TRUE),
+    gtfs = sqrt(mean(eta_data$gtfs_eta^2, na.rm = TRUE))
+)
+RMSE
+
+range(eta_data$timestamp)
+
+# if (!interactive()) q("no")
+
+# q("no")
+# for (TRIP in sample(unique(eta_data$trip_id))) {
+#     print(TRIP)
+#     routedata <- eta_data %>%
+#         filter(trip_id == TRIP & !is.na(eta) & timestamp > as.POSIXct("2019-08-19 6:00:00"))
+#     if (nrow(routedata) == 0) next()
+#     p <- ggplot(routedata %>% filter(time_until_arrival > 0),
+#         aes(timestamp)) +
+#         geom_pointrange(aes(y = eta_prediction, ymin = lower_prediction, ymax = upper_prediction)) +
+#         geom_point(aes(y = gtfs_arrival_time), colour = "red") +
+#         geom_hline(aes(yintercept = actual_arrival), colour = "blue") +
+#         geom_hline(aes(yintercept = scheduled_arrival), colour = "black", lty = 2) +
+#         facet_wrap(~stop_sequence,scales="free_y") +
+#         theme(legend.position = "none")
+#     print(p)
+#     grid::grid.locator()
+# }
+
+
+
+get_ci <- function(x, p, which = c("lower", "upper"), q = 0.95, ts) {
+    which <- match.arg(which)
+    q <- (1 - q) / 2
+    if (which == "upper") q <- 1 - q
+    p <- pmin(1e5, p)
+    z <- qnorm(q, x, sqrt(p))
+    if (missing(ts)) return(z)
+    t <- as.POSIXct(ts + z, origin = "1970-01-01")
+    if (which == "upper") t <- t + 60
+    as.POSIXct(
+        paste(
+            format(t, "%Y-%m-%d %H:"),
+            as.integer(format(t, "%M")),
+            ":00"
+        )
+    )
+}
+
+
+
+raw <- readr::read_csv(
+        "simulations/sim000/eta_state.csv",
+        col_names = c(
+            "trip_id", "stop_sequence", "timestamp",
+            "X", "P", "Xhat", "Phat", "Z", "E", "Xnew", "Pnew"
+        ),
+        col_types = "ciinnnnnnnn"
+    ) %>% filter(X < 2*60*60) %>%
+    mutate(
+        timestamp = ts2dt(timestamp),
+        stop_sequence = stop_sequence + 1
+    )
+
+
+
+### Let's look at
+# TRIP <- "1141156294-20190806160740_v82.21"
+# TRIP <- "1141157373-20190806160740_v82.21"
+# TRIP <- "51358161469-20190806160740_v82.21"
+# TRIP <- "1141188958-20190806160740_v82.21"
+# TRIP <- "51358155347-20190806160740_v82.21"
+# TRIP <- "470158176-20190806160740_v82.21"
+# TRIP <- "442135482-20190806160740_v82.21"
+TRIP <- "51446171530-20190806160740_v82.21"
+
+for (TRIP in unique(eta_data$trip_id)) {
+tripdata <- eta_data %>%
+    filter(trip_id == TRIP & !is.na(eta)) %>%
+    filter(stop_sequence < max(.data$stop_sequence)) %>%
+    ungroup()
+
+# also need the historical delay from db
+con <- RSQLite::dbConnect(RSQLite::SQLite(), "at_gtfs.db")
+hist_delays <- RSQLite::dbGetQuery(con,
+    sprintf("SELECT stop_sequence, avg, sd FROM stop_delays WHERE trip_id='%s'",
+        gsub("-.+", "", tripdata$trip_id[1])
+    )
+) %>% rename(avg_delay = avg, sd_delay = sd)
+RSQLite::dbDisconnect(con)
+
+trip_etas <- tripdata %>%
+    select(
+        timestamp, stop_sequence, scheduled_arrival, actual_arrival, gtfs_eta
+    ) %>%
+    left_join(
+        raw %>% filter(trip_id == TRIP) %>%
+            select(timestamp, stop_sequence, Z, E),
+        by = c("timestamp", "stop_sequence")
+    ) %>%
+    left_join(hist_delays, by = "stop_sequence") %>%
+    rename(
+        raw_estimate = Z,
+        raw_uncertainty = E,
+        schedule_delay_estimate = gtfs_eta,
+        historical_estimate = avg_delay,
+        historical_uncertainty = sd_delay
+    ) %>%
+    mutate(
+        schedule_delay_uncertainty =
+            (pmin(3.0, pmax(1.0, 1.0 + 0.1 * (schedule_delay_estimate / 60))) * 60)^2,
+        historical_estimate =
+            scheduled_arrival + historical_estimate - timestamp,
+        historical_uncertainty = historical_uncertainty^2
+    ) %>%
+    mutate(
+        ## model weights
+        total_uncertainty =
+            raw_uncertainty + schedule_delay_uncertainty + historical_uncertainty,
+        w_raw = raw_uncertainty / total_uncertainty,
+        w_schedule_delay = schedule_delay_uncertainty / total_uncertainty,
+        w_historical = historical_uncertainty / total_uncertainty,
+        BMA_estimate =
+            w_raw * raw_estimate +
+            w_schedule_delay * schedule_delay_estimate +
+            w_historical * historical_estimate
+    )
+
+graph <-
+ggplot(trip_etas, aes(timestamp)) +
+    ## info about scheduled, actual arrival time
+    geom_point(
+        aes(actual_arrival, 0),
+        data = trip_etas %>%
+            select(stop_sequence, actual_arrival) %>%
+            unique()
+    ) +
+    geom_hline(
+        aes(yintercept = 0),
+        colour = "black", lty = 2
+    ) +
+    geom_hline(
+        aes(yintercept = scheduled_arrival - actual_arrival),
+        colour = "black", lty = 3
+    ) +
+    ## 1. raw estimate (particle filter + network)
+    geom_ribbon(
+        aes(
+            ymin = as.integer(get_ci(raw_estimate, raw_uncertainty, "lower",
+                ts = timestamp) - actual_arrival),
+            ymax = as.integer(get_ci(raw_estimate, raw_uncertainty, "upper",
+                ts = timestamp) - actual_arrival)
+        ),
+        fill = "orangered",
+        alpha = 0.3
+    ) +
+    geom_path(
+        aes(y = timestamp + raw_estimate - actual_arrival),
+        colour = "orangered"
+    ) +
+    ## 2. historical delay
+    # geom_ribbon(
+    #     aes(
+    #         ymin = get_ci(historical_estimate, historical_uncertainty, "lower") +
+    #             as.integer(timestamp - actual_arrival),
+    #         ymax = get_ci(historical_estimate, historical_uncertainty, "upper") +
+    #             as.integer(timestamp - actual_arrival)
+    #     ),
+    #     fill = "magenta",
+    #     alpha = 0.3
+    # ) +
+    geom_path(
+        aes(y = timestamp + historical_estimate - actual_arrival),
+        colour = "magenta"
+    ) +
+    ## 3. schedule + delay
+    # geom_ribbon(
+    #     aes(
+    #         ymin = get_ci(schedule_delay_estimate, schedule_delay_uncertainty, "lower") +
+    #             as.integer(timestamp - actual_arrival),
+    #         ymax = get_ci(schedule_delay_estimate, schedule_delay_uncertainty, "upper") +
+    #             as.integer(timestamp - actual_arrival)
+    #     ),
+    #     fill = "forestgreen",
+    #     alpha = 0.3
+    # ) +
+    geom_path(
+        aes(y = timestamp + schedule_delay_estimate - actual_arrival),
+        colour = "forestgreen"
+    ) +
+    ## Averaged estimate
+    # geom_path(
+    #     aes(y = timestamp + BMA_estimate - actual_arrival),
+    #     colour = "black",
+    #     size = 1
+    # ) +
+    facet_wrap(~stop_sequence) + #, scales = "free_y") +
+    theme(legend.position = "none") +
+    scale_y_continuous(
+        breaks = function(x) pretty(x/60) * 60,
+        labels = function(x) x / 60
+    ) +
+    labs(x = "Time", y = "ETA error (min)")
+ggsave(sprintf("~/Dropbox/graphs/graph_%s.jpg", TRIP), graph, width = 18, height = 10)
+}
+
+if (!interactive()) q("no")
+
+## How reliable are the various ETAs over time?
+trip_etas %>%
+    mutate(
+        raw_error = timestamp + raw_estimate - actual_arrival,
+        raw_error2 = raw_error / sqrt(raw_uncertainty),
+        historical_error = timestamp + historical_estimate - actual_arrival,
+        historical_error2 = historical_error / sqrt(historical_uncertainty),
+        schedule_delay_error = timestamp + schedule_delay_estimate - actual_arrival
+    ) %>%
+    ggplot(aes(actual_arrival - timestamp)) +
+        geom_point(aes(y = raw_error), colour = "orangered") +
+        geom_point(aes(y = historical_error), colour = "magenta") +
+        geom_point(aes(y = schedule_delay_error), colour = "forestgreen") +
+        # facet_wrap(~stop_sequence) +
+        scale_y_continuous(
+            breaks = function(x) pretty(x/60) * 60,
+            labels = function(x) x / 60
+        ) +
+        scale_x_continuous(
+            breaks = function(x) pretty(x/60) * 60,
+            labels = function(x) x / 60
+        )
+
+eta_data_bin <- trip_etas %>%
+    mutate(
+        ETA = actual_arrival - timestamp,
+        x = pmin(60, floor(ETA / 60 / 5) * 5),
+        x = factor(x, ordered = TRUE, levels = seq(0, 60, by = 5))
+    )
+
+## take a full half of the data ...
+train_ind <- sample(nrow(eta_data_bin), floor(nrow(eta_data_bin)/2))
+data_train <- eta_data_bin[train_ind,]
+data_test <- eta_data_bin[-train_ind,]
+
+# and with that, check out the reliability of the various models,
+# over time
+trips_train <- data_train %>%
+    select(
+        timestamp, stop_sequence,
+        scheduled_arrival, actual_arrival,
+        raw_estimate, raw_uncertainty,
+        historical_estimate, historical_uncertainty,
+        schedule_delay_estimate, schedule_delay_uncertainty,
+        x
+    ) %>%
+    filter(x == 0) %>%
+    mutate(
+        actual_eta = as.integer(actual_arrival) - as.integer(timestamp),
+        m1 = raw_estimate, m1e = raw_uncertainty,
+        m2 = historical_estimate, m2e = historical_uncertainty,
+        m3 = schedule_delay_estimate, m3e = schedule_delay_uncertainty
+    )
+
+# ggplot(trips_train, aes(x, y = sqrt(gtfs_error))) +
+#     geom_violin() +
+#     # scale_y_continuous(
+#     #     breaks = function(x) pretty(x/60) * 60,
+#     #     labels = function(x) x / 60
+#     # ) +
+#     scale_fill_viridis_c()
+#     # scale_x_continuous(
+#     #     breaks = function(x) pretty(x/60) * 60,
+#     #     labels = function(x) x / 60
+#     # )
+
+# ggplot(trips_train, aes(x, y = as.integer(eta_prediction - actual_arrival)/60)) +
+#     geom_violin()
+
+
+y <- trips_train$actual_eta
+f1 <- as.numeric(trips_train$m1)
+f2 <- as.numeric(trips_train$m2)
+f3 <- as.numeric(trips_train$m3)
+
+ab1 <- coef(lm(y ~ f1, weights = 1/trips_train$m1e))
+ab2 <- coef(lm(y ~ f2, weights = 1/trips_train$m2e))
+ab3 <- coef(lm(y ~ f3, weights = 1/trips_train$m3e))
+ab <- rbind(ab1, ab2, ab3)
+a <- ab[,1]
+b <- ab[,2]
+
+px <- ggplot(trips_train, aes(y = actual_eta)) +
+    geom_point(aes(m1, size = 1/sqrt(m1e)), colour = "orangered") +
+    geom_point(aes(m2, size = 1/sqrt(m2e)), colour = "magenta") +
+    geom_point(aes(m3, size = 1/sqrt(m3e)), colour = "forestgreen") +
+    geom_abline(lty = 3) +
+    geom_abline(aes(intercept = ab1[1], slope = ab1[2]), colour = "orangered") +
+    geom_abline(aes(intercept = ab2[1], slope = ab2[2]), colour = "magenta") +
+    geom_abline(aes(intercept = ab3[1], slope = ab3[2]), colour = "forestgreen")
+
+
+theta <- matrix(NA, nrow = 50, ncol = 4)
+theta[1, ] <- c(0.1, 0.1, 0.8, 100.0) # w1, w2, sigma
+# E step
+for (j in 2:nrow(theta)) {
+    z_partial <- sapply(1:3, function(i) dnorm(y, a[i] + b[i] * f1, theta[j-1,4]) * theta[j-1,i])
+    z <- sweep(z_partial, 1, rowSums(z_partial), "/")
+
+    # M step
+    theta[j,1:3] <- colMeans(z)
+    theta[j, 4] <- sqrt(sum(z[,1] * (y - f1)^2 + z[,2] * (y - f2)^2 + z[,3] * (y - f3)^2) / nrow(z))
+
+    yhat <- theta[j, 4] * (a[1] + b[1] * f1) +
+        theta[j, 4] * (a[2] + b[2] * f2) +
+        theta[j, 4] * (a[3] + b[3] * f3)
+    dev.hold()
+    print(px + geom_point(aes(x = yhat, y = y), data = NULL))
+    dev.flush()
+}
+
+## RAW eta state data
+library(tidyverse)
+ts2dt <- function(ts) as.POSIXct(ts, origin = "1970-01-01")
+
+
+view <- function() {
+    raw <- readr::read_csv(
+            "simulations/sim000/eta_state.csv",
+            col_names = c(
+                "trip_id", "stop_sequence", "timestamp",
+                "X", "P", "Xhat", "Phat", "Z", "E", "Xnew", "Pnew"
+            ),
+            col_types = "ciinnnnnnnn"
+        ) %>% filter(X < 2*60*60) %>%
+        mutate(
+            timestamp = ts2dt(timestamp),
+            stop_sequence = stop_sequence + 1
+        )
+    max(raw$timestamp)
+
+
+    ## pick a trip
+    # tid <- "1141155994-20190806160740_v82.21"
+    # tid <- "1141156213-20190806160740_v82.21"
+    # tid <- "1141156521-20190806160740_v82.21"
+
+    raw %>% arrange(desc(Z)) %>% pull(trip_id) %>% head(100)
+
+    tid <- "8301169919-20190806160740_v82.21"
+    for (tid in unique(raw$trip_id)) {
+        arr_data <- arrivaldata %>% filter(trip_id == tid)
+        trip_data <- raw %>% filter(trip_id == tid) %>%
+            left_join(arr_data %>% select(trip_id, stop_sequence, arrival_time),
+                by = c("trip_id", "stop_sequence")
+            ) %>%
+            filter(is.na(arrival_time) | timestamp <= arrival_time)
+
+        p <- ggplot(trip_data, aes(timestamp)) +
+            geom_hline(aes(x = NULL, y = NULL, yintercept = arrival_time),
+                data = arr_data) +
+            geom_vline(aes(x = NULL, y = NULL, xintercept = arrival_time),
+                data = arr_data) +
+            geom_hline(aes(x = NULL, y = NULL, yintercept = scheduled_arrival),
+                data = arr_data, lty = 3) +
+            geom_pointrange(
+                aes(
+                    x = timestamp,
+                    y = timestamp + Z,
+                    ymin = timestamp + get_ci(Z, E, "lower"),
+                    ymax = timestamp + get_ci(Z, E, "upper")
+                ),
+                colour = "red", size = 0.1
+            ) +
+            geom_linerange(
+                aes(
+                    x = timestamp+5,
+                    ymin = timestamp + get_ci(Xhat, Phat, "lower"),
+                    ymax = timestamp + get_ci(Xhat, Phat, "upper")
+                ),
+                colour = "blue"
+            ) +
+            geom_linerange(
+                aes(
+                    x = timestamp+10,
+                    # y = NULL,#timestamp + Xnew,
+                    ymin = get_ci(Xnew, Pnew, "lower", ts = timestamp),
+                    ymax = get_ci(Xnew, Pnew, "upper", ts = timestamp)
+                )
+            ) +
+            facet_wrap(~stop_sequence, scale = "free_y")
+        plot(p)
+        grid::grid.locator()
+    }
+}
+view()
+
+## Calculate reliablity of PF estimates over time
+delay_data <- raw %>%
+    left_join(arrivaldata,
+        by = c("trip_id", "stop_sequence")
+    ) %>%
+    unique() %>%
+    filter(timestamp <= arrival_time & Z >= 0) %>%
+    mutate(
+        eta_lower = get_ci(Xnew, Pnew, "lower"),
+        eta_upper = get_ci(Xnew, Pnew, "upper")
+    )
+
+delay_data %>%
+    mutate(
+        width = eta_upper - eta_lower,
+        actual_eta = as.integer(arrival_time - timestamp)
+    ) %>%
+    ggplot(aes(actual_eta/60, width/60)) +
+        geom_hex()
+
+    # filter(between(Z, 0, 2*60*60)) %>%
+    # mutate(
+    #     particle_eta = timestamp + Z,
+    #     particle_error = as.integer(particle_eta - arrival_time),
+    #     actual_eta = as.integer(arrival_time - timestamp),
+    #     bin = factor(floor(actual_eta / 60), ordered = TRUE)
+    # ) %>%
+    # filter(E < 2*actual_eta)
+
+ggplot(delay_data, aes(actual_eta/60, particle_error/60)) +
+    geom_hex()
+
+delay_data %>%
+    group_by(bin) %>%
+    summarize(RMSE = sqrt(sum(particle_error^2))) %>%
+    # filter(bin < 11) %>%
+    ggplot(aes(as.integer(bin), sqrt(RMSE))) +
+        geom_point()
+        # geom_abline(slope = 20, intercept = 30)
+
+
+
+
+
+    # p <- ggplot(routedata, aes(time_until_arrival/60,
+    #     as.integer(arrival_time - actual_arrival)/60)) +
+    #     geom_point(aes(colour = trip_id)) +
+    #     geom_point(aes(y = as.integer(gtfs_eta - actual_arrival)/60),
+    #         colour = "red", size = 1) +
+    #     facet_wrap(~stop_sequence)
+    #     # geom_abline(colour = "orangered")
+    # print(p)
+    # grid::grid.locator()
+
+    # p <- ggplot(routedata, aes(timestamp,
+    #     as.integer(arrival_time-timestamp)/60)) +
+    #     geom_point(aes(colour = as.factor(stop_sequence))) +
+    #     geom_point(aes(y = as.integer(gtfs_eta - timestamp)/60), colour = "red", size = 0.5)+
+    #     facet_wrap(~stop_sequence)
+    # print(p)
+    grid::grid.locator()
+}
+
+bad_trip <- eta_data %>%
+    filter(trip_id=="51357146239-20190806160740_v82.21") %>%
+    # filter(trip_id=="51446171528-20190806160740_v82.21") %>%
+    arrange(timestamp, stop_sequence)
+
+## segment ids for this route
+## funs from view_network.R
+segs <- get_segment_data(route_ids = bad_trip$route_id[1])
+dat <- get_segments("simulations/sim000/segment_states.csv") %>%
+    filter(segment_id %in% segs$road_segment_id) %>%
+    left_join(segs, by = c("segment_id" = "road_segment_id"))
+
+ggplot(dat, aes(timestamp, travel_time)) +
+    geom_pointrange(aes(
+        ymin = travel_time - sqrt(uncertainty),
+        ymax = travel_time + sqrt(uncertainty)
+    )) +
+    facet_wrap(~segment_id, scales = "free_y")
+
+ggplot(bad_trip, aes(timestamp, arrival_time)) +
+    geom_point()+
+    facet_wrap(~stop_sequence)
+
+
+
+
+
+############# NEWEST
+library(tidyverse)
+library(patchwork)
+ts2dt <- function(ts) as.POSIXct(ts, origin = "1970-01-01")
+load("simulations/raw_arrivaldata.rda")
+rawarrival <- arrivaldata
+load("simulations/arrivaldata_etas.rda")
+
+etas <- read_csv("simulations/sim_100/eta_state.csv",
+    col_names = c("trip_id", "vehicle_id", "stop_sequence", "timestamp",
+        "vehicle_distance", "stop_distance",
+        "pf_mean", "pf_var", "pf_lower", "pf_upper",
+        "normal_mean", "normal_var", "normal_lower", "normal_upper",
+        "X", "P"),
+    col_types = "cciinnnnnnnnnnnn"
+)
+
+eta_data <- etas %>%
+    left_join(arrivaldata %>% rename(actual_arrival = arrival_time) %>%
+        select(trip_id, stop_sequence, scheduled_arrival, actual_arrival, delay),
+    by = c("trip_id", "stop_sequence")
+    ) %>%
+    mutate(
+        scheduled_arrival = as.integer(scheduled_arrival),
+        actual_arrival = as.integer(actual_arrival),
+        time_until_arrival = actual_arrival - timestamp
+    ) %>%
+    group_by(trip_id, vehicle_id) %>%
+    group_modify(~ {
+        # .y <- tibble(trip_id = unique(etas$trip_id)[2])
+        # .x <- eta_data %>% filter(trip_id == .y$trip_id)
+
+        d <- rawarrival %>%
+            filter(
+                trip_id == .y$trip_id &
+                vehicle_id == .y$vehicle_id &
+                !is.na(delay)
+            )
+        dat <- tibble(timestamp = unique(.x$timestamp)) %>%
+            mutate(
+                current_delay = sapply(
+                    timestamp,
+                    function(t) {
+                        suppressWarnings(a <- d$delay[max(which(d$arrival_time <= t))])
+                        ifelse(is.na(a), 0, a)
+                    }
+                )
+            )
+
+        .x %>%
+            left_join(dat, by = "timestamp") %>%
+            mutate(
+                scheduled_arrival = as.integer(scheduled_arrival),
+                timestamp = as.integer(timestamp)
+            ) %>%
+            arrange(stop_sequence) %>%
+            mutate(
+                gtfs_arrival_time = scheduled_arrival + current_delay,
+                gtfs_eta = scheduled_arrival + current_delay - timestamp
+            )
+    }) %>%
+    filter(time_until_arrival >= 0) %>%
+    mutate(timestamp = ts2dt(timestamp))
+
+## By route:
+library(RSQLite)
+library(dbplyr)
+con <- dbConnect(SQLite(), "at_gtfs.db")
+con %>% tbl("trips") %>%
+    left_join(con %>% tbl("routes")) %>%
+    filter(trip_id %in% !!unique(etas$trip_id)) %>%
+    select(trip_id, route_id, route_short_name) %>%
+    collect() -> trip_routes
+dbDisconnect(con)
+
+eta_data <- eta_data %>% left_join(trip_routes) %>% ungroup()
+errr <- eta_data %>%
+    # filter(route_short_name %in% rkeep) %>%
+    # filter(route_short_name %in% c("125X")) %>%
+    # filter(vehicle_id == "6225") %>%
+    pluck("trip_id") %>% unique
+
+t <- etas$trip_id[1]
+t <- "51357146318-20190806160740_v82.21"
+t <- "8301165813-20190806160740_v82.21"
+for (t in sample(errr)) {
+    dt <- eta_data %>% filter(trip_id == t) %>%
+        mutate(t = as.integer(timestamp))
+    if (nrow(dt) == 0) next
+    p <- ggplot(dt, aes(timestamp)) +
+        facet_wrap(~stop_sequence, scale = "free_y", ncol = 1) +
+        # geom_path(aes(y = -time_until_arrival)) +
+        geom_hline(aes(yintercept = scheduled_arrival),
+            data = dt %>% ungroup() %>%
+                select(stop_sequence, scheduled_arrival) %>% distinct(),
+            lty = 3
+        ) +
+        geom_ribbon(
+            aes(
+                ymin = pf_lower + t,
+                ymax = pf_upper + t
+            ),
+            fill = "orangered", alpha = 0.5) +
+        geom_ribbon(
+            aes(
+                ymin = t + qnorm(0.025, X, sqrt(P + X)),
+                ymax = t + qnorm(0.975, X, sqrt(P + X))
+            ),
+            fill = "gold", alpha = 0.5) +
+        # geom_ribbon(
+        #     aes(
+        #         ymin = normal_lower - time_until_arrival,
+        #         ymax = normal_upper - time_until_arrival
+        #     ),
+        #     fill = "blue", alpha = 0.5) +
+        geom_hline(aes(yintercept = as.integer(arrival_time)),
+            data = rawarrival %>% filter(trip_id == t)
+        ) +
+        geom_path(aes(y = pf_mean + t),
+            colour = "orangered") +
+        geom_path(aes(y = normal_mean + t),
+            colour = "blue") +
+        geom_path(aes(y = gtfs_eta + t),
+            colour = "magenta") +
+        geom_point(aes(x = arrival_time, y = as.integer(arrival_time)),
+            rawarrival %>% filter(trip_id == t)
+        ) +
+        theme(legend.position = "none") +
+        scale_y_continuous(
+            labels = function(x) as.POSIXct(x, origin="1970-01-01") %>% format("%H:%M")
+        )
+    # dtd <- rawarrival %>% filter(trip_id == t) %>% mutate(stop_sequence = stop_sequence - 1) %>%
+    #     left_join(dt %>% ungroup() %>% select(stop_sequence, stop_distance), by = "stop_sequence")
+    p2 <- ggplot(dt, aes(timestamp)) +
+        geom_point(aes(y = vehicle_distance)) +
+        geom_point(aes(y = stop_distance), size = 1, colour = "red") +
+        geom_point(aes(x = arrival_time, y = stop_distance),
+            data = rawarrival %>% filter(trip_id == t) %>% select(stop_sequence, arrival_time) %>% unique %>%
+                left_join(dt %>% ungroup %>% select(stop_sequence, stop_distance) %>% unique),
+            colour = "blue"
+        ) +
+        geom_hline(aes(yintercept = stop_distance),
+            data = dt %>% ungroup %>% select(stop_sequence, stop_distance) %>% unique,
+            colour = "gray", lty = 2
+        ) +
+        scale_y_continuous(
+            sec.axis = sec_axis(~., name = "Distance (m)"),
+            name = "stop index",
+            breaks = dt$stop_distance %>% unique,
+            labels = dt$stop_sequence %>% unique
+        )
+    #print(p + p2 + plot_layout(width = c(1, 1)))
+
+    p3 <- ggplot(dt, aes(y = timestamp)) +
+        facet_wrap(~stop_sequence, scales = "free_x") +
+        geom_abline(colour = "white") +
+        geom_vline(aes(xintercept = arrival_time),
+            data = rawarrival %>% filter(trip_id == t) %>%
+                select(stop_sequence, arrival_time) %>% unique
+        ) +
+        geom_vline(aes(xintercept = scheduled_arrival),
+            data = dt %>% ungroup() %>% select(stop_sequence, scheduled_arrival) %>% unique,
+            colour = "gray", lty = 2
+        ) +
+        # geom_point(aes(y = vehicle_distance)) +
+        # geom_hline(aes(yintercept = stop_distance),
+        #     data = dt %>% ungroup %>% select(stop_sequence, stop_distance) %>% unique,
+        #     colour = "gray", lty = 2
+        # ) +
+        geom_segment(aes(
+            timestamp + pf_lower,
+            timestamp,
+            xend = timestamp + pf_upper,
+            yend = timestamp
+        )) +
+        # geom_segment(aes(
+        #     timestamp + normal_lower,
+        #     timestamp,
+        #     xend = timestamp + normal_upper,
+        #     yend = timestamp
+        # ), colour = "green4") +
+        geom_point(aes(x = timestamp + gtfs_eta), colour = "magenta") +
+        geom_point(aes(x = timestamp + X), colour = "blue") +
+        geom_point(aes(x = timestamp + normal_mean), colour = "green4") +
+        geom_point(aes(x = timestamp + pf_mean, timestamp))
+
+    print(p3 + p2 + plot_layout(width = c(1, 1)))
+
+    #ggsave(glue::glue("~/Dropbox/graphs/trip_{t}.jpg"), width = 16, height = 10, units = "in")
+    grid::grid.locator()
+}
+
+## calculate RMSE etc
+eta_results <- eta_data %>%
+    mutate(
+        pf_lower_min = as.POSIXct(format(timestamp + pf_lower, "%Y-%m-%d %H:%M:00")) - timestamp,
+        pf_upper_min = as.POSIXct(format(timestamp + pf_upper + 60, "%Y-%m-%d %H:%M:00")) - timestamp,
+        pf_error = pf_mean - time_until_arrival,
+        pf_ci = ifelse(pf_lower <= time_until_arrival & time_until_arrival <= pf_upper, 1, 0),
+        pf_ci_min = ifelse(
+            pf_lower_min <= time_until_arrival & time_until_arrival <= pf_upper_min,
+            1, 0
+        ),
+        normal_error = normal_mean - time_until_arrival,
+        normal_ci = ifelse(normal_lower <= time_until_arrival & time_until_arrival <= normal_upper, 1, 0),
+        gtfs_error = gtfs_eta - time_until_arrival
+    ) %>%
+    filter(gtfs_error > -60*60 & gtfs_error < 2*60*60)
+tOK <- eta_results %>% ungroup() %>% group_by(trip_id) %>%
+    summarize(ok = all(abs(pf_error) < 45*60)) %>%
+    # summarize(ok = any(current_delay != 0)) %>%
+    filter(ok)
+
+con <- dbConnect(SQLite(), "at_gtfs.db")
+hist_delays <- con %>% tbl("stop_delays") %>%
+    filter(trip_id %in% !!unique(gsub("-.*", "", eta_results$trip_id))) %>%
+    select(trip_id, stop_sequence, avg, sd) %>%
+    collect()
+dbDisconnect(con)
+
+eta_results <- eta_results %>%
+    mutate(tid = gsub("-.*", "", trip_id)) %>%
+    left_join(
+        hist_delays,
+        by = c("tid" = "trip_id", "stop_sequence")
+    ) %>%
+    mutate(
+        historical_mean = scheduled_arrival + avg - as.integer(timestamp),
+        historical_var = sd^2,
+        historical_lower = qnorm(0.05, historical_mean, sd),
+        historical_upper = qnorm(0.9, historical_mean, sd)
+    )
+
+eta_res_route <- eta_results %>%
+    filter(time_until_arrival > 0) %>%
+    # group_by(route_short_name) %>%
+    summarize(
+        pf_rmse = sqrt(mean(pf_error^2)),
+        normal_rmse = sqrt(mean(normal_error^2)),
+        historical_rmse =
+            sqrt(mean((historical_mean - time_until_arrival)^2, na.rm = TRUE)),
+        gtfs_rmse = sqrt(mean(gtfs_error^2)),
+        n = length(unique(trip_id))
+    ) %>%
+    mutate(pf_rmse_comp = pf_rmse / gtfs_rmse)
+
+rkeep <- eta_res_route %>% filter(n > 10 & pf_rmse_comp < 1.5) %>% pull(route_short_name)
+
+
+for (i in 0:5) {
+    etai <- eta_results[(i*1000000L+1L):min(nrow(eta_results),((i+1L)*1000000L)),]
+    save(etai, file = glue::glue("../phd-thesis/chapters/chapter05/data/eta_results{i}.rda"))
+}
+
+ggplot(eta_results %>% filter(trip_id %in% tOK$trip_id)) +
+    geom_point(aes(pf_error/60, gtfs_error/60, colour=time_until_arrival/60))+
+    scale_colour_viridis_c()
+
+## what is the actual error?
+ers <- eta_results %>% filter(trip_id %in% tOK$trip_id)
+
+pbase <- ggplot(ers %>% filter(stop_sequence < 11) %>% arrange(timestamp),
+    aes(time_until_arrival, colour = trip_id))
+pf_err <- pbase +
+        geom_path(aes(y = pf_error, group = trip_id)) +
+        geom_smooth(aes(y = pf_error, colour = NULL))
+normal_err <- pbase +
+        geom_point(aes(y = normal_error)) +
+        geom_smooth(aes(y = normal_error, colour = NULL))
+gtfs_err <- pbase +
+        geom_point(aes(y = gtfs_error)) +
+        geom_smooth(aes(y = gtfs_error, colour = NULL))
+
+pf_err / normal_err / gtfs_err &
+    geom_abline(slope = -1, intercept = 0) &
+    facet_grid(~stop_sequence) &
+    theme(legend.position = "none") &
+    scale_y_continuous(
+        name = "Error (min)",
+        breaks = function(x) pretty(x / 60) * 60,
+        labels = function(x) x / 60,
+        limits = c(-60, 60) * 60
+    ) &
+    scale_x_continuous(
+        name = "Time until arrival (min)",
+        breaks = function(x) pretty(x / 60) * 60,
+        labels = function(x) x / 60
+    )
+
+# ers %>%
+#     mutate(
+#         pf_avg_speed = (stop_distance - vehicle_distance) / pf_mean,
+#         normal_avg_speed = (stop_distance - vehicle_distance) / normal_mean
+#     ) %>%
+#     filter(stop_distance >= vehicle_distance) %>%
+#     ggplot(aes(time_until_arrival)) +
+#         geom_point(aes(y = pf_avg_speed)) +
+#         geom_hline(yintercept = 110 / 3.6)
+
+# overall
+eta_results %>%
+    filter(trip_id %in% tOK$trip_id) %>%
+    # filter(route_short_name %in% rkeep) %>%
+    ungroup %>%
+    summarize(
+        pf_rmse = sqrt(mean(pf_error^2)),
+        pf_ci_cov = mean(pf_ci),
+        normal_rmse = sqrt(mean(normal_error^2)),
+        normal_ci_cov = mean(normal_ci),
+        gtfs_rmse = sqrt(mean(gtfs_error^2))
+    ) %>%
+    with(
+        tibble(
+            model = c("pf", "normal", "gtfs"),
+            rmse = c(pf_rmse, normal_rmse, gtfs_rmse),
+            ci_cov = c(pf_ci_cov, normal_ci_cov, NA)
+        )
+    ) %>%
+    ggplot(aes(rmse, model)) +
+        geom_segment(
+            aes(
+                xend = 0,
+                yend = model
+            )
+        ) +
+        geom_point()
+
+# by minutes-until-arrival
+res_min <- eta_results %>%
+    filter(route_short_name %in% rkeep) %>%
+    ungroup() %>%
+    mutate(
+        min = time_until_arrival %/% 60
+    ) %>%
+    group_by(min) %>%
+    summarize(
+        pf_rmse = sqrt(mean(pf_error^2)),
+        pf_ci_cov = mean(pf_ci),
+        pf_ci_cov_min = mean(pf_ci_min),
+        normal_rmse = sqrt(mean(normal_error^2)),
+        normal_ci_cov = mean(normal_ci),
+        gtfs_rmse = sqrt(mean(gtfs_error^2))
+    )
+
+#pr <-
+
+ggplot(res_min %>% filter(min <= 90), aes(min)) +
+    geom_path(aes(y = pf_rmse, colour = "particle filter")) +
+    geom_path(aes(y = normal_rmse, colour = "normal")) +
+    geom_path(aes(y = gtfs_rmse, colour = "gtfs")) +
+    scale_colour_manual(
+        name = "model",
+        values = c(
+            "particle filter" = "orangered",
+            "normal" = "blue",
+            "gtfs" = "magenta"
+        )
+    ) +
+    scale_y_continuous(
+        limits = c(0, 1100)
+    )
+
+# by time of day
+eta_results %>%
+    ungroup() %>%
+    mutate(
+        hour = timestamp %>% format("%H") %>% as.integer,
+        minute = timestamp %>% format("%M") %>% as.integer,
+        hour = hour + (floor(minute / 10) * 10 / 60)
+    ) %>%
+    group_by(hour) %>%
+    summarize(
+        pf_rmse = sqrt(mean(pf_error^2)),
+        pf_ci_cov = mean(pf_ci),
+        pf_ci_cov_min = mean(pf_ci_min),
+        normal_rmse = sqrt(mean(normal_error^2)),
+        normal_ci_cov = mean(normal_ci),
+        gtfs_rmse = sqrt(mean(gtfs_error^2))
+    ) %>%
+    ggplot(aes(hour)) +
+    geom_path(aes(y = pf_rmse, colour = "particle filter")) +
+    geom_path(aes(y = normal_rmse, colour = "normal")) +
+    geom_path(aes(y = gtfs_rmse, colour = "gtfs")) +
+    scale_colour_manual(
+        name = "model",
+        values = c(
+            "particle filter" = "orangered",
+            "normal" = "blue",
+            "gtfs" = "magenta"
+        )
+    )
+
+# by distance away
+eta_results %>%
+    ungroup() %>%
+    mutate(
+        dist_to_go = floor((stop_distance - vehicle_distance) / 1000) * 1000
+    ) %>%
+    group_by(dist_to_go) %>%
+    summarize(
+        pf_rmse = sqrt(mean(pf_error^2)),
+        pf_ci_cov = mean(pf_ci),
+        pf_ci_cov_min = mean(pf_ci_min),
+        normal_rmse = sqrt(mean(normal_error^2)),
+        normal_ci_cov = mean(normal_ci),
+        gtfs_rmse = sqrt(mean(gtfs_error^2))
+    ) %>%
+    ggplot(aes(dist_to_go)) +
+    geom_path(aes(y = pf_rmse, colour = "particle filter")) +
+    geom_path(aes(y = normal_rmse, colour = "normal")) +
+    geom_path(aes(y = gtfs_rmse, colour = "gtfs")) +
+    scale_colour_manual(
+        name = "model",
+        values = c(
+            "particle filter" = "orangered",
+            "normal" = "blue",
+            "gtfs" = "magenta"
+        )
+    )
+
+
+# ggsave("~/Dropbox/rmse.jpg", pr, width = 10, height = 5, units = "in")
+
+# pci <-
+
+ggplot(res_min, aes(min)) +
+    geom_path(aes(y = pf_ci_cov), colour = "orangered") +
+    geom_path(aes(y = pf_ci_cov_min), colour = "orangered", lty = 2) +
+    geom_path(aes(y = normal_ci_cov), colour = "blue") +
+    geom_hline(yintercept = 0.85, lty = 3) +
+    scale_y_continuous(
+        breaks = seq(0, 1, by = 0.2),
+        labels = function(x) glue::glue("{100*x}%"),
+        limits = c(0, 1)
+    ) +
+    xlim(0, 60)
+
+# ggsave("~/Dropbox/ci.jpg", pci, width = 10, height = 5, units = "in")
+
+# ## Error versus error
+# eta_results %>%
+#     mutate(arrival_error = (scheduled_arrival - actual_arrival)) %>%
+#     filter(abs(arrival_error) < 20*60) %>%
+#     ggplot(aes(arrival_error)) +
+#     geom_point(aes(y = (pf_error)), colour = "orangered") +
+#     geom_point(aes(y = (normal_error)), colour = "blue") +
+#     geom_point(aes(y = (gtfs_error)), colour = "magenta") +
+#     scale_x_continuous(
+#         name = "Arrival delay (mins)",
+#         breaks = function(x) pretty(x / 60) * 60,
+#         labels = function(x) x / 60
+#     )
+
+## Uncertainty by ...
+
+# distance
+eta_results %>%
+    mutate(distance_to_go = stop_distance - vehicle_distance) %>%
+    ungroup %>%
+    filter(distance_to_go > 0 & abs(pf_error / 60) < 30) %>%
+    ggplot(aes(distance_to_go, pf_error/60)) +
+        geom_hex() +
+        geom_smooth()
+
+# time
+eta_results %>%
+    ungroup() %>%
+    filter(abs(pf_error / 60) < 30) %>%
+    ggplot(aes(as.integer(timestamp), pf_error / 60)) +
+        geom_hex() +
+        geom_smooth()
+
+eta_res_route %>%
+    filter(n > 10) %>%
+    ggplot(aes(pf_rmse_comp)) +
+        geom_histogram(
+            aes(fill = pf_rmse_comp < 1),
+            boundary = 1,
+            bins = 20
+        ) +
+        geom_vline(xintercept = 1) +
+        ggtitle(glue::glue("{round(mean(eta_res_route$pf_rmse_comp < 1)*100)}% of routes are better"))
+
+        # facet_grid(route_short_name~.)
+
+# pB <- eta_res_route %>%
+#     ggplot(aes(n, as.integer(n > 0))) +
+#         geom_segment(aes(xend = 0, yend = 1)) +
+#         geom_point() +
+#         facet_grid(route_short_name~.) +
+#         theme(
+#             axis.text.y = element_blank(),
+#             axis.ticks.y = element_blank(),
+#             axis.title.y = element_blank()
+#         )
+
+# pA + pB + plot_layout(width = c(4, 1))
+
+
+
+## P(miss bus | arrive 1~min before arrival/at lower bound)
+eta_results %>%
+    # filter(time_until_arrival > 180) %>%
+    mutate(
+        pf_miss = as.integer(time_until_arrival < pf_lower),
+        gtfs_miss = as.integer(time_until_arrival < gtfs_eta - 8*60),
+        pf_wait = ifelse(pf_miss, NA, time_until_arrival - pf_lower),
+        gtfs_wait = ifelse(gtfs_miss, NA, time_until_arrival - gtfs_eta + 8*60)
+    ) %>%
+    summarize(
+        pf_pr_miss = mean(pf_miss),
+        gtfs_pr_miss = mean(gtfs_miss),
+        pf_e_wait = mean(pf_wait, na.rm = TRUE) / 60,
+        gtfs_e_wait = mean(gtfs_wait, na.rm = TRUE) / 60
+    )
+
+
+# Interval width
+eta_results %>%
+    mutate(
+        pf_width = pf_upper - pf_lower,
+        in_ci = case_when(
+            pf_lower > time_until_arrival ~ "early",
+            pf_upper < time_until_arrival ~ "late",
+            TRUE ~ "on_time"
+        )
+    ) %>%
+    ggplot(aes(time_until_arrival/60, pf_width/60)) +
+        geom_hex() +
+        scale_y_continuous(limits=c(0,60)) +
+        geom_abline()

@@ -116,9 +116,8 @@ context ("Road network") {
         for (auto it = gtfs.segments ().begin (); it != gtfs.segments ().end (); ++it)
         {
             it->second.update (&par, &gtfs);
-            expect_true (it->second.travel_time () == it->second.length () / 10.0);
+            expect_true (it->second.speed () > 0);
+            expect_true (it->second.travel_time () == round (it->second.length () / it->second.speed ()));
         }
     }
 }
-
-

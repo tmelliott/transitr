@@ -16,7 +16,7 @@ create_gtfs <- function(source, db = tempfile(), quiet = FALSE, output = "predic
         stop("Please install the `RSQLite` package first,\n",
              "  or connect to a database manually and use `load_gtfs` instead.")
     }
-    
+
     create_tables(db)
     nw <- load_gtfs(db, output)
     if (!missing(source)) {
@@ -53,21 +53,21 @@ check_tables <- function(db) {
 ##' @author Tom Elliott
 ##' @export
 load_gtfs <- function(db, output = "predictions.pb") {
-    if (!check_tables(db)) {
-        stop("Oops, some of the tables aren't right...\n")
+    if (!(bad <- check_tables(db))) {
+        stop("Oops, some of the tables aren't right...\n", attr(bad, "which"))
     }
 
     structure(
         list(
-            database = db, 
-            apis = apis(), 
+            database = db,
+            apis = apis(),
             output = output,
             parameters = list(
                 # computation parameters
-                n_core = 1L, 
-                n_particles = 1000L, 
+                n_core = 1L,
+                n_particles = 1000L,
                 # vehicle parameters
-                # -- transition 
+                # -- transition
                 noise_model = 0L,
                 system_noise = 1.0,
                 pr_stop = 0.5,
@@ -81,6 +81,8 @@ load_gtfs <- function(db, output = "predictions.pb") {
                 # network parameters
                 nw_system_noise = 0.001,
                 nw_measurement_error = 50,
+                # eta parameters
+                eta_model = 0L,
                 # other ...
                 save_timings = FALSE,
                 reset_method = 1L

@@ -28,19 +28,19 @@ construct_network <- function(nw, node_threshold = 0.01) {
         #     # )
         #     rad <- function(x) x*pi/180
         #     dists <- sqrt(
-        #         ((rad(NodeMatrix[,1]) - rad(stops$stop_lon[i])) * 
+        #         ((rad(NodeMatrix[,1]) - rad(stops$stop_lon[i])) *
         #             cos(rad(stops$stop_lat[i])))^2 +
         #         (rad(NodeMatrix[,2]) - rad(stops$stop_lat[i]))^2
         #     ) * 6378137
         #     if (min(dists) < node_threshold)
         #         node_id <- nodes$node_id[which.min(dists)]
         # }
-        
+
         stop_code <- stops$stop_code[i]
         matching_nodes <- stops$node_id[stops$stop_code == stop_code]
         if (length(matching_nodes))
             node_id <- matching_nodes[1]
-        
+
         # if one doesn't exist, create it
         if (is.na(node_id)) {
             node_id <- max(nodes$node_id + 1L, 1L, na.rm = TRUE)
@@ -54,7 +54,7 @@ construct_network <- function(nw, node_threshold = 0.01) {
                 )
             )
         }
-        
+
         # then add node ID to stop
         stops$node_id[i] <- node_id
     }
@@ -94,7 +94,7 @@ construct_network <- function(nw, node_threshold = 0.01) {
         # distGeo now adds an NA
         rad <- function(x) x*pi/180
         shape$shape_dist_traveled <- cumsum(c(0, sqrt(
-            ((rad(ShapeMat[-nrow(ShapeMat), 1]) - rad(ShapeMat[-1, 1])) * 
+            ((rad(ShapeMat[-nrow(ShapeMat), 1]) - rad(ShapeMat[-1, 1])) *
                 cos(rad(ShapeMat[-1, 2])))^2 +
             (rad(ShapeMat[-nrow(ShapeMat), 2]) - rad(ShapeMat[-1, 2]))^2
         ) * 6371000))
@@ -102,11 +102,11 @@ construct_network <- function(nw, node_threshold = 0.01) {
         ## New approach:
         # - use all nodes that are STOPS, and
         # - find all nodes that are INTERSECTIONS within ~5m of shape
-        
+
         # There's an issue with CIRCULAR routes,
         # so need to actually fetch the stops and THEN the nodes ...
-        
-        qry <- RSQLite::dbSendQuery(con, 
+
+        qry <- RSQLite::dbSendQuery(con,
             paste(sep = "\n",
                 "SELECT node_id FROM stop_times",
                 "INNER JOIN stops ON stops.stop_id = stop_times.stop_id ",
@@ -155,7 +155,7 @@ construct_network <- function(nw, node_threshold = 0.01) {
 
         # with(ShapeNodes, points(node_lon, node_lat, cex = 0.5, pch = 21, bg="white"))
         # with(ShapeNodes, text(node_lon, node_lat, seq, col = "blue"))
-        
+
         shape_nodes <- data.frame(
             shape_id = shape_id,
             node_id = ShapeNodes$node_id,
@@ -164,11 +164,11 @@ construct_network <- function(nw, node_threshold = 0.01) {
         )
         if (max(shape_nodes$distance_traveled) != max(shape$shape_dist_traveled)) {
             if (abs(max(shape_nodes$distance_traveled) - max(shape$shape_dist_traveled)) < 50)
-                shape_nodes$distance_traveled[nrow(shape_nodes)] <- 
+                shape_nodes$distance_traveled[nrow(shape_nodes)] <-
                     max(shape$shape_dist_traveled)
             else {
                 print("ERROR ERROR ERROR")
-                print(tail(shape))
+                print(utils::tail(shape))
                 print(shape_nodes)
                 next
             }
@@ -176,7 +176,7 @@ construct_network <- function(nw, node_threshold = 0.01) {
 
         # - insert into shape_nodes
         RSQLite::dbWriteTable(con, "shape_nodes", shape_nodes, append = TRUE)
-        
+
         # - find segments between found nodes
         shape_segs <- data.frame(
             road_segment_id = NA,
@@ -188,21 +188,21 @@ construct_network <- function(nw, node_threshold = 0.01) {
             "SELECT road_segment_id FROM road_segments WHERE node_from=? AND node_to=?"
         )
         for (i in seq_along(1:nrow(shape_segs))) {
-            RSQLite::dbBind(qry, 
+            RSQLite::dbBind(qry,
                 list(shape_segs$node_from[i], shape_segs$node_to[i])
             )
             seg <- RSQLite::dbFetch(qry)$road_segment_id
-            if (length(seg)) shape_segs$road_segment_id[i] <- seg            
+            if (length(seg)) shape_segs$road_segment_id[i] <- seg
         }
         RSQLite::dbClearResult(qry)
 
         # insert new segments
         shape_segs <- shape_segs[is.na(shape_segs$road_segment_id), ]
-        next_seg_id <- RSQLite::dbGetQuery(con, 
+        next_seg_id <- RSQLite::dbGetQuery(con,
             "SELECT MAX(road_segment_id)as ID FROM road_segments"
         )$ID + 1
         if (is.na(next_seg_id)) next_seg_id <- 1
-        shape_segs$road_segment_id <- 
+        shape_segs$road_segment_id <-
             seq(next_seg_id, by = 1, length.out = nrow(shape_segs))
         RSQLite::dbWriteTable(con, "road_segments", shape_segs, append = TRUE)
     }

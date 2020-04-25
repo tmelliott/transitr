@@ -10,10 +10,10 @@ Timer::Timer ()
 void Timer::reset ()
 {
     clock = std::clock ();
-    wall = std::chrono::high_resolution_clock::now ();   
-    
+    wall = std::chrono::high_resolution_clock::now ();
+
     clock2 = std::clock ();
-    wall2 = std::chrono::high_resolution_clock::now ();   
+    wall2 = std::chrono::high_resolution_clock::now ();
 }
 
 void Timer::report ()
@@ -43,7 +43,7 @@ void Timer::report ()
     }
 
     clock2 = std::clock ();
-    wall2 = std::chrono::high_resolution_clock::now (); 
+    wall2 = std::chrono::high_resolution_clock::now ();
 }
 
 void Timer::report (const char* str)

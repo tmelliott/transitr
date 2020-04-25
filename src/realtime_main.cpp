@@ -44,7 +44,7 @@ void run_realtime_model (List nw)
     String outputname_raw = nw["output"];
     std::string dbname (dbname_raw);
     std::string outputname (outputname_raw);
-    
+
     // Construct the realtime feed object
     List apis = nw["apis"];
     List rt = apis["realtime"];
@@ -52,7 +52,7 @@ void run_realtime_model (List nw)
     int Nurl = url_raw.size ();
     std::vector<std::string> urls;
     for (int i=0; i<Nurl; i++)
-    {   
+    {
         String url (url_raw[i]);
         urls.push_back (url);
     }
@@ -79,7 +79,7 @@ void run_realtime_model (List nw)
     signal (SIGTERM, intHandler);
     Timer timer;
     if (params.save_timings) {
-        timer.save_to ("timings.csv", "iteration,timestamp,nvehicles");
+        timer.save_to ("timings.csv", "iteration,timestamp,nvehicles,ntripupdates");
     }
 
     // Initialize an RNG
@@ -104,12 +104,12 @@ void run_realtime_model (List nw)
         Rcout << "\n --- Commence iteration ---\n";
 
         timer.reset ();
-        
+
         // call the feed once and check the result is reasonable
         int ures = rtfeed.update ();
         // 5 => "simulations completed"
         if (ures == 5) break;
-        
+
         if (ures != 0 && tries < 10)
         {
             Rcout << "\n x Unable to fetch URL. Trying again ...\n";
@@ -118,19 +118,20 @@ void run_realtime_model (List nw)
             continue;
         }
         tries = 0;
-        Rcout << "\n + loaded " 
+        Rcout << "\n + loaded "
             << rtfeed.n_vehicles () << " vehicle positions and "
             << rtfeed.n_trip_updates () << " trip updates\n";
 
         {
             std::ostringstream tinfo;
             tinfo << iteration << ",";
-            if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ()) 
+            if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ())
             {
                 tinfo << rtfeed.feed()->header ().timestamp ();
             }
-            tinfo << "," << rtfeed.feed ()->entity_size ();
-            
+            // tinfo << "," << rtfeed.feed ()->entity_size ();
+            tinfo << "," << rtfeed.n_vehicles () << "," << rtfeed.n_trip_updates ();
+
             timer.set_info (tinfo.str ());
         }
         timer.report ("loading vehicle positions");
@@ -144,7 +145,7 @@ void run_realtime_model (List nw)
         Rcout << vehicles.size () << " vehicles\n";
 #endif
         // for (auto v = vehicles.begin (); v != vehicles.end (); ++v)
-        // {       
+        // {
         //     Rcout << "+ vehicle " << v->second.vehicle_id () << "\n";
         //         // << "  - trip id: " << v->second.trip ()->trip_id () << "\n";
 
@@ -173,10 +174,11 @@ void run_realtime_model (List nw)
 #endif
 #if SIMULATION
         std::vector<std::string> routes_to_keep ({
-            "24B", "931", "NX1", "NX2", "866", "802", "82", "83", "25B", 
-            "27H", "030", "047", "003", "SKY", "321", "221X", "243X", "223X", 
-            "248X", "22A", "70", "028", "101", "966", "22N", "22R", "24R", 
-            "24W", "25L", "27T", "27W", "75", "INN", "OUT", "923", "924"
+            // "NX1" "NX1", "NX2","INN", "OUT",
+            "24B", "931", "866", "802", "82", "83", "25B",
+            "27H", "030", "047", "003", "SKY", "321", "221X", "243X", "223X",
+            "248X", "22A", "70", "028", "101", "966", "22N", "22R", "24R",
+            "24W", "25L", "27T", "27W", "75",  "923", "924"
         });
 #endif
         #pragma omp parallel for num_threads(params.n_core)
@@ -185,7 +187,7 @@ void run_realtime_model (List nw)
             for (auto v = vehicles.begin (i); v != vehicles.end (i); ++v)
             {
 #if SIMULATION
-                if (v->second.trip () != nullptr)
+                if (v->second.has_trip ())
                 {
                     auto rsn = v->second.trip ()->route ()->route_short_name ();
                     bool skip = true;
@@ -193,10 +195,26 @@ void run_realtime_model (List nw)
                     {
                         if (rsn == *rtk) skip = false;
                     }
-                    if (skip) continue;
+                    // if (skip) continue;
                 }
 #endif
-                v->second.mutate (rngs.at (omp_get_thread_num ()), &gtfs);
+                try
+                {
+                    v->second.mutate (rngs.at (omp_get_thread_num ()), &gtfs);
+                }
+                catch(const std::exception& e)
+                {
+                    std::cerr
+                        << " x Error mutating vehicle:\n  "
+                        << e.what() << '\n';
+
+                    if (v->second.is_errored ())
+                    {
+                        // delete vehicle
+                        vehicles.erase (v->second.vehicle_id ());
+                        std::cout << " -> vehicle deleted x_x" << std::endl;
+                    }
+                }
             }
         }
 #if VERBOSE > 0
@@ -216,7 +234,7 @@ void run_realtime_model (List nw)
                 {
                     fout << sl->second.segment_id () << ","
                         << rtfeed.feed()->header ().timestamp () << ","
-                        << ds.first << "," 
+                        << ds.first << ","
                         << ds.second << "\n";
                 }
             }
@@ -242,11 +260,12 @@ void run_realtime_model (List nw)
             for (auto sl = gtfs.segments ().begin (); sl != gtfs.segments ().end (); ++sl)
             {
                 if (sl->second.timestamp () < rtfeed.feed()->header ().timestamp ()) continue;
-                // if (sl->second.get_data ().size () == 0) continue;
                 fout << sl->second.segment_id () << ","
                     << sl->second.timestamp () << ","
-                    << sl->second.travel_time () << "," 
-                    << sl->second.uncertainty () << "\n";
+                    << sl->second.speed () << ","
+                    << sl->second.uncertainty () << ","
+                    << sl->second.prior_speed () << ","
+                    << sl->second.prior_speed_var () << "\n";
             }
             fout.close ();
         }
@@ -255,7 +274,25 @@ void run_realtime_model (List nw)
 #if VERBOSE > 0
         Rcout << "\n\n >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ETA Predictions\n";
 #endif
-        
+
+// #if SIMULATION
+//         {
+//             std::ofstream fout;
+//             fout.open ("vehicle_states.csv", std::ofstream::app);
+//             for (auto vehicle = vehicles.begin (); vehicle != vehicles.end (); ++vehicle)
+//             {
+//                 if (!vehicle->second.has_trip ()) continue;
+//                 fout << "\n" << vehicle->second.vehicle_id ()
+//                     << "," << vehicle->second.trip ()->trip_id ()
+//                     << "," << vehicle->second.trip ()->route ()->route_id ()
+//                     << "," << vehicle->second.timestamp ()
+//                     << "," << vehicle->second.distance ()
+//                     << "," << vehicle->second.speed ();
+//             }
+//             fout.close ();
+//         }
+// #endif
+
         // Predict ETAs
         uint64_t curtime (rtfeed.feed()->header ().timestamp ());
         #pragma omp parallel for num_threads(params.n_core)
@@ -263,14 +300,22 @@ void run_realtime_model (List nw)
         {
             for (auto trip = trips->begin (i); trip != trips->end (i); ++trip)
             {
+#if SIMULATION
+                auto rsn = trip->second.route ()->route_short_name ();
+                bool skip = true;
+                // if (trip->second.trip_id () != "1141156213-20190806160740_v82.21") continue;
+                for (auto rtk = routes_to_keep.begin (); rtk != routes_to_keep.end (); ++rtk)
+                {
+                    if (rsn == *rtk) skip = false;
+                }
+                // if (skip) continue;
+#endif
                 if (trip->second.is_active (curtime))
                 {
+                    trip->second.update (curtime, rngs.at (omp_get_thread_num ()));
+                    // trip->second.update_etas (curtime, rngs.at (omp_get_thread_num ()));
 #if VERBOSE > 1
-                    if (trip->second.route ()->route_short_name () != "NX1") continue;
-#endif
-                    trip->second.update_etas (curtime, rngs.at (omp_get_thread_num ()));
-#if VERBOSE > 1
-                    trip->second.print_etas ();
+                    // trip->second.print_etas ();
 #endif
                 }
             }
@@ -282,15 +327,15 @@ void run_realtime_model (List nw)
 #if SIMULATION
         std::ostringstream outputname_t;
         outputname_t << "etas/etas";
-        if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ()) 
+        if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ())
         {
-            outputname_t << "_" << rtfeed.feed ()->header ().timestamp ();
+            outputname_t << "_" << curtime;
         }
         outputname_t << ".pb";
         std::string oname (outputname_t.str ());
-        write_trip_updates (trips, oname);
+        write_trip_updates (trips, oname, curtime);
 #endif
-        write_trip_updates (trips, outputname);
+        write_trip_updates (trips, outputname, curtime);
         timer.report ("writing ETAs to protobuf feed");
 
 //         for (unsigned i=0; i<vehicles.bucket_count (); ++i)
@@ -309,7 +354,7 @@ void run_realtime_model (List nw)
 // #if SIMULATION
 //         std::ostringstream outputname_t;
 //         outputname_t << "etas/etas";
-//         if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ()) 
+//         if (rtfeed.feed()->has_header () && rtfeed.feed()->header ().has_timestamp ())
 //         {
 //             outputname_t << "_" << rtfeed.feed ()->header ().timestamp ();
 //         }

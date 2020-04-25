@@ -15,11 +15,12 @@ addons:
       - sourceline: 'ppa:edd/misc'
     packages:
       - libcurl4-openssl-dev
-      - libprotobuf-dev 
-      - libprotoc-dev 
-      - protobuf-compiler 
+      - libprotobuf-dev
+      - libprotoc-dev
+      - protobuf-compiler
       - libgoogle-perftools-dev
       - libeigen3-dev
+      - libgsl0-dev
 
 r_github_packages:
 
@@ -44,4 +45,3 @@ notifications:
   email:
     on_success: change
     on_failure: change
-    

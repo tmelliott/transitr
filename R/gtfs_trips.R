@@ -39,8 +39,9 @@ update_trips <- function(object, file) {
 }
 
 check_trips <- function(db) {
-	  con <- db_connect(db)
+    con <- db_connect(db)
     on.exit(db_close(con))
+    print(RSQLite::dbGetQuery(con, "PRAGMA table_info(trips)"))
     res <- identical(RSQLite::dbGetQuery(con, "PRAGMA table_info(trips)"),
               data.frame(cid = 0:7,
                          name = c("trip_id", "route_id", "shape_id", "service_id",
@@ -48,7 +49,8 @@ check_trips <- function(db) {
                                   "version"),
                          type = c("TEXT", "TEXT", "TEXT", "TEXT", "TEXT",
                                   "INTEGER", "TEXT", "DOUBLE"),
-                         notnull = 0L, dflt_value = as.logical(NA),
+                         notnull = 0L,
+                         dflt_value = as.logical(NA),
                          pk = c(1L, 0L, 0L, 0L, 0L, 0L, 0L, 0L),
                          stringsAsFactors = FALSE))
     res

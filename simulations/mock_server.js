@@ -25,12 +25,12 @@ app.use("/:pid/:ts/minutes/:min/vehicle_positions", (req, res) => {
     ts *= 1000
     var x = new Date()
     x.setTime(ts)
-    const d = x.getFullYear() + 
-        (x.getMonth() < 9 ? 0 : '') + (x.getMonth() + 1) + 
-        (x.getDate() < 10 ? 0 : '') + x.getDate() +
-        (x.getHours() < 10 ? 0 : '' ) + x.getHours() +
-        (x.getMinutes() < 10 ? 0 : '' ) + x.getMinutes() +
-        (x.getSeconds() < 10 ? 0 : '' ) + x.getSeconds()
+    const d = x.getFullYear().toString() + 
+        (x.getMonth() < 9 ? 0 : '') + (x.getMonth() + 1).toString() + 
+        (x.getDate() < 10 ? 0 : '') + x.getDate().toString() +
+        (x.getHours() < 10 ? 0 : '' ) + x.getHours().toString() +
+        (x.getMinutes() < 10 ? 0 : '' ) + x.getMinutes().toString() +
+        (x.getSeconds() < 10 ? 0 : '' ) + x.getSeconds().toString()
     const dt = parseInt(d)
     var start = 0
     for (var i=0; i<files.length; i++) {

@@ -17,6 +17,18 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// processEtas
+void processEtas(StringVector files, StringVector out, StringVector dbname);
+RcppExport SEXP _transitr_processEtas(SEXP filesSEXP, SEXP outSEXP, SEXP dbnameSEXP) {
+BEGIN_RCPP
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< StringVector >::type files(filesSEXP);
+    Rcpp::traits::input_parameter< StringVector >::type out(outSEXP);
+    Rcpp::traits::input_parameter< StringVector >::type dbname(dbnameSEXP);
+    processEtas(files, out, dbname);
+    return R_NilValue;
+END_RCPP
+}
 // shapes_df_to_list
 List shapes_df_to_list(DataFrame x);
 RcppExport SEXP _transitr_shapes_df_to_list(SEXP xSEXP) {
@@ -54,6 +66,7 @@ RcppExport SEXP run_testthat_tests();
 
 static const R_CallMethodDef CallEntries[] = {
     {"_transitr_construct_network", (DL_FUNC) &_transitr_construct_network, 2},
+    {"_transitr_processEtas", (DL_FUNC) &_transitr_processEtas, 3},
     {"_transitr_shapes_df_to_list", (DL_FUNC) &_transitr_shapes_df_to_list, 1},
     {"_transitr_calculate_shape_distance", (DL_FUNC) &_transitr_calculate_shape_distance, 1},
     {"_transitr_run_realtime_model", (DL_FUNC) &_transitr_run_realtime_model, 1},

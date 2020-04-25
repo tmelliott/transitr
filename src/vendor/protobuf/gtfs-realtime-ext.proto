@@ -22,4 +22,5 @@ message TimePrediction {
 
 extend transit_realtime.TripUpdate.StopTimeUpdate {
     optional TimePrediction eta = 1000;
+    optional int32 current_delay = 1001;
 }

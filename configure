@@ -3920,6 +3920,14 @@ if test x"${PKGCONFIG}" == x"yes"; then
     curl_cxxflags=""
     curl_libs="-libcurl"
   fi
+
+  if pkg-config --exists gsl; then
+    gsl_cxxflags=`pkg-config --cflags gsl`
+    gsl_libs=`pkg-config --libs gsl`
+  else
+    gsl_cxxflags=""
+    gsl_libs="-lm -lgsl -lgslcblas"
+  fi
 else
   # Add a reasonable default of -lprotobuf and -lcurl if we don't have pkg-config
   protobuf_cxxflags=""
@@ -3927,6 +3935,9 @@ else
 
   curl_cxxflags=""
   curl_libs="-libcurl"
+
+  gsl_cxxflags=""
+  gsl_libs="-lm -lgsl -lgslcblas"
 fi
 
 ## And make sure these flags are used for the tests below.
@@ -4104,7 +4115,7 @@ fi
 # ## now use all these
 PKG_CPPFLAGS="${PKG_CPPFLAGS} ${CXXFLAGS} ${protobuf_cxxflags} ${curl_cxxflags} ${OPENMP_CXXFLAGS}"
 
-PKG_LIBS="${PKG_LIBS} ${protobuf_libs} ${curl_libs}"
+PKG_LIBS="${PKG_LIBS} ${protobuf_libs} ${curl_libs} ${gsl_libs}"
 
 ac_config_files="$ac_config_files src/Makevars"
 

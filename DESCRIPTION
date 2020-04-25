@@ -9,13 +9,13 @@ URL: https://github.com/tmelliott/transitr
 BugReports: https://github.com/tmelliott/transitr/issues
 Encoding: UTF-8
 LazyData: true
-SystemRequirements: 
+SystemRequirements:
     C++11,
     libcurl,
     GNU Make
-Depends: 
-    R (>= 3.4.0)
-Imports: 
+Depends:
+    R (>= 3.5.0)
+Imports:
     Rcpp,
     tools,
     RSQLite,
@@ -29,11 +29,11 @@ Imports:
     ggplot2,
     shiny,
     leaflet
-Suggests: 
+Suggests:
     testthat (>= 2.0.0),
     covr
-LinkingTo: 
-    Rcpp, 
+LinkingTo:
+    Rcpp,
     RcppThread,
     BH,
     testthat

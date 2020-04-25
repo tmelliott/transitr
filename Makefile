@@ -54,3 +54,7 @@ exports:
 DRY?=n
 syncSims:
 	rsync -avP$(DRY) --delete --exclude="sim1*" --exclude="sim0*" --exclude node_modules --exclude="*.zip" tell029@certellprd01.its.auckland.ac.nz:/data/transitr/simulations/ simulations
+
+
+simprogress:
+	@tail -n 1 simulations/$(SIM)/eta_state.csv | xargs -I{} R --slave -e "as.POSIXct(read.csv(textConnection(commandArgs(trailing=TRUE)[1]), header=F)[[3]], origin='1970-01-01')" --args {}
