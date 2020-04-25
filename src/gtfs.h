@@ -680,6 +680,9 @@ namespace Gtfs
             std::string _vehicle_id;
             Trip* _trip = nullptr;
             latlng _position;
+            double _velocity;
+            double _bearing;
+            double _odometer;
             int _stop_index;
             uint64_t _timestamp = 0;
             unsigned _delta;
@@ -746,6 +749,9 @@ namespace Gtfs
             Trip* trip ();
             bool has_trip ();
             latlng& position ();
+            double velocity ();
+            double bearing ();
+            double odometer ();
             uint64_t timestamp ();
             unsigned delta ();
             int current_delay ();
