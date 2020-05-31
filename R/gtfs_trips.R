@@ -41,7 +41,6 @@ update_trips <- function(object, file) {
 check_trips <- function(db) {
     con <- db_connect(db)
     on.exit(db_close(con))
-    print(RSQLite::dbGetQuery(con, "PRAGMA table_info(trips)"))
     res <- identical(RSQLite::dbGetQuery(con, "PRAGMA table_info(trips)"),
               data.frame(cid = 0:7,
                          name = c("trip_id", "route_id", "shape_id", "service_id",

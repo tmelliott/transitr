@@ -657,6 +657,9 @@ namespace Gtfs
         EventType type;
         std::string trip_id;
         latlng position;    // only for type == EventType::gps
+        double velocity;
+        u_short bearing;
+        u_int odometer;
         int stop_index;     // only for type == EventType::arrival or EventType::departure
         int delay = 0;      // for arrival/departure events
         bool used = false;  // once incorporated into likelihood, no longer use this event
@@ -664,6 +667,7 @@ namespace Gtfs
         Event (uint64_t ts, EventType type, std::string trip, int index);
         Event (uint64_t ts, EventType type, std::string trip, int index, int delay);
         Event (uint64_t ts, EventType type, std::string trip, latlng pos);
+        Event (uint64_t ts, EventType type, std::string trip, latlng pos, double v, u_int o, u_short b);
 
         bool operator < (const Event& e) const
         {
@@ -681,8 +685,8 @@ namespace Gtfs
             Trip* _trip = nullptr;
             latlng _position;
             double _velocity;
-            double _bearing;
-            double _odometer;
+            u_short _bearing;
+            u_int _odometer;
             int _stop_index;
             uint64_t _timestamp = 0;
             unsigned _delta;
@@ -742,6 +746,7 @@ namespace Gtfs
 
             int error = 0;
 
+
         public:
             Vehicle (std::string& id, par* pars);
 
@@ -750,8 +755,8 @@ namespace Gtfs
             bool has_trip ();
             latlng& position ();
             double velocity ();
-            double bearing ();
-            double odometer ();
+            u_short bearing ();
+            u_int odometer ();
             uint64_t timestamp ();
             unsigned delta ();
             int current_delay ();
@@ -884,6 +889,8 @@ namespace Gtfs
         // int calculate_segment_tt (double vel, int i, RNG& rng);
 
         void calculate_likelihood (latlng& y, std::vector<ShapePt>& path, double sigma);
+        void calculate_likelihood (latlng& y, double v, u_int o, std::vector<ShapePt>& path,
+                                   double sigma_y, double sigma_v, double sigma_o);
         void calculate_likelihood (Event& e, double error);
         void set_weight (double w);
 

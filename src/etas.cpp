@@ -122,6 +122,10 @@ namespace Gtfs {
                     }
 
                     _stop_index = event->stop_index;
+                    if (_stop_index < 0 || _stop_index >= _stops.size ())
+                    {
+                        std::cout << "\nUh oh ... stop index is " << _stop_index << " -_-\n";
+                    }
                     double d = _stops.at (_stop_index).distance;
                     _segment_index = find_segment_index (d, &(_shape->segments ()));
                 }

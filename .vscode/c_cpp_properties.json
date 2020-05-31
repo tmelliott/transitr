@@ -3,8 +3,11 @@
         {
             "name": "Linux",
             "includePath": [
-                "${workspaceFolder}/**",
-                "/home/emperor/R-3.6.1/**"
+                "${workspaceFolder}/src",
+                "/home/emperor/R-3.6.3/**",
+                "/home/emperor/R-3.6.3/library/Rcpp/include",
+                "/home/emperor/R-3.6.3/library/RcppThread/include",
+                "/home/emperor/R-3.6.3/include"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",

@@ -3,6 +3,7 @@
  */
 #include "particle_filter.h"
 #include "timing.h"
+#include "dists.h"
 
 namespace Gtfs {
 
@@ -563,7 +564,11 @@ namespace Gtfs {
                 case EventType::gps :
                     {
                         double err = fmax (_gpserror, dist_to_route);
-                        p.calculate_likelihood (e.position, this->trip ()->shape ()->path (), err);
+                        p.calculate_likelihood (
+                            e.position, e.velocity, e.odometer,
+                            this->trip ()->shape ()->path (),
+                            err, 3., 10.
+                        );
                         double d = p.get_distance ();
                         auto pos = this->trip ()->shape ()->coordinates_of (d);
                         ddbar += distanceEarth (e.position, pos) * p.get_weight ();
@@ -1580,6 +1585,20 @@ namespace Gtfs {
 #if VERBOSE == 2
         if (vehicle->get_n () < 20) std::cout << " => d(h(x), y) = " << d << "m";
 #endif
+    }
+
+    void
+    Particle::calculate_likelihood (latlng& y, double v, u_int o,
+                                    std::vector<ShapePt>& path,
+                                    double sigma_y, double sigma_v, double sigma_o)
+    {
+        // standard distance metric:
+        calculate_likelihood (y, path, sigma_y);
+
+        if (vehicle->velocity () > 0)
+        {
+            log_likelihood += stats::normal_pdf_log (speed, v, sigma_v);
+        }
     }
 
     void Particle::calculate_likelihood (Event& e, double error)

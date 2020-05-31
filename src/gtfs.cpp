@@ -914,23 +914,25 @@ namespace Gtfs
         //     std::cout << "\n [" << i << "] " <<
         //         nodes.at (i).distance;
         // }
-        int ni = 0;
-        int si = 0;
-        for (auto st = _stops.begin (); st != _stops.end (); ++st)
-        {
-            // find next stop node
-            while (nodes.at (ni).node->node_type () == 1) ni++;
-            if (nodes.at (ni).node->node_id () == st->stop->node ()->node_id ())
+        if (nodes.size () > 0) {
+            int ni = 0;
+            int si = 0;
+            for (auto st = _stops.begin (); st != _stops.end (); ++st)
             {
-                st->distance = nodes.at (ni).distance;
-                ni++;
+                // find next stop node
+                while (nodes.at (ni).node->node_type () == 1) ni++;
+                if (nodes.at (ni).node->node_id () == st->stop->node ()->node_id ())
+                {
+                    st->distance = nodes.at (ni).distance;
+                    ni++;
+                }
+                si++;
+                // something went wrong ...
+                // else if (st->stop && _shape && st->distance == 0)
+                // {
+                //     st->distance = _shape->distance_of (st->stop->stop_position ());
+                // }
             }
-            si++;
-            // something went wrong ...
-            // else if (st->stop && _shape && st->distance == 0)
-            // {
-            //     st->distance = _shape->distance_of (st->stop->stop_position ());
-            // }
         }
 
         // set start time
@@ -1329,6 +1331,13 @@ namespace Gtfs
         {
             Rcpp::Rcerr << " x Couldn't get row count from db\n  "
                 << sqlite3_errmsg (db) << "\n";
+            sqlite3_finalize (stmt);
+            gtfs->close_connection ();
+            return;
+        }
+        if (sqlite3_column_int (stmt, 0) == 0)
+        {
+            Rcpp::Rcerr << " x No nodes for this shape\n";
             sqlite3_finalize (stmt);
             gtfs->close_connection ();
             return;
@@ -2456,6 +2465,13 @@ namespace Gtfs
     {
     }
 
+    Event::Event (uint64_t ts, EventType type, std::string trip, latlng pos, double v, u_int o, u_short b) :
+        timestamp (ts), type (type), trip_id (trip), position (pos), stop_index (-1),
+        velocity (v), odometer (o), bearing (b)
+    {
+
+    }
+
     void Event::print ()
     {
         if (type == EventType::gps)
@@ -2524,6 +2540,21 @@ namespace Gtfs
     latlng& Vehicle::position ()
     {
         return _position;
+    }
+
+    double Vehicle::velocity ()
+    {
+        return _velocity;
+    }
+
+    u_short Vehicle::bearing ()
+    {
+        return _bearing;
+    }
+
+    u_int Vehicle::odometer ()
+    {
+        return _odometer;
     }
 
     uint64_t Vehicle::timestamp ()
@@ -2605,11 +2636,24 @@ namespace Gtfs
         if (!vp.has_position ()) return;
         if (!vp.has_timestamp ()) return;
 
-        add_event (Event (vp.timestamp (),
-                          EventType::gps,
-                          vp.trip ().trip_id (),
-                          latlng (vp.position ().latitude (),
-                                  vp.position ().longitude ())));
+        std::cout
+            << "\n Vehicle ID: " << vp.vehicle ().id ()
+            << "\n  - velocity: " << vp.position ().speed ()
+            << "\n  - odometer: " << vp.position ().odometer ()
+            << "\n  - bearing: " << vp.position ().bearing ();
+
+        add_event (
+            Event (
+                vp.timestamp (),
+                EventType::gps,
+                vp.trip ().trip_id (),
+                latlng (vp.position ().latitude (),
+                        vp.position ().longitude ()),
+                vp.position ().speed (),
+                vp.position ().odometer (),
+                vp.position ().bearing ()
+            )
+        );
 
         return;
 
