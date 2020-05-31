@@ -2477,7 +2477,9 @@ namespace Gtfs
         if (type == EventType::gps)
         {
             std::cout << "position update {" <<
-                position.latitude << ", " << position.longitude << "}";
+                position.latitude << ", " << position.longitude
+                << "; " << velocity << "m/s, " << odometer << "m, " << bearing
+                << "\u00B0" << "}";
         }
         else
         {
@@ -2651,7 +2653,8 @@ namespace Gtfs
                         vp.position ().longitude ()),
                 vp.position ().speed (),
                 vp.position ().odometer (),
-                vp.position ().bearing ()
+                vp.position ().bearing () >= 0 & vp.position ().bearing () <= 360 ?
+                    vp.position ().bearing () : 0.0
             )
         );
 

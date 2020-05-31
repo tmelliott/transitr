@@ -567,7 +567,7 @@ namespace Gtfs {
                         p.calculate_likelihood (
                             e.position, e.velocity, e.odometer,
                             this->trip ()->shape ()->path (),
-                            err, 3., 10.
+                            err, 1.5, 10.
                         );
                         double d = p.get_distance ();
                         auto pos = this->trip ()->shape ()->coordinates_of (d);
