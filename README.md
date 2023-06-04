@@ -1,99 +1,59 @@
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
 # transitr
 
-[![Travis build status](https://travis-ci.org/tmelliott/transitr.svg?branch=develop)](https://travis-ci.org/tmelliott/transitr)
-[![codecov](https://codecov.io/gh/tmelliott/transitr/branch/develop/graph/badge.svg)](https://codecov.io/gh/tmelliott/transitr)
+<!-- badges: start -->
 
-The goals of `transitr` are to make it easy to __load GTFS data__ into a database,
-construct a __transit network__ of roads and intersections,
-and __model vehicles in real-time__ from an API feed to update the network
-and __generate ETAs__.
+[![Codecov test
+coverage](https://codecov.io/gh/tmelliott/transitr/branch/develop/graph/badge.svg)](https://app.codecov.io/gh/tmelliott/transitr?branch=develop)
+[![R-CMD-check](https://github.com/tmelliott/transitr/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/tmelliott/transitr/actions/workflows/R-CMD-check.yaml)
+<!-- badges: end -->
 
+The goal of transitr is to …
 
-# install
+## Installation
 
-`transitr` is not (yet) on CRAN, so for you would need to use `devtools`:
-```r
-devtools::install_github('tmelliott/transitr')
+You can install the development version of transitr from
+[GitHub](https://github.com/) with:
+
+``` r
+# install.packages("devtools")
+devtools::install_github("tmelliott/transitr")
 ```
 
+## Example
 
-# usage
+This is a basic example which shows you how to solve a common problem:
 
-__Still under development!__
-This here is just for demonstration of what it could be like at some point
-in the future.
-
-```r
+``` r
 library(transitr)
-library(magrittr)
-
-## Create a database, construct network, and connect to a realtime feed
-dbname <- "realtime.db"
-nw <- create_gtfs("https://cdn01.at.govt.nz/data/gtfs.zip", db = dbname) %>%
-    construct() %>%
-    realtime_feed("https://api.at.govt.nz/v2/public/realtime/vehiclelocations",
-                  with_headers("Ocp-Apim-Subscription-Key" = "mykey"),
-                  response = "protobuf")
-
-## Set the parameters and then run the model
-nw %>% 
-    set_parameters(n_core = 2, 
-                   n_particles = 500, 
-                   gps_error = 5) %>%
-    model()
+## basic example code
 ```
 
-Once running, you can launch a new R session and view the shiny app:
-```r
-transitr::view_realtime("realtime.db")
+What is special about using `README.Rmd` instead of just `README.md`?
+You can include R chunks like so:
+
+``` r
+summary(cars)
+#>      speed           dist       
+#>  Min.   : 4.0   Min.   :  2.00  
+#>  1st Qu.:12.0   1st Qu.: 26.00  
+#>  Median :15.0   Median : 36.00  
+#>  Mean   :15.4   Mean   : 42.98  
+#>  3rd Qu.:19.0   3rd Qu.: 56.00  
+#>  Max.   :25.0   Max.   :120.00
 ```
 
+You’ll still need to render `README.Rmd` regularly, to keep `README.md`
+up-to-date. `devtools::build_readme()` is handy for this. You could also
+use GitHub Actions to re-render `README.Rmd` every time you push. An
+example workflow can be found here:
+<https://github.com/r-lib/actions/tree/v1/examples>.
 
-# mock data server
+You can also embed plots, for example:
 
-In order to facilitate model development and checking, there's also a mock data server
-in the `simulations` directory.
+<img src="man/figures/README-pressure-1.png" width="100%" />
 
-To install:
-```bash
-cd simulations
-yarn 
-
-## or if you don't use yarn
-npm install
-```
-
-To start the server, you need first an archive of vehicle position feeds,
-```bash
-ls archive | grep vehicle | head -n 5
-# vehicle_locations_20180911050001.pb
-# vehicle_locations_20180911050031.pb
-# vehicle_locations_20180911050102.pb
-# vehicle_locations_20180911050132.pb
-# vehicle_locations_20180911050201.pb
-
-yarn start
-# yarn run v1.9.4
-# $ node mock_server.js
-# Mock GTFS server running on port 3000!
-```
-
-Now you can run the model with the local server, which will automatically serve 
-the next file with each request.
-```r
-## assumeing you've constructed with simulation flag:
-## $ make FLAGS="-DSIMULATION"
-## simulation history will be saved in a `history` directory
-dir.create("history")
-
-## set some process ID for the server to recognise (allows running multiple simulations simultaneously)
-pid <- "test1"
-nw <- load_gtfs("fulldata.db") %>%
-    realtime_feed(sprintf("http://localhost:3000/%s/vehicle_positions", pid),
-                  response = "protobuf") %>%
-    set_parameters(n_core = 1,
-                   n_particles = 2000,
-                   gps_error = 10)
-
-nw %>% model()
-```
+In that case, don’t forget to commit and push the resulting figure
+files, so they display on GitHub and CRAN.

@@ -1,0 +1,8 @@
+*.o
+*.so
+*.dll
+
+Makevars
+*.pb.cpp
+*.pb.cc
+vendor/protobuf/*.pb.h
