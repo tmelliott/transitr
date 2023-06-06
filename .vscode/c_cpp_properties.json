@@ -4,7 +4,9 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/home/emperor/R-3.6.1/**"
+                "/usr/share/R/include/**",
+                "/usr/local/lib/R/**",
+                "/home/tom/R/x86_64-pc-linux-gnu-library/4.2/**"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
